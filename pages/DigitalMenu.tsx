@@ -60,6 +60,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const navigate = useNavigate();
   const urlTable = searchParams.get('mesa');
   const urlType = searchParams.get('tipo');
+  const urlModo = searchParams.get('modo'); // 'local' | 'externo'
   const storeSlug = searchParams.get('loja');
   
   const [cart, setCart] = useState<OrderItem[]>([]);
@@ -92,6 +93,16 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
     if (urlType && ['BALCAO', 'ENTREGA', 'MESA', 'COMANDA'].includes(urlType)) return true;
     if (isWaitstaff) return true;
     if (effectiveTable && settings.isTableOrderActive) return true;
+    
+    if (urlModo === 'local') {
+        if (settings.isTableOrderActive && settings.isCommandOrderActive === false) return true;
+        if (!settings.isTableOrderActive && settings.isCommandOrderActive !== false) return true;
+    }
+    if (urlModo === 'externo') {
+        if (settings.isCounterPickupActive && !settings.isDeliveryActive) return true;
+        if (!settings.isCounterPickupActive && settings.isDeliveryActive) return true;
+    }
+    
     return false;
   });
   
@@ -100,6 +111,16 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
     if (urlType === 'ENTREGA' && settings.isDeliveryActive) return 'ENTREGA';
     if (urlType === 'COMANDA') return 'COMANDA';
     if (effectiveTable && settings.isTableOrderActive) return 'MESA';
+    
+    if (urlModo === 'local') {
+        if (settings.isTableOrderActive && settings.isCommandOrderActive === false) return 'MESA';
+        if (!settings.isTableOrderActive && settings.isCommandOrderActive !== false) return 'COMANDA';
+    }
+    if (urlModo === 'externo') {
+        if (settings.isCounterPickupActive && !settings.isDeliveryActive) return 'BALCAO';
+        if (!settings.isCounterPickupActive && settings.isDeliveryActive) return 'ENTREGA';
+    }
+    
     return isWaitstaff ? 'MESA' : 'BALCAO';
   });
 
@@ -111,6 +132,11 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
 
   const handleResetMode = () => {
     if (urlType || effectiveTable) return; // Don't reset if locked by URL
+    
+    // Don't reset if urlModo locks to a single option
+    if (urlModo === 'local' && (!settings.isTableOrderActive || settings.isCommandOrderActive === false)) return;
+    if (urlModo === 'externo' && (!settings.isCounterPickupActive || !settings.isDeliveryActive)) return;
+    
     setHasSelectedMode(false);
     setCheckoutStep('cart');
     setIsCartOpen(false);
@@ -792,7 +818,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
-                {settings.isTableOrderActive && (
+                {(!urlModo || urlModo === 'local') && settings.isTableOrderActive && (
                   <button onClick={() => { setOrderType('MESA'); setHasSelectedMode(true); }} className="group flex items-center justify-between p-5 bg-orange-50/50 hover:bg-orange-100/50 rounded-[1.8rem] transition-all border border-orange-100 active:scale-95 text-left">
                       <div className="flex items-center gap-5">
                           <div className="p-4 bg-white rounded-2xl text-orange-600 shadow-sm transition-transform group-hover:scale-110"><Utensils size={28} /></div>
@@ -804,7 +830,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                       <ArrowRight className="text-orange-200 group-hover:text-orange-400 group-hover:translate-x-1 transition-all" size={20} />
                   </button>
                 )}
-                {settings.isCommandOrderActive !== false && (
+                {(!urlModo || urlModo === 'local') && settings.isCommandOrderActive !== false && (
                   <button onClick={() => { setOrderType('COMANDA'); setHasSelectedMode(true); }} className="group flex items-center justify-between p-5 bg-purple-50/50 hover:bg-purple-100/50 rounded-[1.8rem] transition-all border border-purple-100 active:scale-95 text-left">
                       <div className="flex items-center gap-5">
                           <div className="p-4 bg-white rounded-2xl text-purple-600 shadow-sm transition-transform group-hover:scale-110"><Tag size={28} /></div>
@@ -816,7 +842,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                       <ArrowRight className="text-purple-200 group-hover:text-purple-400 group-hover:translate-x-1 transition-all" size={20} />
                   </button>
                 )}
-                {settings.isCounterPickupActive && (
+                {(!urlModo || urlModo === 'externo') && settings.isCounterPickupActive && (
                   <button onClick={() => { setOrderType('BALCAO'); setHasSelectedMode(true); }} className="group flex items-center justify-between p-5 bg-blue-50/50 hover:bg-blue-100/50 rounded-[1.8rem] transition-all border border-blue-100 active:scale-95 text-left">
                       <div className="flex items-center gap-5">
                           <div className="p-4 bg-white rounded-2xl text-blue-600 shadow-sm transition-transform group-hover:scale-110"><ShoppingBag size={28} /></div>
@@ -828,7 +854,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                       <ArrowRight className="text-blue-200 group-hover:text-blue-400 group-hover:translate-x-1 transition-all" size={20} />
                   </button>
                 )}
-                {settings.isDeliveryActive && (
+                {(!urlModo || urlModo === 'externo') && settings.isDeliveryActive && (
                   <button onClick={() => { setOrderType('ENTREGA'); setHasSelectedMode(true); }} className="group flex items-center justify-between p-5 bg-green-50/50 hover:bg-green-100/50 rounded-[1.8rem] transition-all border border-green-100 active:scale-95 text-left">
                       <div className="flex items-center gap-5">
                           <div className="p-4 bg-white rounded-2xl text-green-600 shadow-sm transition-transform group-hover:scale-110"><Truck size={28} /></div>

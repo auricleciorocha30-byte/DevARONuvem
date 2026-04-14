@@ -33,7 +33,6 @@ interface Props {
 
 const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, onLogout }) => {
   const [searchParams] = useSearchParams();
-  const [copied, setCopied] = useState(false);
   const [waitstaff, setWaitstaff] = useState<any[]>([]);
   const [isPrintingCommissionsOnly, setIsPrintingCommissionsOnly] = useState(false);
   
@@ -177,14 +176,17 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
     return Array.from(comms.values()).sort((a, b) => b.commissionValue - a.commissionValue);
   }, [filteredOrders, waitstaff, settings.waitstaffCommissions]);
 
-  const handleCopyLink = () => {
-    const url = `${window.location.origin}/#/cardapio?loja=${storeSlug}`;
-    navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
+  const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const lojaParam = storeSlug ? `?loja=${storeSlug}` : '';
+
+  const handleCopyLink = (type: string, urlSuffix: string = '') => {
+    const separator = lojaParam ? '&' : '?';
+    const finalSuffix = urlSuffix ? `${separator}${urlSuffix.replace('&', '')}` : '';
+    const url = `${window.location.origin}/#/cardapio${lojaParam}${finalSuffix}`;
+    navigator.clipboard.writeText(url);
+    setCopiedLink(type);
+    setTimeout(() => setCopiedLink(null), 2000);
+  };
 
   return (
     <div className={`space-y-8 pb-12 text-zinc-900 animate-fade-in ${isPrintingCommissionsOnly ? 'print-commissions-only' : ''}`}>
@@ -474,14 +476,34 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
 
                 <div className="space-y-3">
                     <button 
-                        onClick={handleCopyLink}
+                        onClick={() => handleCopyLink('geral')}
                         className="w-full flex items-center justify-between p-4 bg-white/10 hover:bg-white/20 rounded-2xl border border-white/10 transition-all group"
                     >
                         <div className="flex items-center gap-3">
-                            {copied ? <Check size={18} className="text-green-400" /> : <Copy size={18} className="text-secondary" />}
-                            <span className="text-xs font-bold">{copied ? 'Copiado!' : 'Copiar Link do App'}</span>
+                            {copiedLink === 'geral' ? <Check size={18} className="text-green-400" /> : <Copy size={18} className="text-secondary" />}
+                            <span className="text-xs font-bold">{copiedLink === 'geral' ? 'Copiado!' : 'Copiar Link Geral (Todos os tipos)'}</span>
                         </div>
-                        {!copied && <ChevronDown size={16} className="-rotate-90 opacity-20" />}
+                        {copiedLink !== 'geral' && <ChevronDown size={16} className="-rotate-90 opacity-20" />}
+                    </button>
+                    <button 
+                        onClick={() => handleCopyLink('local', '&modo=local')}
+                        className="w-full flex items-center justify-between p-4 bg-white/10 hover:bg-white/20 rounded-2xl border border-white/10 transition-all group"
+                    >
+                        <div className="flex items-center gap-3">
+                            {copiedLink === 'local' ? <Check size={18} className="text-green-400" /> : <Copy size={18} className="text-secondary" />}
+                            <span className="text-xs font-bold">{copiedLink === 'local' ? 'Copiado!' : 'Copiar Link Atendimento Local (Mesas/Comandas)'}</span>
+                        </div>
+                        {copiedLink !== 'local' && <ChevronDown size={16} className="-rotate-90 opacity-20" />}
+                    </button>
+                    <button 
+                        onClick={() => handleCopyLink('externo', '&modo=externo')}
+                        className="w-full flex items-center justify-between p-4 bg-white/10 hover:bg-white/20 rounded-2xl border border-white/10 transition-all group"
+                    >
+                        <div className="flex items-center gap-3">
+                            {copiedLink === 'externo' ? <Check size={18} className="text-green-400" /> : <Copy size={18} className="text-secondary" />}
+                            <span className="text-xs font-bold">{copiedLink === 'externo' ? 'Copiado!' : 'Copiar Link Externo (Entrega/Retirada)'}</span>
+                        </div>
+                        {copiedLink !== 'externo' && <ChevronDown size={16} className="-rotate-90 opacity-20" />}
                     </button>
                     <a 
                       href={`/#/cardapio${lojaParam}`} 
