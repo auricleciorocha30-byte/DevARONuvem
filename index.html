@@ -1,0 +1,146 @@
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Produto DevARO</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="G&C Staff">
+    <meta name="theme-color" content="#001F3F">
+    <link rel="apple-touch-icon" href="data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='120' fill='%23041434'/%3E%3Cg transform='translate(80, 80) scale(0.7)'%3E%3Cpath d='M150 256 L400 100 L250 256 L400 412 Z' fill='%2300b4d8'/%3E%3Ccircle cx='80' cy='180' r='25' fill='%2300b4d8'/%3E%3Ccircle cx='50' cy='256' r='25' fill='%2300b4d8'/%3E%3Ccircle cx='80' cy='332' r='25' fill='%2300b4d8'/%3E%3Crect x='80' y='165' width='100' height='30' rx='15' fill='%2300b4d8'/%3E%3Crect x='50' y='241' width='150' height='30' rx='15' fill='%2300b4d8'/%3E%3Crect x='80' y='317' width='100' height='30' rx='15' fill='%2300b4d8'/%3E%3C/g%3E%3Ctext x='256' y='440' font-family='Arial, sans-serif' font-size='80' font-weight='bold' font-style='italic' fill='%23ffffff' text-anchor='middle'%3EDev%3Ctspan fill='%2300b4d8'%3EARO%3C/tspan%3E%3C/text%3E%3C/svg%3E">
+    <link rel="manifest" id="app-manifest" href="manifest.json">
+
+    <script>
+      (function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const hash = window.location.hash;
+        
+        let loja = urlParams.get('loja');
+        if (!loja && hash.includes('loja=')) {
+          const hashParams = new URLSearchParams(hash.split('?')[1]);
+          loja = hashParams.get('loja');
+        }
+
+        const isDelivery = urlParams.get('role') === 'entregador' || hash.includes('role=entregador') || hash.includes('/entregas');
+        const isAttendant = urlParams.get('role') === 'atendente' || hash.includes('role=atendente') || hash.includes('/atendimento');
+        const isMenu = hash.includes('/cardapio');
+        
+        let shouldGenerateManifest = false;
+        let appName = "G&C Staff";
+        let shortName = "G&C";
+        let startUrl = "/";
+
+        if (isDelivery) {
+          appName = loja ? `Entregas - ${loja}` : "Entregas DevARO";
+          shortName = "Entregas";
+          startUrl = `/#/entregas${loja ? '?loja=' + loja : ''}`;
+          shouldGenerateManifest = true;
+        } else if (isAttendant) {
+          appName = loja ? `Colaborador - ${loja}` : "Portal Colaborador";
+          shortName = "Colaborador";
+          startUrl = `/#/atendimento${loja ? '?loja=' + loja : ''}`;
+          shouldGenerateManifest = true;
+        } else if (isMenu) {
+          appName = loja ? `Cardápio - ${loja}` : "Cardápio Digital";
+          shortName = "Cardápio";
+          startUrl = `/#/cardapio${loja ? '?loja=' + loja : ''}`;
+          shouldGenerateManifest = true;
+        }
+        
+        if (shouldGenerateManifest) {
+          const manifest = {
+            "name": appName,
+            "short_name": shortName,
+            "description": appName,
+            "start_url": startUrl,
+            "display": "standalone",
+            "background_color": "#ffffff",
+            "theme_color": "#001F3F",
+            "orientation": "portrait-primary",
+            "icons": [
+              {
+                "src": "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='120' fill='%23041434'/%3E%3Cg transform='translate(80, 80) scale(0.7)'%3E%3Cpath d='M150 256 L400 100 L250 256 L400 412 Z' fill='%2300b4d8'/%3E%3Ccircle cx='80' cy='180' r='25' fill='%2300b4d8'/%3E%3Ccircle cx='50' cy='256' r='25' fill='%2300b4d8'/%3E%3Ccircle cx='80' cy='332' r='25' fill='%2300b4d8'/%3E%3Crect x='80' y='165' width='100' height='30' rx='15' fill='%2300b4d8'/%3E%3Crect x='50' y='241' width='150' height='30' rx='15' fill='%2300b4d8'/%3E%3Crect x='80' y='317' width='100' height='30' rx='15' fill='%2300b4d8'/%3E%3C/g%3E%3Ctext x='256' y='440' font-family='Arial, sans-serif' font-size='80' font-weight='bold' font-style='italic' fill='%23ffffff' text-anchor='middle'%3EDev%3Ctspan fill='%2300b4d8'%3EARO%3C/tspan%3E%3C/text%3E%3C/svg%3E",
+                "sizes": "192x192",
+                "type": "image/svg+xml",
+                "purpose": "any maskable"
+              },
+              {
+                "src": "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='120' fill='%23041434'/%3E%3Cg transform='translate(80, 80) scale(0.7)'%3E%3Cpath d='M150 256 L400 100 L250 256 L400 412 Z' fill='%2300b4d8'/%3E%3Ccircle cx='80' cy='180' r='25' fill='%2300b4d8'/%3E%3Ccircle cx='50' cy='256' r='25' fill='%2300b4d8'/%3E%3Ccircle cx='80' cy='332' r='25' fill='%2300b4d8'/%3E%3Crect x='80' y='165' width='100' height='30' rx='15' fill='%2300b4d8'/%3E%3Crect x='50' y='241' width='150' height='30' rx='15' fill='%2300b4d8'/%3E%3Crect x='80' y='317' width='100' height='30' rx='15' fill='%2300b4d8'/%3E%3C/g%3E%3Ctext x='256' y='440' font-family='Arial, sans-serif' font-size='80' font-weight='bold' font-style='italic' fill='%23ffffff' text-anchor='middle'%3EDev%3Ctspan fill='%2300b4d8'%3EARO%3C/tspan%3E%3C/text%3E%3C/svg%3E",
+                "sizes": "512x512",
+                "type": "image/svg+xml",
+                "purpose": "any maskable"
+              }
+            ]
+          };
+          const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+          document.getElementById('app-manifest').href = URL.createObjectURL(blob);
+        }
+      })();
+    </script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #001F3F;
+            --secondary-color: #FFD700;
+        }
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #fffaf0;
+            overscroll-behavior-y: contain;
+        }
+        .font-brand {
+            font-family: 'Playfair Display', serif;
+        }
+        .bg-primary { background-color: var(--primary-color); }
+        .bg-secondary { background-color: var(--secondary-color); }
+        .text-primary { color: var(--primary-color); }
+        .text-secondary { color: var(--secondary-color); }
+        .border-primary { border-color: var(--primary-color); }
+        .border-secondary { border-color: var(--secondary-color); }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
+        
+        @media print {
+            @page { margin: 0; }
+            body { margin: 1.6cm; }
+        }
+
+        @keyframes scaleUp { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .animate-scale-up { animation: scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    </style>
+    <script>
+      // Anti-Flicker de Tema
+      (function() {
+        try {
+          const cached = localStorage.getItem('gc-conveniencia-settings-v1');
+          if (cached) {
+            const settings = JSON.parse(cached);
+            if (settings.primaryColor) document.documentElement.style.setProperty('--primary-color', settings.primaryColor);
+            if (settings.secondaryColor) document.documentElement.style.setProperty('--secondary-color', settings.secondaryColor);
+          }
+        } catch (e) {}
+      })();
+
+      // Registro do Service Worker para PWA
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration failed:', err));
+        });
+      }
+    </script>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="module" src="/main.tsx"></script>
+</body>
+</html>
