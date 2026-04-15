@@ -645,7 +645,7 @@ function StoreContext() {
           // For other statuses, just update normally
           let updatePayload: any = { status };
           
-          if ((status === 'ENTREGUE' || status === 'ENVIADO_PARA_ENTREGA') && !id.startsWith('local_')) {
+          if ((status === 'ENTREGUE') && !id.startsWith('local_')) {
               // Check if there's an open POS session
               let hasOpenSession = false;
               if (currentStore?.id) {

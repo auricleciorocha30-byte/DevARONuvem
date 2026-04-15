@@ -1155,7 +1155,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                   <div className="mt-2 p-3 bg-blue-50 rounded-xl border border-blue-100 flex items-center justify-between">
                                     <div>
                                       <p className="text-xs font-bold text-blue-800">Distância: {deliveryDistanceKm?.toFixed(1)} km</p>
-                                      <p className="text-sm font-black text-blue-900">Taxa: R$ {deliveryFee.toFixed(2)}</p>
+                                      <p className="text-sm font-black text-blue-900">Taxa: R$ {deliveryFee.toFixed(2)} | Total: R$ {(cartTotal + deliveryFee).toFixed(2)}</p>
                                     </div>
                                     {!isFeeConfirmed ? (
                                       <button 
@@ -1286,7 +1286,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                     <div className="flex justify-between text-xs opacity-60"><span>Subtotal</span><span>R$ {subtotal.toFixed(2)}</span></div>
                     {discountAmount > 0 && <div className="flex justify-between text-xs text-secondary font-bold"><span>Desconto ({appliedCoupon?.code})</span><span>-R$ {discountAmount.toFixed(2)}</span></div>}
                     {serviceFee > 0 && <div className="flex justify-between text-xs text-secondary font-bold"><span>Comissão ({commissionRate > 0 ? `${commissionRate}%` : 'Atendente'})</span><span>R$ {serviceFee.toFixed(2)}</span></div>}
-                    {orderType === 'ENTREGA' && deliveryFee !== null && <div className="flex justify-between text-xs text-secondary font-bold"><span>Taxa de Entrega</span><span>R$ {deliveryFee.toFixed(2)}</span></div>}
+                    {orderType === 'ENTREGA' && deliveryFee !== null && <div className="flex justify-between text-xs text-secondary font-bold"><span>Taxa de Entrega (Itens + Taxa)</span><span>R$ {deliveryFee.toFixed(2)} (R$ {(cartTotal + deliveryFee).toFixed(2)})</span></div>}
                     <div className="flex justify-between items-end pt-2">
                        <span className="text-sm font-bold uppercase tracking-widest">Total</span>
                        <span className="text-3xl font-black text-secondary">R$ {finalTotal.toFixed(2)}</span>

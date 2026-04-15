@@ -372,7 +372,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
             .select('*')
             .eq('store_id', storeId)
             .eq('type', type)
-            .in('status', ['AGUARDANDO', 'PREPARANDO', 'PRONTO', 'ENVIADO_PARA_ENTREGA', 'SAIU_PARA_ENTREGA', 'CHEGUEI_NA_ORIGEM', 'ENTREGUE'])
+            .in('status', ['AGUARDANDO', 'PREPARANDO', 'PRONTO', 'ENVIADO_PARA_ENTREGA', 'SAIU_PARA_ENTREGA', 'CHEGUEI_NA_ORIGEM'])
             .gte('createdAt', Date.now() - 24 * 60 * 60 * 1000);
 
         if (type === 'MESA' || type === 'COMANDA') {
@@ -387,8 +387,18 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
 
         if (data && data.length > 0) {
             const unpaidData = data.filter(o => {
-                if (o.session_id) return false;
+                // 1. Never show cancelled orders
                 if (o.status === 'CANCELADO') return false;
+                
+                // 2. If it's finalized in a closed session, hide it
+                if (o.session_id === 'FECHADO') return false;
+
+                // 3. Session ownership logic:
+                // If it has a session_id, it must be OUR session.
+                // If it has NO session_id, it's a new order from an attendant/menu.
+                if (o.session_id && o.session_id !== currentSession?.id) return false;
+
+                // 4. If it's already finalized (ENTREGUE), check if it needs payment
                 if (o.status === 'ENTREGUE') {
                     let hasRealPayment = false;
                     if (o.paymentMethod && o.paymentMethod !== 'A_PAGAR') hasRealPayment = true;
@@ -398,6 +408,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                             if (pd.some((p: any) => p.method !== 'A_PAGAR')) hasRealPayment = true;
                         } catch {}
                     }
+                    // If it's delivered AND paid, it's definitely not "pendente"
                     if (hasRealPayment) return false;
                 }
                 
@@ -605,7 +616,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
             .select('*')
             .eq('store_id', storeId)
             .eq('type', type)
-            .in('status', ['AGUARDANDO', 'PREPARANDO', 'PRONTO', 'ENVIADO_PARA_ENTREGA', 'SAIU_PARA_ENTREGA', 'CHEGUEI_NA_ORIGEM', 'ENTREGUE'])
+            .in('status', ['AGUARDANDO', 'PREPARANDO', 'PRONTO', 'ENVIADO_PARA_ENTREGA', 'SAIU_PARA_ENTREGA', 'CHEGUEI_NA_ORIGEM'])
             .gte('createdAt', Date.now() - 24 * 60 * 60 * 1000)
             .order('createdAt', { ascending: false });
 
@@ -613,8 +624,18 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
 
         if (data && data.length > 0) {
             const unpaidData = data.filter(o => {
-                if (o.session_id) return false;
+                // 1. Never show cancelled orders
                 if (o.status === 'CANCELADO') return false;
+                
+                // 2. If it's finalized in a closed session, hide it
+                if (o.session_id === 'FECHADO') return false;
+
+                // 3. Session ownership logic:
+                // If it has a session_id, it must be OUR session.
+                // If it has NO session_id, it's a new order from an attendant/menu.
+                if (o.session_id && o.session_id !== currentSession?.id) return false;
+
+                // 4. If it's already finalized (ENTREGUE), check if it needs payment
                 if (o.status === 'ENTREGUE') {
                     let hasRealPayment = false;
                     if (o.paymentMethod && o.paymentMethod !== 'A_PAGAR') hasRealPayment = true;
@@ -624,6 +645,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                             if (pd.some((p: any) => p.method !== 'A_PAGAR')) hasRealPayment = true;
                         } catch {}
                     }
+                    // If it's delivered AND paid, it's definitely not "pendente"
                     if (hasRealPayment) return false;
                 }
                 

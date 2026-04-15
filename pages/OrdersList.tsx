@@ -50,7 +50,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
     filtered.forEach(order => {
         const key = order.type === 'MESA' || order.type === 'COMANDA' 
             ? `${order.type}-${order.tableNumber}` 
-            : `${order.type}-${order.customerName}-${order.customerPhone}`;
+            : `${order.type}-${order.customerName}-${order.customerPhone}-${order.id}`;
             
         if (groupsMap.has(key)) {
             const existing = groupsMap.get(key)!;
