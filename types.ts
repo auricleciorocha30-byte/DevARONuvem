@@ -166,4 +166,13 @@ export interface StoreSettings {
   isDeliveryFeeActive?: boolean;
   freeDeliveryToleranceKm?: number;
   deliveryFeeRules?: { upToKm: number; fee: number }[];
+  
+  // Integrações
+  focusNfeToken?: string;
+  focusNfeEnvironment?: 'production' | 'homologation';
+  focusNfeCertificate?: string;
+  onlinePaymentProvider?: 'mercado_pago' | 'pagseguro' | 'asaas';
+  onlinePaymentAccessToken?: string;
+  onlinePaymentPublicKey?: string;
+  isOnlinePaymentActive?: boolean;
 }
