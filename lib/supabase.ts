@@ -959,7 +959,8 @@ class TursoBridge {
             user: { 
               id: user.id, 
               email: user.name,
-              role: user.role
+              role: user.role,
+              store_id: user.store_id
             } 
           }, 
           error: null 

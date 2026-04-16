@@ -59,14 +59,18 @@ export default function LoginPage({ onLoginSuccess }: Props) {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstallable, setIsInstallable] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
+  const [currentStoreId, setCurrentStoreId] = useState<string | null>(null);
   const [storeSettings, setStoreSettings] = useState<any>(null);
 
   useEffect(() => {
     const fetchSettings = async () => {
       if (storeSlug) {
         const { data } = await supabase.from('store_profiles').eq('slug', storeSlug).maybeSingle();
-        if (data?.settings) {
-          setStoreSettings(data.settings);
+        if (data) {
+          setCurrentStoreId(data.id);
+          if (data.settings) {
+            setStoreSettings(data.settings);
+          }
         }
       }
     };
@@ -134,7 +138,8 @@ export default function LoginPage({ onLoginSuccess }: Props) {
         const userData = {
           id: authData.user.id,
           name: authData.user.email || 'Usuário',
-          role: authData.user.role
+          role: authData.user.role,
+          store_id: (authData.user as any).store_id
         };
         
         onLoginSuccess(userData);
@@ -160,6 +165,14 @@ export default function LoginPage({ onLoginSuccess }: Props) {
       if (session) {
         try {
             const user = JSON.parse(session);
+            
+            // Security: Check if user belongs to this store
+            if (currentStoreId && user.store_id !== currentStoreId) {
+                // Wrong store session. Treat as not logged in for this portal.
+                setIntendedDestination(target);
+                setView('login');
+                return;
+            }
             
             // PDV: Apenas Gerente e Atendente
             if (target === '/pdv') {

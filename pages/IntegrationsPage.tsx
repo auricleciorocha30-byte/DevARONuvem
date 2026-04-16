@@ -30,6 +30,7 @@ export default function IntegrationsPage({ settings, onSave }: Props) {
     onlinePaymentAccessToken: settings.onlinePaymentAccessToken || '',
     onlinePaymentPublicKey: settings.onlinePaymentPublicKey || '',
     isOnlinePaymentActive: settings.isOnlinePaymentActive || false,
+    mercadoPagoPointDeviceId: settings.mercadoPagoPointDeviceId || '',
   });
 
   const handleSave = async () => {
@@ -226,6 +227,25 @@ export default function IntegrationsPage({ settings, onSave }: Props) {
                   />
                 </div>
               </div>
+
+              {formData.onlinePaymentProvider === 'mercado_pago' && (
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">ID da Maquininha (Point Device ID)</label>
+                  <div className="relative">
+                    <Zap className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                    <input
+                      type="text"
+                      value={formData.mercadoPagoPointDeviceId}
+                      onChange={(e) => setFormData({ ...formData, mercadoPagoPointDeviceId: e.target.value })}
+                      className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-mono text-sm"
+                      placeholder="Ex: 12345678"
+                    />
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-2 ml-1 italic">
+                    * Necessário para enviar pagamentos diretamente para a maquininha Point.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="p-4 bg-orange-50 rounded-2xl border border-orange-100">

@@ -107,6 +107,68 @@ async function startServer() {
     }
   });
 
+  // API Route for Mercado Pago Point (Maquininha)
+  app.post('/api/mercado-pago/point/create-payment-intent', async (req, res) => {
+    const { accessToken, deviceId, amount, description, externalReference } = req.body;
+
+    if (!accessToken || !deviceId) {
+      return res.status(400).json({ error: 'Access Token ou Device ID não fornecido.' });
+    }
+
+    try {
+      const response = await fetch(`https://api.mercadopago.com/point/integration-api/devices/${deviceId}/payment-intents`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'x-test-scope': process.env.NODE_ENV === 'production' ? '' : 'sandbox' // Optional: handle sandbox
+        },
+        body: JSON.stringify({
+          amount: Math.round(amount * 100) / 100, // Ensure 2 decimal places
+          description: description || 'Venda PDV',
+          external_reference: externalReference,
+          payment: {
+            installments: 1,
+            type: 'credit_card' // Default to credit, but Point usually allows choosing on device
+          }
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Erro ao criar intenção de pagamento na maquininha.');
+      }
+
+      res.json(data);
+    } catch (error: any) {
+      console.error('Erro no Mercado Pago Point:', error);
+      res.status(500).json({ error: error.message || 'Erro ao comunicar com a maquininha.' });
+    }
+  });
+
+  app.get('/api/mercado-pago/point/payment-intent/:id', async (req, res) => {
+    const { id } = req.params;
+    const accessToken = req.query.accessToken as string;
+
+    if (!accessToken) {
+      return res.status(400).json({ error: 'Access Token não fornecido.' });
+    }
+
+    try {
+      const response = await fetch(`https://api.mercadopago.com/point/integration-api/payment-intents/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error('Erro ao consultar status da maquininha:', error);
+      res.status(500).json({ error: 'Erro ao consultar status do pagamento.' });
+    }
+  });
+
   // API Route for Focus NFe NFC-e Emission
   app.post('/api/focus-nfe/emit-nfce', async (req, res) => {
     const { token, environment, nfceData, reference } = req.body;

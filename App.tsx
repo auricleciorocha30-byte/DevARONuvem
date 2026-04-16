@@ -131,6 +131,19 @@ function StoreContext() {
     setAdminUser(user);
   };
 
+  // Security: Ensure user session matches current store
+  useEffect(() => {
+    if (adminUser && currentStore && adminUser.store_id && adminUser.store_id !== currentStore.id) {
+      const protectedPaths = ['/pdv', '/atendimento', '/entregas', '/cozinha', '/tv'];
+      const isAdminPath = location.pathname === '/' || location.pathname.startsWith('/pedidos') || location.pathname.startsWith('/cardapio-admin');
+      
+      if (protectedPaths.includes(location.pathname) || isAdminPath) {
+        console.warn("Security: User store mismatch detected. Clearing session.");
+        handleSetUser(null);
+      }
+    }
+  }, [adminUser, currentStore, location.pathname]);
+
   const playAudio = (url: string) => {
     const audio = new Audio(url);
     audio.crossOrigin = "anonymous";
@@ -738,20 +751,32 @@ function StoreContext() {
   return (
     <Routes>
       <Route path="/atendimento" element={
-        adminUser && (adminUser.role === 'ATENDENTE' || adminUser.role === 'GERENTE') ? (
+        adminUser && (adminUser.role === 'ATENDENTE' || adminUser.role === 'GERENTE') && adminUser.store_id === currentStore?.id ? (
           <AttendantPanel adminUser={adminUser} orders={orders} settings={settings} onSelectTable={setActiveTable} updateStatus={updateOrderStatus} onLogout={() => handleSetUser(null)} isOffline={isOffline} />
         ) : (
           <Navigate to={`/login${lojaParam}${lojaParam ? '&' : '?'}role=atendente`} replace />
         )
       } />
-      <Route path="/cozinha" element={<KitchenBoard orders={orders} updateStatus={updateOrderStatus} />} />
-      <Route path="/tv" element={<TVBoard orders={orders} settings={settings} products={products} />} />
+      <Route path="/cozinha" element={
+        adminUser && (adminUser.role === 'ATENDENTE' || adminUser.role === 'GERENTE') && adminUser.store_id === currentStore?.id ? (
+          <KitchenBoard orders={orders} updateStatus={updateOrderStatus} />
+        ) : (
+          <Navigate to={loginRedirect} replace />
+        )
+      } />
+      <Route path="/tv" element={
+        adminUser && (adminUser.role === 'ATENDENTE' || adminUser.role === 'GERENTE') && adminUser.store_id === currentStore?.id ? (
+          <TVBoard orders={orders} settings={settings} products={products} />
+        ) : (
+          <Navigate to={loginRedirect} replace />
+        )
+      } />
       <Route path="/cardapio" element={<DigitalMenu storeId={currentStore?.id} products={products} categories={categories} settings={settings} orders={orders} addOrder={addOrder} tableNumber={activeTable} onLogout={() => setActiveTable(null)} isWaitstaff={!!adminUser} />} />
       <Route path="/master" element={<SuperAdminPanel />} />
       <Route path="/login" element={<LoginPage onLoginSuccess={handleSetUser} />} />
 
       <Route path="/pdv" element={
-        adminUser && (adminUser.role === 'ATENDENTE' || adminUser.role === 'GERENTE') ? (
+        adminUser && (adminUser.role === 'ATENDENTE' || adminUser.role === 'GERENTE') && adminUser.store_id === currentStore?.id ? (
           <POS 
             storeId={currentStore?.id || ''} 
             user={adminUser} 
@@ -766,7 +791,7 @@ function StoreContext() {
       } />
 
       <Route path="/entregas" element={
-        adminUser && (adminUser.role === 'ENTREGADOR' || adminUser.role === 'GERENTE') ? (
+        adminUser && (adminUser.role === 'ENTREGADOR' || adminUser.role === 'GERENTE') && adminUser.store_id === currentStore?.id ? (
           <DeliveryPanel 
             storeId={currentStore?.id || adminUser.store_id || ''} 
             user={adminUser} 
@@ -781,7 +806,7 @@ function StoreContext() {
 
       <Route path="/" element={
         !storeSlug ? <SuperAdminPanel /> : (
-          adminUser ? (
+          adminUser && adminUser.store_id === currentStore?.id ? (
             adminUser.role === 'GERENTE' ? 
               <AdminLayout settings={settings} onLogout={() => handleSetUser(null)} /> : 
               adminUser.role === 'ENTREGADOR' ?

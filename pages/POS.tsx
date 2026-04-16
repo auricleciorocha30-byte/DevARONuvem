@@ -31,7 +31,8 @@ import {
   ScanLine,
   Camera,
   Award,
-  MessageCircle
+  MessageCircle,
+  Zap
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Product, Order, OrderItem, StoreSettings, Waitstaff, PaymentMethod, Customer, OrderStatus } from '../types';
@@ -109,6 +110,9 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
   const [currentPaymentAmount, setCurrentPaymentAmount] = useState('');
   const [installments, setInstallments] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isPointProcessing, setIsPointProcessing] = useState(false);
+  const [pointPaymentId, setPointPaymentId] = useState<string | null>(null);
+  const [pointStatus, setPointStatus] = useState<string | null>(null);
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
   const [loadedCommandIds, setLoadedCommandIds] = useState<string[]>(() => {
     const saved = localStorage.getItem(`pos-loadedCommandIds-${storeId}`);
@@ -1204,6 +1208,76 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
   const handleRemovePayment = (index: number) => {
     setPayments(prev => prev.filter((_, i) => i !== index));
   };
+
+  const handlePointPayment = async () => {
+    const amount = parseFloat(currentPaymentAmount);
+    if (isNaN(amount) || amount <= 0) return;
+    if (!settings.onlinePaymentAccessToken || !settings.mercadoPagoPointDeviceId) {
+        alert("Configuração do Mercado Pago Point incompleta.");
+        return;
+    }
+
+    setIsPointProcessing(true);
+    setPointStatus('Enviando para maquininha...');
+    
+    try {
+        const response = await fetch('/api/mercado-pago/point/create-payment-intent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                accessToken: settings.onlinePaymentAccessToken,
+                deviceId: settings.mercadoPagoPointDeviceId,
+                amount: amount,
+                description: `Venda PDV - ${settings.storeName}`,
+                externalReference: `pos_${Date.now()}`
+            })
+        });
+
+        const data = await response.json();
+        if (data.id) {
+            setPointPaymentId(data.id);
+            setPointStatus('Aguardando pagamento na maquininha...');
+        } else {
+            throw new Error(data.error || 'Erro ao iniciar pagamento.');
+        }
+    } catch (err: any) {
+        alert(err.message);
+        setIsPointProcessing(false);
+        setPointStatus(null);
+    }
+  };
+
+  useEffect(() => {
+    let interval: any;
+    if (isPointProcessing && pointPaymentId) {
+        interval = setInterval(async () => {
+            try {
+                const response = await fetch(`/api/mercado-pago/point/payment-intent/${pointPaymentId}?accessToken=${settings.onlinePaymentAccessToken}`);
+                const data = await response.json();
+                
+                if (data.state === 'FINISHED') {
+                    clearInterval(interval);
+                    const amount = parseFloat(currentPaymentAmount);
+                    setPayments(prev => [...prev, { method: 'MAQUININHA', amount }]);
+                    setIsPointProcessing(false);
+                    setPointPaymentId(null);
+                    setPointStatus(null);
+                    setCurrentPaymentAmount('');
+                    alert("Pagamento aprovado na maquininha!");
+                } else if (data.state === 'CANCELED' || data.state === 'ERROR') {
+                    clearInterval(interval);
+                    alert("Pagamento cancelado ou erro na maquininha.");
+                    setIsPointProcessing(false);
+                    setPointPaymentId(null);
+                    setPointStatus(null);
+                }
+            } catch (err) {
+                console.error("Erro ao consultar status do Point:", err);
+            }
+        }, 3000);
+    }
+    return () => clearInterval(interval);
+  }, [isPointProcessing, pointPaymentId, currentPaymentAmount, settings.onlinePaymentAccessToken]);
 
     const handleSaveToCommand = async () => {
     if (cart.length === 0) return;
@@ -3038,14 +3112,32 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                                           <option value="DEBITO">Débito</option>
                                           <option value="VALES">Vales</option>
                                           <option value="PIX">Pix</option>
+                                          {settings.onlinePaymentProvider === 'mercado_pago' && settings.mercadoPagoPointDeviceId && (
+                                              <option value="MAQUININHA">Maquininha Point</option>
+                                          )}
                                       </select>
                                       <button 
-                                          onClick={handleAddPayment}
-                                          className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700"
+                                          onClick={currentPaymentMethod === 'MAQUININHA' ? handlePointPayment : handleAddPayment}
+                                          disabled={isPointProcessing}
+                                          className={`p-3 text-white rounded-xl ${isPointProcessing ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`}
                                       >
-                                          <Plus size={20} />
+                                          {isPointProcessing ? <Loader2 className="animate-spin" size={20} /> : <Plus size={20} />}
                                       </button>
                                   </div>
+
+                                  {isPointProcessing && (
+                                      <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 flex items-center gap-3 animate-pulse">
+                                          <Loader2 className="animate-spin text-blue-600" size={20} />
+                                          <span className="text-sm font-bold text-blue-800">{pointStatus}</span>
+                                      </div>
+                                  )}
+                                  
+                                  {currentPaymentMethod === 'MAQUININHA' && !isPointProcessing && (
+                                      <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 text-xs text-blue-800">
+                                          <p className="font-bold uppercase">Integração Mercado Pago Point</p>
+                                          <p>Ao clicar no botão (+), o valor será enviado automaticamente para a maquininha vinculada.</p>
+                                      </div>
+                                  )}
                                   
                                   {currentPaymentMethod === 'CARTAO' && currentPaymentAmount && !isNaN(parseFloat(currentPaymentAmount)) && (
                                       <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 text-xs text-blue-800 space-y-1">
@@ -3093,6 +3185,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                                           {p.method === 'VALES' && <Ticket size={16} className="text-orange-600" />}
                                           {p.method === 'PIX' && <QrCode size={16} className="text-purple-600" />}
                                           {p.method === 'CASHBACK' && <Award size={16} className="text-orange-500" />}
+                                          {p.method === 'MAQUININHA' && <Zap size={16} className="text-blue-600" />}
                                           <span className="font-bold text-sm">{p.method === 'CASHBACK' ? 'CASHBACK' : p.method}</span>
                                       </div>
                                       <div className="flex items-center gap-3">

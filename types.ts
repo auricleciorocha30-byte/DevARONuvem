@@ -1,7 +1,7 @@
 
 export type OrderStatus = 'AGUARDANDO' | 'PREPARANDO' | 'PRONTO' | 'ENVIADO_PARA_ENTREGA' | 'CHEGUEI_NA_ORIGEM' | 'SAIU_PARA_ENTREGA' | 'ENTREGUE' | 'CANCELADO';
 export type OrderType = 'MESA' | 'BALCAO' | 'ENTREGA' | 'COMANDA';
-export type PaymentMethod = 'PIX' | 'CARTAO' | 'DINHEIRO' | 'DEBITO' | 'VALES' | 'CASHBACK' | 'MISTO' | 'A_PAGAR' | 'ONLINE';
+export type PaymentMethod = 'PIX' | 'CARTAO' | 'DINHEIRO' | 'DEBITO' | 'VALES' | 'CASHBACK' | 'MISTO' | 'A_PAGAR' | 'ONLINE' | 'MAQUININHA';
 
 export interface StoreProfile {
   id: string;
@@ -178,4 +178,5 @@ export interface StoreSettings {
   onlinePaymentAccessToken?: string;
   onlinePaymentPublicKey?: string;
   isOnlinePaymentActive?: boolean;
+  mercadoPagoPointDeviceId?: string;
 }
