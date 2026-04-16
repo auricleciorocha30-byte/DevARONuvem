@@ -36,7 +36,8 @@ import {
   Hash,
   UserRound,
   ArrowLeft,
-  Award
+  Award,
+  Clock
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Product, StoreSettings, Order, OrderItem, OrderType, PaymentMethod, Waitstaff } from '../types';
@@ -62,11 +63,13 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const urlType = searchParams.get('tipo');
   const urlModo = searchParams.get('modo'); // 'local' | 'externo'
   const storeSlug = searchParams.get('loja');
+  const paymentStatus = searchParams.get('payment');
+  const paymentOrderId = searchParams.get('orderId');
   
   const [cart, setCart] = useState<OrderItem[]>([]);
-  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isCartOpen, setIsCartOpen] = useState(!!paymentStatus);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
-  const [checkoutStep, setCheckoutStep] = useState<'cart' | 'details' | 'success'>('cart');
+  const [checkoutStep, setCheckoutStep] = useState<'cart' | 'details' | 'success'>(paymentStatus ? 'success' : 'cart');
   const [activeCategory, setActiveCategory] = useState('Todos');
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -83,6 +86,24 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
 
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<{code: string, discount: number} | null>(null);
+
+  useEffect(() => {
+    if (paymentStatus && paymentOrderId) {
+      // Update order in database based on payment status
+      const updatePaymentStatus = async () => {
+        try {
+          if (paymentStatus === 'success') {
+            await supabase.from('orders').eq('id', paymentOrderId).update({ paymentDetails: JSON.stringify([{ method: 'ONLINE', status: 'approved' }]) });
+          } else if (paymentStatus === 'failure') {
+            await supabase.from('orders').eq('id', paymentOrderId).update({ paymentDetails: JSON.stringify([{ method: 'ONLINE', status: 'rejected' }]) });
+          }
+        } catch (error) {
+          console.error('Erro ao atualizar status do pagamento:', error);
+        }
+      };
+      updatePaymentStatus();
+    }
+  }, [paymentStatus, paymentOrderId]);
 
   const effectiveTable = initialTable || urlTable || null;
   const isStoreClosed = settings.isStoreOpen === false;
@@ -789,7 +810,33 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
         setNotes('');
         setChangeFor('');
         setPayment('PIX');
+        setCombinedPayment('PIX');
         if (!effectiveTable) setManualTable('');
+        
+        if ((payment === 'ONLINE' || combinedPayment === 'ONLINE') && settings.onlinePaymentProvider === 'mercado_pago') {
+          try {
+            const response = await fetch('/api/mercado-pago/create-preference', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                accessToken: settings.onlinePaymentAccessToken,
+                orderData: finalOrder,
+                storeUrl: window.location.href.split('?')[0]
+              })
+            });
+            const data = await response.json();
+            if (data.init_point) {
+              window.location.href = data.init_point;
+              return; // Stop execution to allow redirect
+            } else {
+              alert('Erro ao gerar link de pagamento. O pedido foi salvo, por favor pague na entrega ou no balcão.');
+            }
+          } catch (err) {
+            console.error('Erro no pagamento online:', err);
+            alert('Erro ao gerar link de pagamento. O pedido foi salvo, por favor pague na entrega ou no balcão.');
+          }
+        }
+
         setCheckoutStep('success'); 
     } catch (err: any) { 
         alert(`Erro ao enviar pedido: ${err.message}`); 
@@ -1187,6 +1234,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                 {id: 'PIX', icon: <DollarSign size={18}/>, label: 'PIX'},
                                 {id: 'CARTAO', icon: <CreditCard size={18}/>, label: 'Cartão'},
                                 {id: 'DINHEIRO', icon: <Banknote size={18}/>, label: 'Dinheiro'},
+                                ...(settings.isOnlinePaymentActive && settings.onlinePaymentProvider ? [{id: 'ONLINE', icon: <CreditCard size={18}/>, label: 'Pagar Online'}] : []),
                                 ...(orderType === 'ENTREGA' ? [{id: 'A_PAGAR', icon: <Wallet size={18}/>, label: 'Pagar na Entrega'}] : []),
                                 ...(settings.isCashbackActive && customerPoints > 0 && customerPoints >= (settings.minCashbackToUse || 0) ? [{id: 'CASHBACK', icon: <Award size={18}/>, label: `Cashback (R$ ${customerPoints.toFixed(2)})`}] : [])
                               ].map(m => (
@@ -1213,6 +1261,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                     {id: 'PIX', icon: <DollarSign size={18}/>, label: 'PIX'},
                                     {id: 'CARTAO', icon: <CreditCard size={18}/>, label: 'Cartão'},
                                     {id: 'DINHEIRO', icon: <Banknote size={18}/>, label: 'Dinheiro'},
+                                    ...(settings.isOnlinePaymentActive && settings.onlinePaymentProvider ? [{id: 'ONLINE', icon: <CreditCard size={18}/>, label: 'Pagar Online'}] : []),
                                     ...(orderType === 'ENTREGA' ? [{id: 'A_PAGAR', icon: <Wallet size={18}/>, label: 'Pagar na Entrega'}] : []),
                                   ].map(m => (
                                     <button key={m.id} onClick={() => setCombinedPayment(m.id as any)} className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${combinedPayment === m.id ? 'bg-primary border-primary text-white shadow-lg' : 'bg-white border-gray-100 text-gray-400'}`}>
@@ -1243,13 +1292,25 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                   </div>
                 ) : (
                   <div className="py-12 text-center animate-scale-up space-y-6">
-                     <div className="w-24 h-24 bg-green-500 text-white rounded-full flex items-center justify-center mx-auto shadow-2xl animate-bounce"><Check size={48} strokeWidth={4} /></div>
+                     <div className={`w-24 h-24 ${paymentStatus === 'failure' ? 'bg-red-500' : paymentStatus === 'pending' ? 'bg-yellow-500' : 'bg-green-500'} text-white rounded-full flex items-center justify-center mx-auto shadow-2xl animate-bounce`}>
+                       {paymentStatus === 'failure' ? <X size={48} strokeWidth={4} /> : paymentStatus === 'pending' ? <Clock size={48} strokeWidth={4} /> : <Check size={48} strokeWidth={4} />}
+                     </div>
                      <div>
-                        <h3 className="text-3xl font-brand font-bold text-primary">Pedido Enviado!</h3>
-                        <p className="text-gray-500 mt-2 font-medium">Já estamos preparando seu pedido.</p>
+                        <h3 className="text-3xl font-brand font-bold text-primary">
+                          {paymentStatus === 'success' ? 'Pagamento Aprovado!' : 
+                           paymentStatus === 'failure' ? 'Pagamento Recusado' : 
+                           paymentStatus === 'pending' ? 'Pagamento Pendente' : 
+                           'Pedido Enviado!'}
+                        </h3>
+                        <p className="text-gray-500 mt-2 font-medium">
+                          {paymentStatus === 'success' ? 'Recebemos seu pagamento e já estamos preparando seu pedido.' : 
+                           paymentStatus === 'failure' ? 'Houve um problema com seu pagamento. Por favor, pague no balcão ou na entrega.' :
+                           paymentStatus === 'pending' ? 'Estamos aguardando a confirmação do pagamento.' :
+                           'Já estamos preparando seu pedido.'}
+                        </p>
                      </div>
                      <div className="bg-gray-50 p-6 rounded-3xl border border-gray-100 text-left space-y-2">
-                        <div className="flex justify-between items-center"><span className="text-[10px] font-black text-gray-400 uppercase">Senha do Pedido</span><span className="text-xl font-black text-primary">#{generatedDisplayId}</span></div>
+                        <div className="flex justify-between items-center"><span className="text-[10px] font-black text-gray-400 uppercase">Senha do Pedido</span><span className="text-xl font-black text-primary">#{generatedDisplayId || paymentOrderId?.slice(-4)}</span></div>
                         <p className="text-[10px] text-gray-400 leading-snug">Fique atento ao painel da loja ou aguarde nosso atendente chamar.</p>
                      </div>
                      

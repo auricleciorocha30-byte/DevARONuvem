@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Order, OrderStatus, Product, OrderType, OrderItem, StoreSettings } from '../types';
-import { Clock, Printer, UserRound, CheckCircle2, DollarSign, AlertCircle, MapPin, Phone, MessageSquare, Ticket, Percent, Navigation, CreditCard, Wallet, Banknote } from 'lucide-react';
+import { Clock, Printer, UserRound, CheckCircle2, DollarSign, AlertCircle, MapPin, Phone, MessageSquare, Ticket, Percent, Navigation, CreditCard, Wallet, Banknote, FileText, Loader2 } from 'lucide-react';
 
 interface Props {
   orders: Order[];
@@ -37,17 +37,25 @@ interface GroupedOrder {
 
 const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder, settings }) => {
   console.log("OrdersList received orders:", orders);
-  const [filterType, setFilterType] = useState<'TODOS' | OrderType>('TODOS');
+  const [filterType, setFilterType] = useState<'TODOS' | OrderType | 'FINALIZADOS'>('TODOS');
   const [printOrder, setPrintOrder] = useState<GroupedOrder | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isEmittingNfce, setIsEmittingNfce] = useState<string | null>(null);
 
   const displayGroups = useMemo(() => {
-    const activeOrders = orders.filter(o => o.status !== 'ENTREGUE' && o.status !== 'CANCELADO');
-    const filtered = activeOrders.filter(o => filterType === 'TODOS' || o.type === filterType);
+    let filteredOrders = orders;
+    if (filterType === 'FINALIZADOS') {
+      filteredOrders = orders.filter(o => o.status === 'ENTREGUE');
+    } else {
+      filteredOrders = orders.filter(o => o.status !== 'ENTREGUE' && o.status !== 'CANCELADO');
+      if (filterType !== 'TODOS') {
+        filteredOrders = filteredOrders.filter(o => o.type === filterType);
+      }
+    }
     
     const groupsMap = new Map<string, GroupedOrder>();
     
-    filtered.forEach(order => {
+    filteredOrders.forEach(order => {
         const key = order.type === 'MESA' || order.type === 'COMANDA' 
             ? `${order.type}-${order.tableNumber}` 
             : `${order.type}-${order.customerName}-${order.customerPhone}-${order.id}`;
@@ -95,6 +103,80 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
     return Array.from(groupsMap.values()).sort((a, b) => b.createdAt - a.createdAt);
   }, [orders, filterType]);
 
+  const handleEmitNfce = async (group: GroupedOrder) => {
+    if (!settings.focusNfeToken) {
+      alert("Token da Focus NFe não configurado nas Integrações.");
+      return;
+    }
+    if (!settings.cnpj) {
+      alert("CNPJ da loja não configurado nas Configurações.");
+      return;
+    }
+
+    setIsEmittingNfce(group.id);
+    try {
+      const nfceData = {
+        cnpj_emitente: settings.cnpj.replace(/\D/g, ''),
+        data_emissao: new Date().toISOString(),
+        indicador_inscricao_estadual_destinatario: 9,
+        modalidade_frete: 9,
+        local_destino: 1,
+        presenca_comprador: group.type === 'ENTREGA' ? 4 : 1,
+        items: group.items.map((item, index) => {
+          const product = products.find(p => p.id === item.productId);
+          return {
+            numero_item: index + 1,
+            codigo_produto: item.productId,
+            descricao: item.name,
+            quantidade: item.quantity,
+            unidade_comercial: item.isByWeight ? 'KG' : 'UN',
+            valor_unitario: item.price,
+            ncm: product?.ncm || '21069090', // Default NCM if not set
+            cfop: product?.cfop || (group.type === 'ENTREGA' ? '5102' : '5102'),
+            icms_situacao_tributaria: product?.icms_situacao_tributaria || '102'
+          };
+        }),
+        formas_pagamento: [
+          {
+            forma_pagamento: group.paymentMethod === 'DINHEIRO' ? '01' : 
+                            group.paymentMethod === 'CARTAO' ? '03' : 
+                            group.paymentMethod === 'DEBITO' ? '04' : 
+                            group.paymentMethod === 'PIX' ? '17' : '99',
+            valor_pagamento: group.total
+          }
+        ]
+      };
+
+      const response = await fetch('/api/focus-nfe/emit-nfce', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: settings.focusNfeToken,
+          environment: settings.focusNfeEnvironment,
+          nfceData,
+          reference: `order_${group.id}_${Date.now()}`
+        })
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        alert("NFC-e emitida com sucesso!");
+        if (result.caminho_xml_nota_fiscal) {
+           window.open(`https://${settings.focusNfeEnvironment === 'production' ? 'api' : 'homologacao'}.focusnfe.com.br${result.caminho_xml_nota_fiscal}`, '_blank');
+        }
+      } else {
+        console.error("Erro Focus NFe:", result);
+        alert(`Erro ao emitir NFC-e: ${result.mensagem || JSON.stringify(result)}`);
+      }
+    } catch (error) {
+      console.error("Erro ao emitir NFC-e:", error);
+      alert("Erro de conexão ao emitir NFC-e.");
+    } finally {
+      setIsEmittingNfce(null);
+    }
+  };
+
   const handlePrint = (group: GroupedOrder) => {
     setPrintOrder(group);
     setTimeout(() => { 
@@ -118,6 +200,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
     if (method === 'PIX') return <CreditCard size={14} className="text-blue-500" />;
     if (method === 'CARTAO') return <Wallet size={14} className="text-purple-500" />;
     if (method === 'DINHEIRO') return <Banknote size={14} className="text-green-500" />;
+    if (method === 'ONLINE') return <CreditCard size={14} className="text-indigo-500" />;
     return <DollarSign size={14} className="text-gray-400" />;
   };
 
@@ -145,7 +228,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
       `}</style>
 
       <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-          {['TODOS', 'MESA', 'BALCAO', 'ENTREGA'].map(f => (
+          {['TODOS', 'MESA', 'BALCAO', 'ENTREGA', 'FINALIZADOS'].map(f => (
             <button key={f} onClick={() => setFilterType(f as any)} className={`px-6 py-2.5 rounded-2xl font-bold text-sm border transition-all ${filterType === f ? 'bg-primary text-white border-primary shadow-md' : 'bg-white text-gray-400 border-gray-100'}`}>{f}</button>
           ))}
       </div>
@@ -169,7 +252,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                     </span>
                   )}
                   <span className="bg-zinc-100 text-zinc-600 px-2 py-1 rounded-full text-[8px] font-black uppercase flex items-center gap-1">
-                    <Clock size={10} /> {new Date(group.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    <Clock size={10} /> {new Date(group.createdAt).toLocaleDateString('pt-BR')} {new Date(group.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
                 <h3 className="text-lg font-bold text-gray-800 truncate">
@@ -231,7 +314,21 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                    <div className="p-2 bg-gray-50 rounded-lg">{getPaymentIcon(group.paymentMethod)}</div>
                    <div>
                       <p className="text-[8px] font-black text-gray-300 uppercase leading-none">Pagamento</p>
-                      <p className="text-[10px] font-bold text-gray-700 uppercase">{group.paymentMethod || 'A Definir'}</p>
+                      <div className="flex items-center gap-1">
+                        <p className="text-[10px] font-bold text-gray-700 uppercase">{group.paymentMethod || 'A Definir'}</p>
+                        {group.paymentMethod === 'ONLINE' && (() => {
+                          const originalOrder = orders.find(o => o.id === group.id);
+                          if (originalOrder?.paymentDetails) {
+                            try {
+                              const details = JSON.parse(originalOrder.paymentDetails);
+                              const onlineDetail = details.find((d: any) => d.method === 'ONLINE');
+                              if (onlineDetail?.status === 'approved') return <span className="bg-green-100 text-green-600 px-1.5 py-0.5 rounded text-[8px] font-black uppercase">Aprovado</span>;
+                              if (onlineDetail?.status === 'rejected') return <span className="bg-red-100 text-red-600 px-1.5 py-0.5 rounded text-[8px] font-black uppercase">Recusado</span>;
+                            } catch (e) {}
+                          }
+                          return <span className="bg-yellow-100 text-yellow-600 px-1.5 py-0.5 rounded text-[8px] font-black uppercase">Pendente</span>;
+                        })()}
+                      </div>
                    </div>
                 </div>
                 <div className="text-right">
@@ -255,7 +352,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                 </div>
               )}
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                  {group.status === 'PREPARANDO' && (
                    <button 
                     disabled={isProcessing}
@@ -265,20 +362,36 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                     Sinalizar Pronto
                    </button>
                  )}
-                 <button 
-                  disabled={isProcessing}
-                  onClick={() => handleStatusUpdate(group, group.type === 'ENTREGA' ? 'ENVIADO_PARA_ENTREGA' : 'ENTREGUE')} 
-                  className={`flex-1 py-3.5 bg-green-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
-                 >
-                  {group.type === 'ENTREGA' ? 'Enviar p/ Entrega' : 'Finalizar'}
-                 </button>
-                 <button 
-                  disabled={isProcessing}
-                  onClick={() => { if(window.confirm('Tem certeza que deseja cancelar este pedido? O estoque será restaurado.')) handleStatusUpdate(group, 'CANCELADO'); }} 
-                  className={`flex-1 py-3.5 bg-red-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
-                 >
-                  Cancelar
-                 </button>
+                 {group.status !== 'ENTREGUE' && (
+                   <button 
+                    disabled={isProcessing}
+                    onClick={() => handleStatusUpdate(group, group.type === 'ENTREGA' ? 'ENVIADO_PARA_ENTREGA' : 'ENTREGUE')} 
+                    className={`flex-1 py-3.5 bg-green-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                   >
+                    {group.type === 'ENTREGA' ? 'Enviar p/ Entrega' : 'Finalizar'}
+                   </button>
+                 )}
+                 
+                 {settings.focusNfeToken && (
+                   <button 
+                    disabled={isEmittingNfce === group.id}
+                    onClick={() => handleEmitNfce(group)} 
+                    className={`flex-1 py-3.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 ${isEmittingNfce === group.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                   >
+                    {isEmittingNfce === group.id ? <Loader2 className="animate-spin" size={14} /> : <FileText size={14} />}
+                    Emitir NFC-e
+                   </button>
+                 )}
+
+                 {group.status !== 'ENTREGUE' && (
+                   <button 
+                    disabled={isProcessing}
+                    onClick={() => { if(window.confirm('Tem certeza que deseja cancelar este pedido? O estoque será restaurado.')) handleStatusUpdate(group, 'CANCELADO'); }} 
+                    className={`flex-1 py-3.5 bg-red-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                   >
+                    Cancelar
+                   </button>
+                 )}
               </div>
             </div>
           </div>

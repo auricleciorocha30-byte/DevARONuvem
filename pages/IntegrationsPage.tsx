@@ -35,7 +35,7 @@ export default function IntegrationsPage({ settings, onSave }: Props) {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await onSave(formData);
+      await onSave({ ...settings, ...formData });
     } catch (error) {
       console.error(error);
       alert('Erro ao salvar configurações.');
@@ -53,7 +53,7 @@ export default function IntegrationsPage({ settings, onSave }: Props) {
           </div>
           <div>
             <h2 className="text-2xl font-brand font-bold text-gray-800">Integrações</h2>
-            <p className="text-sm text-gray-500">Conecte sua loja com serviços externos de NF-e e Pagamentos</p>
+            <p className="text-sm text-gray-500">Conecte sua loja com serviços externos de NF-e e Pagamentos (v2)</p>
           </div>
         </div>
         

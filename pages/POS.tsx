@@ -2210,13 +2210,16 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                 <DollarSign size={18} />
                 <span className="text-xs font-bold">Fechar Caixa</span>
              </button>
-             <button onClick={() => window.location.reload()} className="p-2 text-gray-500 hover:bg-gray-100 rounded-xl border border-gray-100 shrink-0" 
+             <button onClick={() => {
+                 localStorage.removeItem(`gc-metadata-cache-v1_${storeId}`);
+                 window.location.reload();
+             }} className="p-2 text-gray-500 hover:bg-gray-100 rounded-xl border border-gray-100 shrink-0" 
                 style={{ 
                     color: settings.primaryColor ? '#ffffff' : undefined,
                     borderColor: settings.primaryColor ? 'rgba(255,255,255,0.2)' : undefined,
                     backgroundColor: settings.primaryColor ? 'rgba(255,255,255,0.1)' : undefined
                 }}
-                title="Atualizar">
+                title="Atualizar Cardápio">
                 <RefreshCw size={18} />
              </button>
              <button 

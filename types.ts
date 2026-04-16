@@ -1,7 +1,7 @@
 
 export type OrderStatus = 'AGUARDANDO' | 'PREPARANDO' | 'PRONTO' | 'ENVIADO_PARA_ENTREGA' | 'CHEGUEI_NA_ORIGEM' | 'SAIU_PARA_ENTREGA' | 'ENTREGUE' | 'CANCELADO';
 export type OrderType = 'MESA' | 'BALCAO' | 'ENTREGA' | 'COMANDA';
-export type PaymentMethod = 'PIX' | 'CARTAO' | 'DINHEIRO' | 'DEBITO' | 'VALES' | 'CASHBACK' | 'MISTO' | 'A_PAGAR';
+export type PaymentMethod = 'PIX' | 'CARTAO' | 'DINHEIRO' | 'DEBITO' | 'VALES' | 'CASHBACK' | 'MISTO' | 'A_PAGAR' | 'ONLINE';
 
 export interface StoreProfile {
   id: string;
@@ -40,6 +40,9 @@ export interface Product {
   fractions?: number;
   units?: number;
   fractionPrice?: number;
+  ncm?: string;
+  cfop?: string;
+  icms_situacao_tributaria?: string;
 }
 
 export interface OrderItem {

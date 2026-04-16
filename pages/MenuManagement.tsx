@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Product } from '../types';
-import { Plus, Search, Edit2, Trash2, Camera, Star, Tag, X, Loader2, Weight, Power, ListTree, ScanLine } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Camera, Star, Tag, X, Loader2, Weight, Power, ListTree, ScanLine, FileText } from 'lucide-react';
 import { Switch } from '../components/Switch';
 import { supabase } from '../lib/supabase';
 import { Html5Qrcode } from 'html5-qrcode';
@@ -132,7 +132,10 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
             stock: (editingProduct.stock != null && !isNaN(Number(editingProduct.stock))) ? Number(editingProduct.stock) : null,
             fractions: (editingProduct.fractions != null && !isNaN(Number(editingProduct.fractions))) ? Number(editingProduct.fractions) : null,
             units: (editingProduct.units != null && !isNaN(Number(editingProduct.units))) ? Number(editingProduct.units) : null,
-            fractionPrice: (editingProduct.fractionPrice != null && !isNaN(Number(editingProduct.fractionPrice))) ? Number(editingProduct.fractionPrice) : null
+            fractionPrice: (editingProduct.fractionPrice != null && !isNaN(Number(editingProduct.fractionPrice))) ? Number(editingProduct.fractionPrice) : null,
+            ncm: editingProduct.ncm || undefined,
+            cfop: editingProduct.cfop || undefined,
+            icms_situacao_tributaria: editingProduct.icms_situacao_tributaria || undefined
         };
 
         await saveProduct(productData);
@@ -512,6 +515,48 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                       <option value="-1">Nenhum dia</option>
                       {days.map((day) => <option key={day.id} value={day.id}>{day.name}</option>)}
                   </select>
+              </div>
+
+              <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-100 space-y-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <FileText size={16} className="text-zinc-400" />
+                  <h4 className="font-bold text-sm text-gray-700 uppercase tracking-widest">Dados Fiscais (NFC-e)</h4>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">NCM</label>
+                    <input 
+                      type="text" 
+                      maxLength={8}
+                      value={editingProduct?.ncm || ''} 
+                      onChange={(e) => setEditingProduct({...editingProduct, ncm: e.target.value.replace(/\D/g, '')})} 
+                      className="w-full p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 text-xs font-mono" 
+                      placeholder="Ex: 21069090" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">CFOP</label>
+                    <input 
+                      type="text" 
+                      maxLength={4}
+                      value={editingProduct?.cfop || ''} 
+                      onChange={(e) => setEditingProduct({...editingProduct, cfop: e.target.value.replace(/\D/g, '')})} 
+                      className="w-full p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 text-xs font-mono" 
+                      placeholder="Ex: 5102" 
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">CSOSN / CST (Situação Tributária)</label>
+                  <input 
+                    type="text" 
+                    maxLength={3}
+                    value={editingProduct?.icms_situacao_tributaria || ''} 
+                    onChange={(e) => setEditingProduct({...editingProduct, icms_situacao_tributaria: e.target.value.replace(/\D/g, '')})} 
+                    className="w-full p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 text-xs font-mono" 
+                    placeholder="Ex: 102" 
+                  />
+                </div>
               </div>
 
               <div className="pt-4 flex gap-3">

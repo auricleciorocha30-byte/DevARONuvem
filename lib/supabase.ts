@@ -1168,6 +1168,33 @@ class TursoBridge {
   disconnectStore() {
       TursoBridge.disconnectStore();
   }
+
+  async cleanupOldCashHistory(storeId: string, days: number = 40) {
+      if (!storeId) return;
+      try {
+          const cutoffTime = Date.now() - (days * 24 * 60 * 60 * 1000);
+          
+          // Delete old cash movements
+          const tempInstance1 = new TursoBridge();
+          tempInstance1.tableName = 'cash_movements';
+          await tempInstance1.executeQuery(
+              `DELETE FROM cash_movements WHERE store_id = ? AND createdAt < ?`,
+              [storeId, cutoffTime]
+          );
+
+          // Delete old register sessions
+          const tempInstance2 = new TursoBridge();
+          tempInstance2.tableName = 'register_sessions';
+          await tempInstance2.executeQuery(
+              `DELETE FROM register_sessions WHERE store_id = ? AND opened_at < ?`,
+              [storeId, cutoffTime]
+          );
+          
+          console.log(`Cleaned up cash history older than ${days} days.`);
+      } catch (err) {
+          console.error("Error cleaning up cash history:", err);
+      }
+  }
 }
 
 export const supabase = new TursoBridge();

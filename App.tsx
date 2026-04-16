@@ -170,6 +170,8 @@ function StoreContext() {
               
               if (parsed.dbUrl && parsed.dbAuthToken) {
                   (supabase as any).connectToStore(parsed.dbUrl, parsed.dbAuthToken);
+                  // Run cleanup in background
+                  (supabase as any).cleanupOldCashHistory(parsed.id, 40);
               } else {
                   (supabase as any).disconnectStore();
               }
@@ -239,6 +241,8 @@ function StoreContext() {
         if (fullStoreData.dbUrl && fullStoreData.dbAuthToken) {
             console.log("Connecting to dedicated DB for store:", fullStoreData.name);
             (supabase as any).connectToStore(fullStoreData.dbUrl, fullStoreData.dbAuthToken);
+            // Run cleanup in background
+            (supabase as any).cleanupOldCashHistory(fullStoreData.id, 40);
         }
 
         // Cache store profile
@@ -371,15 +375,16 @@ function StoreContext() {
         }
     }
 
-    const fetchMetadata = async () => {
+    const fetchMetadata = async (forceRefresh = false) => {
       const cached = localStorage.getItem(`${METADATA_CACHE_KEY}_${currentStore.id}`);
-      if (cached) {
+      if (cached && !forceRefresh) {
         try {
             const { products: p, categories: c, time } = JSON.parse(cached);
+            // Use cache if offline or if cache is less than 1 hour old
             if (!navigator.onLine || (Date.now() - time < 3600000)) { 
               setProducts(p);
               setCategories(c);
-              if (!navigator.onLine) return;
+              return; // Skip fetching from DB!
             }
         } catch (e) {
             console.error("Error parsing cached metadata:", e);
@@ -678,7 +683,14 @@ function StoreContext() {
   const handleUpdateSettings = async (newSettings: StoreSettings) => {
     if (currentStore) {
       await supabase.from('store_profiles').eq('id', currentStore.id).update({ settings: JSON.stringify(newSettings) });
-      setCurrentStore({ ...currentStore, settings: newSettings });
+      const updatedStore = { ...currentStore, settings: newSettings };
+      setCurrentStore(updatedStore);
+      
+      // Update cache so reloads don't use stale data
+      const normalizedSlug = currentStore.slug?.toLowerCase();
+      if (normalizedSlug) {
+        localStorage.setItem(`store_profile_${normalizedSlug}`, JSON.stringify(updatedStore));
+      }
     }
     setSettings(newSettings);
     applyColors(newSettings);
