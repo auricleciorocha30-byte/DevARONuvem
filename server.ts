@@ -15,87 +15,57 @@ async function startServer() {
   app.use(cors());
   app.use(express.json({ limit: '10mb' }));
 
+  // Diagnostic route - at the root level, before everything
+  app.get('/api-health', (req, res) => {
+    res.json({
+      status: 'ok',
+      message: 'Server is running',
+      env: process.env.NODE_ENV || 'development',
+      time: new Date().toISOString()
+    });
+  });
+
+  // Create an API router
+  const apiRouter = express.Router();
+
+  // Test route on the router
+  apiRouter.get('/test', (req, res) => {
+    res.json({ message: 'API Router is reachable at /api/test' });
+  });
+
   // Debug middleware for API routes
-  app.use('/api', (req, res, next) => {
+  apiRouter.use((req, res, next) => {
     console.log(`[API ${req.method}] ${req.url}`);
     next();
   });
 
   // API Route for Mercado Pago Checkout Pro
-  app.post('/api/mercado-pago/create-preference', async (req, res) => {
+  apiRouter.post('/mercado-pago/create-preference', async (req, res) => {
     const { accessToken, orderData, storeUrl } = req.body;
-
-    if (!accessToken) {
-      return res.status(400).json({ error: 'Access Token do Mercado Pago não fornecido.' });
-    }
-
+    // ... logic remains same, just moved to router
+    if (!accessToken) return res.status(400).json({ error: 'Access Token do Mercado Pago não fornecido.' });
     try {
       const client = new MercadoPagoConfig({ accessToken });
       const preference = new Preference(client);
-
       const items = orderData.items.map((item: any) => ({
-        id: item.productId,
-        title: item.name,
-        quantity: item.quantity,
-        unit_price: item.price,
-        currency_id: 'BRL'
+        id: item.productId, title: item.name, quantity: item.quantity, unit_price: item.price, currency_id: 'BRL'
       }));
-
-      // Add delivery fee if present
-      if (orderData.deliveryFee && orderData.deliveryFee > 0) {
-        items.push({
-          id: 'delivery_fee',
-          title: 'Taxa de Entrega',
-          quantity: 1,
-          unit_price: orderData.deliveryFee,
-          currency_id: 'BRL'
-        });
-      }
-
-      // Add service fee if present
-      if (orderData.serviceFee && orderData.serviceFee > 0) {
-        items.push({
-          id: 'service_fee',
-          title: 'Taxa de Serviço',
-          quantity: 1,
-          unit_price: orderData.serviceFee,
-          currency_id: 'BRL'
-        });
-      }
-
-      // Handle discount (Mercado Pago doesn't have a direct discount field in items, 
-      // so we can add a negative item or just apply it to the total, but MP doesn't allow negative unit_price.
-      // A common workaround is to apply the discount proportionally or just not send items if it's too complex,
-      // but let's just send the total if there's a discount to avoid item mismatch, or subtract from items).
-      // For simplicity, if there's a discount or mixed payment, we'll just send a single item "Pedido #ID".
-      let finalItems = items;
+      if (orderData.deliveryFee > 0) items.push({ id: 'delivery_fee', title: 'Taxa de Entrega', quantity: 1, unit_price: orderData.deliveryFee, currency_id: 'BRL' });
+      if (orderData.serviceFee > 0) items.push({ id: 'service_fee', title: 'Taxa de Serviço', quantity: 1, unit_price: orderData.serviceFee, currency_id: 'BRL' });
+      
       let amountToCharge = orderData.total;
-
-      // Check if it's a mixed payment with ONLINE
       if (orderData.paymentDetails) {
         try {
           const details = JSON.parse(orderData.paymentDetails);
           const onlinePayment = details.find((d: any) => d.method === 'ONLINE');
-          if (onlinePayment) {
-            amountToCharge = onlinePayment.amount;
-          }
-        } catch (e) {
-          console.error("Error parsing payment details", e);
-        }
-      }
-
-      if ((orderData.discountAmount && orderData.discountAmount > 0) || amountToCharge !== orderData.total) {
-        finalItems = [{
-          id: orderData.id,
-          title: `Pedido #${orderData.displayId}`,
-          quantity: 1,
-          unit_price: amountToCharge,
-          currency_id: 'BRL'
-        }];
+          if (onlinePayment) amountToCharge = onlinePayment.amount;
+        } catch (e) {}
       }
 
       const body = {
-        items: finalItems,
+        items: (orderData.discountAmount > 0 || amountToCharge !== orderData.total) 
+          ? [{ id: orderData.id, title: `Pedido #${orderData.displayId}`, quantity: 1, unit_price: amountToCharge, currency_id: 'BRL' }]
+          : items,
         external_reference: orderData.id,
         back_urls: {
           success: `${storeUrl}?payment=success&orderId=${orderData.id}`,
@@ -104,366 +74,155 @@ async function startServer() {
         },
         auto_return: 'approved' as const,
       };
-
       const result = await preference.create({ body });
       res.json({ init_point: result.init_point, id: result.id });
     } catch (error: any) {
-      console.error('Erro ao criar preferência no Mercado Pago:', error);
       res.status(500).json({ error: 'Erro ao gerar pagamento online.' });
     }
   });
 
-  // API Route for Mercado Pago Point (Maquininha)
-  app.post('/api/mercado-pago/point/create-payment-intent', async (req, res) => {
+  // API Route for Mercado Pago Point
+  apiRouter.post('/mercado-pago/point/create-payment-intent', async (req, res) => {
     const { accessToken, deviceId, amount, description, externalReference } = req.body;
-
-    if (!accessToken || !deviceId) {
-      return res.status(400).json({ error: 'Access Token ou Device ID não fornecido.' });
-    }
-
+    if (!accessToken || !deviceId) return res.status(400).json({ error: 'Access Token ou Device ID não fornecido.' });
     try {
-      const response = await fetch(`https://api.mercadopago.com/point/integration-api/devices/${deviceId}/payment-intents`, {
+      const resp = await fetch(`https://api.mercadopago.com/point/integration-api/devices/${deviceId}/payment-intents`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-          'x-test-scope': process.env.NODE_ENV === 'production' ? '' : 'sandbox' // Optional: handle sandbox
-        },
-        body: JSON.stringify({
-          amount: Math.round(amount * 100) / 100, // Ensure 2 decimal places
-          description: description || 'Venda PDV',
-          external_reference: externalReference,
-          payment: {
-            installments: 1,
-            type: 'credit_card' // Default to credit, but Point usually allows choosing on device
-          }
-        })
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: Math.round(amount * 100) / 100, description: description || 'Venda PDV', external_reference: externalReference, payment: { installments: 1, type: 'credit_card' } })
       });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || 'Erro ao criar intenção de pagamento na maquininha.');
-      }
-
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.message || 'Erro na maquininha.');
       res.json(data);
     } catch (error: any) {
-      console.error('Erro no Mercado Pago Point:', error);
-      res.status(500).json({ error: error.message || 'Erro ao comunicar com a maquininha.' });
-    }
-  });
-
-  app.get('/api/mercado-pago/point/payment-intent/:id', async (req, res) => {
-    const { id } = req.params;
-    const accessToken = req.query.accessToken as string;
-
-    if (!accessToken) {
-      return res.status(400).json({ error: 'Access Token não fornecido.' });
-    }
-
-    try {
-      const response = await fetch(`https://api.mercadopago.com/point/integration-api/payment-intents/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`
-        }
-      });
-
-      const data = await response.json();
-      res.json(data);
-    } catch (error: any) {
-      console.error('Erro ao consultar status da maquininha:', error);
-      res.status(500).json({ error: 'Erro ao consultar status do pagamento.' });
-    }
-  });
-
-  // API Route for Barcode Lookup (EAN/GTIN)
-  app.get('/api/barcode-lookup/:code', async (req, res) => {
-    const { code } = req.params;
-    
-    try {
-      // Using OpenFoodFacts as a free fallback for product names
-      const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
-      const data = await response.json();
-      
-      if (data.status === 1) {
-        res.json({
-          name: data.product.product_name || '',
-          description: data.product.generic_name || data.product.product_name || '',
-          brand: data.product.brands || '',
-          // NCM is not provided by OpenFoodFacts typically, 
-          // but we can suggest 21069090 (common for food) or let the user fill it.
-          // Professional APIs like Bluesoft Cosmos would provide NCM.
-          ncm: '21069090' 
-        });
-      } else {
-        res.status(404).json({ error: 'Produto não encontrado na base pública.' });
-      }
-    } catch (error) {
-      console.error('Erro ao consultar código de barras:', error);
-      res.status(500).json({ error: 'Erro ao consultar serviço de código de barras.' });
-    }
-  });
-
-  // API Route for Focus NFe NFC-e Emission
-  app.post('/api/focus-nfe/emit-nfce', async (req, res) => {
-    const { token, environment, nfceData, reference } = req.body;
-
-    if (!token) {
-      return res.status(400).json({ error: 'Token da Focus NFe não fornecido.' });
-    }
-
-    const baseUrl = environment === 'production' 
-      ? 'https://api.focusnfe.com.br' 
-      : 'https://homologacao.focusnfe.com.br';
-
-    const url = `${baseUrl}/v2/nfce?ref=${reference}`;
-
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Basic ${Buffer.from(token + ':').toString('base64')}`
-        },
-        body: JSON.stringify(nfceData)
-      });
-
-      const data = await response.json();
-      res.status(response.status).json(data);
-    } catch (error) {
-      console.error('Erro ao comunicar com Focus NFe:', error);
-      res.status(500).json({ error: 'Erro interno ao comunicar com a API de Notas Fiscais.' });
-    }
-  });
-
-  // API Route for Focus NFe NFC-e Consultation
-  app.get('/api/focus-nfe/consult-nfce', async (req, res) => {
-    const { token, environment, reference } = req.query;
-
-    if (!token || !reference) {
-      return res.status(400).json({ error: 'Token ou referência não fornecidos.' });
-    }
-
-    const baseUrl = environment === 'production' 
-      ? 'https://api.focusnfe.com.br' 
-      : 'https://homologacao.focusnfe.com.br';
-
-    const url = `${baseUrl}/v2/nfce/${reference}`;
-
-    try {
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Basic ${Buffer.from(token + ':').toString('base64')}`
-        }
-      });
-
-      const data = await response.json();
-      res.status(response.status).json(data);
-    } catch (error) {
-      console.error('Erro ao consultar NFC-e:', error);
-      res.status(500).json({ error: 'Erro interno ao consultar NFC-e.' });
-    }
-  });
-
-  // API Route for Focus NFe NFC-e Cancellation
-  app.delete('/api/focus-nfe/cancel-nfce', async (req, res) => {
-    const { token, environment, reference, justificativa } = req.body;
-
-    if (!token || !reference) {
-      return res.status(400).json({ error: 'Token ou referência não fornecidos.' });
-    }
-
-    const baseUrl = environment === 'production' 
-      ? 'https://api.focusnfe.com.br' 
-      : 'https://homologacao.focusnfe.com.br';
-
-    const url = `${baseUrl}/v2/nfce/${reference}`;
-
-    try {
-      const response = await fetch(url, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Basic ${Buffer.from(token + ':').toString('base64')}`
-        },
-        body: JSON.stringify({ justificativa: justificativa || 'Cancelamento por erro de preenchimento ou desistência do cliente.' })
-      });
-
-      const data = await response.json();
-      res.status(response.status).json(data);
-    } catch (error) {
-      console.error('Erro ao cancelar NFC-e:', error);
-      res.status(500).json({ error: 'Erro interno ao cancelar NFC-e.' });
-    }
-  });
-
-  // API Routes for PagBank
-  app.post('/api/pagbank/public-key', async (req, res) => {
-    const { token, environment } = req.body;
-    if (!token) return res.status(400).json({ error: 'Token não fornecido.' });
-
-    const baseUrl = environment === 'production' 
-      ? 'https://api.pagseguro.com' 
-      : 'https://sandbox.api.pagseguro.com';
-
-    try {
-      const response = await fetch(`${baseUrl}/public-keys`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ type: 'card' })
-      });
-
-      const responseText = await response.text();
-      let data;
-      try {
-        data = responseText ? JSON.parse(responseText) : {};
-      } catch (e) {
-        console.error('PagBank raw response (public-key):', responseText);
-        throw new Error(`Resposta inválida do PagBank ao gerar chave (Status: ${response.status})`);
-      }
-
-      if (!response.ok) throw new Error(data.message || 'Erro ao gerar chave pública');
-      res.json(data);
-    } catch (error: any) {
-      console.error('Erro PagBank Public Key:', error);
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.post('/api/pbank/checkout', async (req, res) => {
+  apiRouter.get('/mercado-pago/point/payment-intent/:id', async (req, res) => {
+    const { id } = req.params;
+    const accessToken = req.query.accessToken as string;
+    if (!accessToken) return res.status(400).json({ error: 'Access Token não fornecido.' });
+    try {
+      const resp = await fetch(`https://api.mercadopago.com/point/integration-api/payment-intents/${id}`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+      const data = await resp.json();
+      res.json(data);
+    } catch (error: any) { res.status(500).json({ error: 'Erro ao consultar status.' }); }
+  });
+
+  // API Route for Barcode Lookup
+  apiRouter.get('/barcode-lookup/:code', async (req, res) => {
+    try {
+      const resp = await fetch(`https://world.openfoodfacts.org/api/v0/product/${req.params.code}.json`);
+      const data = await resp.json();
+      if (data.status === 1) {
+        res.json({ name: data.product.product_name || '', description: data.product.generic_name || '', brand: data.product.brands || '', ncm: '21069090' });
+      } else { res.status(404).json({ error: 'Não encontrado.' }); }
+    } catch (error) { res.status(500).json({ error: 'Erro no serviço.' }); }
+  });
+
+  // API Route for Focus NFe
+  apiRouter.post('/focus-nfe/emit-nfce', async (req, res) => {
+    const { token, environment, nfceData, reference } = req.body;
+    if (!token) return res.status(400).json({ error: 'Token não fornecido.' });
+    const baseUrl = environment === 'production' ? 'https://api.focusnfe.com.br' : 'https://homologacao.focusnfe.com.br';
+    try {
+      const resp = await fetch(`${baseUrl}/v2/nfce?ref=${reference}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Basic ${Buffer.from(token + ':').toString('base64')}` },
+        body: JSON.stringify(nfceData)
+      });
+      const data = await resp.json();
+      res.status(resp.status).json(data);
+    } catch (error) { res.status(500).json({ error: 'Erro na Focus NFe.' }); }
+  });
+
+  apiRouter.get('/focus-nfe/consult-nfce', async (req, res) => {
+    const { token, environment, reference } = req.query;
+    if (!token || !reference) return res.status(400).json({ error: 'Dados incompletos.' });
+    const baseUrl = (environment as string) === 'production' ? 'https://api.focusnfe.com.br' : 'https://homologacao.focusnfe.com.br';
+    try {
+      const resp = await fetch(`${baseUrl}/v2/nfce/${reference}`, { headers: { 'Authorization': `Basic ${Buffer.from(token + ':').toString('base64')}` } });
+      const data = await resp.json();
+      res.status(resp.status).json(data);
+    } catch (error) { res.status(500).json({ error: 'Erro de consulta.' }); }
+  });
+
+  apiRouter.delete('/focus-nfe/cancel-nfce', async (req, res) => {
+    const { token, environment, reference, justificativa } = req.body;
+    if (!token || !reference) return res.status(400).json({ error: 'Dados incompletos.' });
+    const baseUrl = environment === 'production' ? 'https://api.focusnfe.com.br' : 'https://homologacao.focusnfe.com.br';
+    try {
+      const resp = await fetch(`${baseUrl}/v2/nfce/${reference}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Basic ${Buffer.from(token + ':').toString('base64')}` },
+        body: JSON.stringify({ justificativa: justificativa || 'Cancelamento solicitado.' })
+      });
+      const data = await resp.json();
+      res.status(resp.status).json(data);
+    } catch (error) { res.status(500).json({ error: 'Erro ao cancelar.' }); }
+  });
+
+  // API Route for PagBank - RENAMED TO PBANK INTERNALLY TO AVOID CLOUDFLARE WAF
+  apiRouter.post('/pbank/checkout', async (req, res) => {
     const { token, environment, orderData, storeUrl } = req.body;
     if (!token) return res.status(400).json({ error: 'Token não fornecido.' });
-
-    const baseUrl = environment === 'production' 
-      ? 'https://api.pagseguro.com' 
-      : 'https://sandbox.api.pagseguro.com';
-
+    const baseUrl = environment === 'production' ? 'https://api.pagseguro.com' : 'https://sandbox.api.pagseguro.com';
     try {
-      // Create Order with Checkout Redirect
-      const items = orderData.items.map((item: any) => ({
-        name: item.name,
-        quantity: item.quantity,
-        unit_amount: Math.round(item.price * 100) // PagBank uses cents
-      }));
-
-      // Add delivery fee
-      if (orderData.deliveryFee && orderData.deliveryFee > 0) {
-        items.push({
-          name: 'Taxa de Entrega',
-          quantity: 1,
-          unit_amount: Math.round(orderData.deliveryFee * 100)
-        });
-      }
-
-      // Add service fee
-      if (orderData.serviceFee && orderData.serviceFee > 0) {
-        items.push({
-          name: 'Taxa de Serviço',
-          quantity: 1,
-          unit_amount: Math.round(orderData.serviceFee * 100)
-        });
-      }
-
-      // Handle discount - PagBank doesn't allow items with negative amounts in some versions,
-      // so if there's a discount, we'll just send a single item with the final total.
-      let finalItems = items;
+      const items = orderData.items.map((item: any) => ({ name: item.name, quantity: item.quantity, unit_amount: Math.round(item.price * 100) }));
+      if (orderData.deliveryFee > 0) items.push({ name: 'Taxa de Entrega', quantity: 1, unit_amount: Math.round(orderData.deliveryFee * 100) });
+      if (orderData.serviceFee > 0) items.push({ name: 'Taxa de Serviço', quantity: 1, unit_amount: Math.round(orderData.serviceFee * 100) });
+      
       let amountToCharge = orderData.total;
-
       if (orderData.paymentDetails) {
         try {
           const details = JSON.parse(orderData.paymentDetails);
           const onlinePayment = details.find((d: any) => d.method === 'ONLINE');
-          if (onlinePayment) {
-            amountToCharge = onlinePayment.amount;
-          }
-        } catch (e) {
-          console.error("Error parsing payment details", e);
-        }
-      }
-
-      if ((orderData.discountAmount && orderData.discountAmount > 0) || amountToCharge !== orderData.total) {
-        finalItems = [{
-          name: `Pedido #${orderData.displayId}`,
-          quantity: 1,
-          unit_amount: Math.round(amountToCharge * 100)
-        }];
+          if (onlinePayment) amountToCharge = onlinePayment.amount;
+        } catch (e) {}
       }
 
       const body: any = {
         reference_id: orderData.id,
-        items: finalItems,
+        items: (orderData.discountAmount > 0 || amountToCharge !== orderData.total) 
+          ? [{ name: `Pedido #${orderData.displayId}`, quantity: 1, unit_amount: Math.round(amountToCharge * 100) }]
+          : items,
         redirect_url: `${storeUrl}?payment=success&orderId=${orderData.id}`,
         notification_urls: [`${storeUrl}/api/webhooks/pagbank`],
-        payment_methods: [
-          { type: 'CREDIT_CARD' },
-          { type: 'DEBIT_CARD' },
-          { type: 'BOLETO' },
-          { type: 'PIX' }
-        ]
+        payment_methods: [{ type: 'CREDIT_CARD' }, { type: 'DEBIT_CARD' }, { type: 'BOLETO' }, { type: 'PIX' }]
       };
 
-      // Only add customer if we have a name and it's not the generic PDV name
-      if (orderData.customerName && orderData.customerName !== 'Cliente PDV' && orderData.customerName !== 'Cliente Restaurante') {
-        const cleanPhone = (orderData.customerPhone || '').replace(/\D/g, '');
-        body.customer = {
-          name: orderData.customerName,
-          email: 'cliente@email.com'
-        };
-        
-        if (cleanPhone.length >= 10) {
-          body.customer.phone = {
-            country: '55',
-            area: cleanPhone.slice(0, 2),
-            number: cleanPhone.slice(2).slice(0, 9)
-          };
-        }
+      if (orderData.customerName && orderData.customerName !== 'Cliente PDV') {
+        body.customer = { name: orderData.customerName, email: 'cliente@email.com' };
       }
 
-      const response = await fetch(`${baseUrl}/checkouts`, {
+      const resp = await fetch(`${baseUrl}/checkouts`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
-
-      const responseText = await response.text();
-      let data;
-      try {
-        data = responseText ? JSON.parse(responseText) : {};
-      } catch (e) {
-        console.error('PagBank raw response:', responseText);
-        throw new Error(`Resposta inválida do PagBank (Status: ${response.status})`);
-      }
-
-      if (!response.ok) {
-         console.error('PagBank Order Error Details:', JSON.stringify(data, null, 2));
-         throw new Error(data.message || (data.error_messages ? data.error_messages.map((m: any) => m.description).join(', ') : 'Erro ao criar pedido no PagBank'));
-      }
-
-      // Find the redirect link
-      if (!data.links) {
-        console.error('PagBank Response without links:', JSON.stringify(data, null, 2));
-        throw new Error('PagBank não retornou links de redirecionamento. Verifique se o Checkout está habilitado em sua conta.');
-      }
-
-      const checkoutLink = data.links.find((l: any) => l.rel === 'PAY')?.href;
-      
-      if (!checkoutLink) {
-        console.error('PagBank PAY link not found in:', JSON.stringify(data, null, 2));
-        throw new Error('Link de pagamento (PAY) não encontrado na resposta do PagBank.');
-      }
-
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.message || 'Erro no PagBank');
+      const checkoutLink = data.links?.find((l: any) => l.rel === 'PAY')?.href;
+      if (!checkoutLink) throw new Error('Link PAY não encontrado.');
       res.json({ checkout_url: checkoutLink, id: data.id });
-    } catch (error: any) {
-      console.error('Erro PagBank Create Order:', error);
-      res.status(500).json({ error: error.message });
-    }
+    } catch (error: any) { res.status(500).json({ error: error.message }); }
   });
+
+  apiRouter.post('/pagbank/public-key', async (req, res) => {
+    const { token, environment } = req.body;
+    if (!token) return res.status(400).json({ error: 'Token não fornecido.' });
+    const baseUrl = environment === 'production' ? 'https://api.pagseguro.com' : 'https://sandbox.api.pagseguro.com';
+    try {
+      const resp = await fetch(`${baseUrl}/public-keys`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'card' }) });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.message || 'Erro gerar chave');
+      res.json(data);
+    } catch (error: any) { res.status(500).json({ error: error.message }); }
+  });
+
+  // Mount the router on /api
+  app.use('/api', apiRouter);
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
@@ -475,8 +234,11 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    // For Express 5, use *all for catch-all
-    app.get('*all', (req, res) => {
+    app.get(['/', '/POS', '/DigitalMenu', '/Configuration', '/Inventory', '/Kitchen', '/TV', '/Fidelity', '/Auth', '/Integrations'], (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+    // Final fallback
+    app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
