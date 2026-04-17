@@ -44,8 +44,41 @@ export default {
         }
         
         if (reference_id) {
-          const tursoUrl = "https://produtodevaro-auricleciorocha30-byte.aws-us-east-1.turso.io";
-          const tursoToken = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzIxMzYwOTMsImlkIjoiMDE5YzliNzctZGMwMS03MmIwLWFmYWItYWRlOGY0MjM5YTBjIiwicmlkIjoiYTQyYjFmY2EtYjc0YS00MGMwLTk3M2QtODlmNmFlMTBkYzFiIn0.A7LAbG4yZ70-XPczvHXgaVUm2t_rJuTlsMpefd86FVprMb50rPZU5aICZdVvQvXpdnwOiav_nNMRCOOmi2cQDQ";
+          const mainTursoUrl = "https://produtodevaro-auricleciorocha30-byte.aws-us-east-1.turso.io";
+          const mainTursoToken = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzIxMzYwOTMsImlkIjoiMDE5YzliNzctZGMwMS03MmIwLWFmYWItYWRlOGY0MjM5YTBjIiwicmlkIjoiYTQyYjFmY2EtYjc0YS00MGMwLTk3M2QtODlmNmFlMTBkYzFiIn0.A7LAbG4yZ70-XPczvHXgaVUm2t_rJuTlsMpefd86FVprMb50rPZU5aICZdVvQvXpdnwOiav_nNMRCOOmi2cQDQ";
+          
+          let targetDbUrl = mainTursoUrl;
+          let targetDbToken = mainTursoToken;
+
+          const slug = url.searchParams.get('slug');
+          
+          if (slug) {
+              try {
+                  const querySql = `SELECT dbUrl, dbAuthToken FROM store_profiles WHERE slug = '${slug}' LIMIT 1`;
+                  const resp = await fetch(mainTursoUrl, {
+                      method: 'POST',
+                      headers: { 'Authorization': `Bearer ${mainTursoToken}`, 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ statements: [{ q: querySql, params: [] }] })
+                  });
+                  const json = await resp.json();
+                  if (json[0]?.results?.rows?.length > 0) {
+                      const row = json[0].results.rows[0];
+                      const cols = json[0].results.columns;
+                      const dbUrlIndex = cols.indexOf('dbUrl');
+                      const dbTokenIndex = cols.indexOf('dbAuthToken');
+                      if (row[dbUrlIndex] && row[dbTokenIndex]) {
+                          targetDbUrl = row[dbUrlIndex];
+                          targetDbToken = row[dbTokenIndex];
+
+                          if (targetDbUrl.startsWith('libsql://')) {
+                              targetDbUrl = targetDbUrl.replace('libsql://', 'https://');
+                          }
+                      }
+                  }
+              } catch (e) {
+                  console.error("Failed to query store database details:", e);
+              }
+          }
           
           let newStatus = 'PENDENTE';
           if (status === 'PAID' || status === 'COMPLETED' || status === 'AUTHORIZED') {
@@ -55,10 +88,10 @@ export default {
           }
 
           const updateSql = `UPDATE orders SET status = '${newStatus}' WHERE id = '${reference_id}' OR id = ${isNaN(Number(reference_id)) ? -1 : Number(reference_id)}`;
-          await fetch(tursoUrl, {
+          await fetch(targetDbUrl, {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${tursoToken}`,
+              'Authorization': `Bearer ${targetDbToken}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
@@ -84,7 +117,7 @@ export default {
 
       try {
         const body = await request.json();
-        const { token, environment, orderData, storeUrl } = body;
+        const { token, environment, orderData, storeUrl, storeSlug } = body;
 
         if (!token) {
           return new Response(JSON.stringify({ error: "Token não fornecido." }), { status: 400, headers: corsHeaders });
@@ -114,13 +147,17 @@ export default {
           ? `${storeUrl}&payment=success&orderId=${orderData.id}` 
           : `${storeUrl}?payment=success&orderId=${orderData.id}`;
 
+        const notificationUrl = storeSlug 
+            ? `${new URL(request.url).origin}/api/webhooks/pagbank?slug=${storeSlug}`
+            : `${new URL(request.url).origin}/api/webhooks/pagbank`;
+
         const pagbankBody = {
           reference_id: orderData.id,
           items: (orderData.discountAmount > 0 || amountToCharge !== orderData.total) 
             ? [{ name: `Pedido #${orderData.displayId}`, quantity: 1, unit_amount: Math.round(amountToCharge * 100) }]
             : items,
           redirect_url: redirectUrl,
-          notification_urls: [`${new URL(request.url).origin}/api/webhooks/pagbank`],
+          notification_urls: [notificationUrl],
           payment_methods: [{ type: 'CREDIT_CARD' }, { type: 'DEBIT_CARD' }, { type: 'BOLETO' }, { type: 'PIX' }]
         };
 

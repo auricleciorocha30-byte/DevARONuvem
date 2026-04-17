@@ -1262,7 +1262,9 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                 environment: settings.pagbankEnvironment || 'sandbox',
                 orderData: mockOrder,
                 status: 'pending',
-                storeUrl: redirectStoreUrl
+                storeUrl: redirectStoreUrl,
+                storeSlug: settings.slug,
+                storeId: storeId
             })
         });
 
