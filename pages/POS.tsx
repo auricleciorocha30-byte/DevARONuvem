@@ -1244,7 +1244,15 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
             })
         });
 
-        const data = await response.json();
+        const responseText = await response.text();
+        let data;
+        try {
+          data = responseText ? JSON.parse(responseText) : {};
+        } catch (e) {
+          console.error('Non-JSON response from PagBank API:', responseText);
+          throw new Error(`Erro no servidor ao gerar link. (Status: ${response.status})`);
+        }
+
         if (data.checkout_url) {
             setOnlineCheckoutUrl(data.checkout_url);
             // Optionally open in new tab or show QR (if we had a QR lib)

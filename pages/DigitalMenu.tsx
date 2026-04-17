@@ -849,16 +849,25 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                 storeUrl: window.location.href.split('?')[0]
               })
             });
-            const data = await response.json();
+            
+            const responseText = await response.text();
+            let data;
+            try {
+              data = responseText ? JSON.parse(responseText) : {};
+            } catch (e) {
+              console.error('Non-JSON response from PagBank API:', responseText);
+              throw new Error(`Resposta inválida do servidor. (Status: ${response.status})`);
+            }
+
             if (data.checkout_url) {
               window.location.href = data.checkout_url;
               return; // Stop execution to allow redirect
             } else {
               alert('Erro ao gerar link de pagamento PagBank: ' + (data.error || 'Verifique suas configurações.'));
             }
-          } catch (err) {
+          } catch (err: any) {
             console.error('Erro no pagamento online PagBank:', err);
-            alert('Erro ao gerar link de pagamento PagBank. O pedido foi salvo.');
+            alert(`Erro ao gerar link de pagamento PagBank: ${err.message}`);
           }
         }
 

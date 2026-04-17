@@ -54,16 +54,23 @@ export default function IntegrationsPage({ settings, onSave }: Props) {
         })
       });
       
-      const data = await response.json();
+      const responseText = await response.text();
+      let data;
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch (e) {
+        throw new Error(`Resposta inválida do servidor ao gerar chave. (Status: ${response.status})`);
+      }
+      
       if (response.ok && data.public_key) {
         setFormData({ ...formData, onlinePaymentPublicKey: data.public_key });
         alert('Chave Pública gerada e preenchida com sucesso!');
       } else {
         alert('Erro ao gerar chave pública: ' + (data.error || 'Verifique seu token.'));
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert('Erro ao comunicar com o servidor.');
+      alert('Erro ao comunicar com o servidor: ' + error.message);
     } finally {
       setIsGeneratingKey(false);
     }

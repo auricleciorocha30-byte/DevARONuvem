@@ -310,7 +310,15 @@ async function startServer() {
         body: JSON.stringify({ type: 'card' })
       });
 
-      const data = await response.json();
+      const responseText = await response.text();
+      let data;
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch (e) {
+        console.error('PagBank raw response (public-key):', responseText);
+        throw new Error(`Resposta inválida do PagBank ao gerar chave (Status: ${response.status})`);
+      }
+
       if (!response.ok) throw new Error(data.message || 'Erro ao gerar chave pública');
       res.json(data);
     } catch (error: any) {
@@ -410,7 +418,15 @@ async function startServer() {
         body: JSON.stringify(body)
       });
 
-      const data = await response.json();
+      const responseText = await response.text();
+      let data;
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch (e) {
+        console.error('PagBank raw response:', responseText);
+        throw new Error(`Resposta inválida do PagBank (Status: ${response.status})`);
+      }
+
       if (!response.ok) {
          console.error('PagBank Order Error Details:', JSON.stringify(data, null, 2));
          throw new Error(data.message || (data.error_messages ? data.error_messages.map((m: any) => m.description).join(', ') : 'Erro ao criar pedido no PagBank'));
