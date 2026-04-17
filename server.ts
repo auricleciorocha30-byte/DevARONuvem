@@ -15,6 +15,12 @@ async function startServer() {
   app.use(cors());
   app.use(express.json({ limit: '10mb' }));
 
+  // Debug middleware for API routes
+  app.use('/api', (req, res, next) => {
+    console.log(`[API ${req.method}] ${req.url}`);
+    next();
+  });
+
   // API Route for Mercado Pago Checkout Pro
   app.post('/api/mercado-pago/create-preference', async (req, res) => {
     const { accessToken, orderData, storeUrl } = req.body;
@@ -327,7 +333,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/pagbank/create-checkout', async (req, res) => {
+  app.post('/api/pbank/checkout', async (req, res) => {
     const { token, environment, orderData, storeUrl } = req.body;
     if (!token) return res.status(400).json({ error: 'Token não fornecido.' });
 
@@ -469,7 +475,8 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
+    // For Express 5, use *all for catch-all
+    app.get('*all', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

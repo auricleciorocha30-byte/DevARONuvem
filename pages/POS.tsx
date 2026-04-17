@@ -1233,7 +1233,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
           customerPhone: selectedCustomer?.phone || ''
         };
 
-        const response = await fetch('/api/pagbank/create-checkout', {
+        const response = await fetch('/api/pbank/checkout', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

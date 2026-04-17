@@ -839,7 +839,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
 
         if ((payment === 'ONLINE' || combinedPayment === 'ONLINE') && settings.onlinePaymentProvider === 'pagbank') {
           try {
-            const response = await fetch('/api/pagbank/create-checkout', {
+            const response = await fetch('/api/pbank/checkout', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
