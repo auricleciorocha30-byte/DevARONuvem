@@ -15,13 +15,7 @@ async function startServer() {
   app.use(cors());
   app.use(express.json({ limit: '10mb' }));
 
-  // GLOBAL LOGGER - See every request entering the server
-  app.use((req, res, next) => {
-    console.log(`[SERVER LOG] ${new Date().toISOString()} - ${req.method} ${req.url}`);
-    next();
-  });
-
-  // Diagnostic route - at the root level, before everything
+  // Diagnostic route
   app.get('/api-health', (req, res) => {
     res.json({
       status: 'ok',
@@ -245,11 +239,17 @@ async function startServer() {
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
+    console.log('Initializing Vite in development mode...');
+    try {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: 'spa',
+      });
+      app.use(vite.middlewares);
+      console.log('Vite middleware integrated.');
+    } catch (e) {
+      console.error('Failed to initialize Vite:', e);
+    }
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
