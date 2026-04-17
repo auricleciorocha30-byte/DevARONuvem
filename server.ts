@@ -386,21 +386,11 @@ async function startServer() {
         }];
       }
 
-      const body = {
+      const body: any = {
         reference_id: orderData.id,
-        customer: {
-          name: orderData.customerName || 'Cliente Restaurante',
-          email: 'cliente@email.com', // Placeholder or from customer data if available
-          tax_id: '12345678909', // Placeholder or from customer data
-          phone: {
-            country: '55',
-            area: orderData.customerPhone?.slice(0, 2) || '11',
-            number: orderData.customerPhone?.slice(2) || '999999999'
-          }
-        },
         items: finalItems,
         redirect_url: `${storeUrl}?payment=success&orderId=${orderData.id}`,
-        notification_urls: [`${storeUrl}/api/webhooks/pagbank`], // Placeholder for webhook
+        notification_urls: [`${storeUrl}/api/webhooks/pagbank`],
         payment_methods: [
           { type: 'CREDIT_CARD' },
           { type: 'DEBIT_CARD' },
@@ -408,6 +398,23 @@ async function startServer() {
           { type: 'PIX' }
         ]
       };
+
+      // Only add customer if we have a name and it's not the generic PDV name
+      if (orderData.customerName && orderData.customerName !== 'Cliente PDV' && orderData.customerName !== 'Cliente Restaurante') {
+        const cleanPhone = (orderData.customerPhone || '').replace(/\D/g, '');
+        body.customer = {
+          name: orderData.customerName,
+          email: 'cliente@email.com'
+        };
+        
+        if (cleanPhone.length >= 10) {
+          body.customer.phone = {
+            country: '55',
+            area: cleanPhone.slice(0, 2),
+            number: cleanPhone.slice(2).slice(0, 9)
+          };
+        }
+      }
 
       const response = await fetch(`${baseUrl}/checkouts`, {
         method: 'POST',
@@ -433,7 +440,18 @@ async function startServer() {
       }
 
       // Find the redirect link
+      if (!data.links) {
+        console.error('PagBank Response without links:', JSON.stringify(data, null, 2));
+        throw new Error('PagBank não retornou links de redirecionamento. Verifique se o Checkout está habilitado em sua conta.');
+      }
+
       const checkoutLink = data.links.find((l: any) => l.rel === 'PAY')?.href;
+      
+      if (!checkoutLink) {
+        console.error('PagBank PAY link not found in:', JSON.stringify(data, null, 2));
+        throw new Error('Link de pagamento (PAY) não encontrado na resposta do PagBank.');
+      }
+
       res.json({ checkout_url: checkoutLink, id: data.id });
     } catch (error: any) {
       console.error('Erro PagBank Create Order:', error);
