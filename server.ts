@@ -291,6 +291,140 @@ async function startServer() {
     }
   });
 
+  // API Routes for PagBank
+  app.post('/api/pagbank/public-key', async (req, res) => {
+    const { token, environment } = req.body;
+    if (!token) return res.status(400).json({ error: 'Token não fornecido.' });
+
+    const baseUrl = environment === 'production' 
+      ? 'https://api.pagseguro.com' 
+      : 'https://sandbox.api.pagseguro.com';
+
+    try {
+      const response = await fetch(`${baseUrl}/public-keys`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ type: 'card' })
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Erro ao gerar chave pública');
+      res.json(data);
+    } catch (error: any) {
+      console.error('Erro PagBank Public Key:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/pagbank/create-checkout', async (req, res) => {
+    const { token, environment, orderData, storeUrl } = req.body;
+    if (!token) return res.status(400).json({ error: 'Token não fornecido.' });
+
+    const baseUrl = environment === 'production' 
+      ? 'https://api.pagseguro.com' 
+      : 'https://sandbox.api.pagseguro.com';
+
+    try {
+      // Create Order with Checkout Redirect
+      const items = orderData.items.map((item: any) => ({
+        name: item.name,
+        quantity: item.quantity,
+        unit_amount: Math.round(item.price * 100) // PagBank uses cents
+      }));
+
+      // Add delivery fee
+      if (orderData.deliveryFee && orderData.deliveryFee > 0) {
+        items.push({
+          name: 'Taxa de Entrega',
+          quantity: 1,
+          unit_amount: Math.round(orderData.deliveryFee * 100)
+        });
+      }
+
+      // Add service fee
+      if (orderData.serviceFee && orderData.serviceFee > 0) {
+        items.push({
+          name: 'Taxa de Serviço',
+          quantity: 1,
+          unit_amount: Math.round(orderData.serviceFee * 100)
+        });
+      }
+
+      // Handle discount - PagBank doesn't allow items with negative amounts in some versions,
+      // so if there's a discount, we'll just send a single item with the final total.
+      let finalItems = items;
+      let amountToCharge = orderData.total;
+
+      if (orderData.paymentDetails) {
+        try {
+          const details = JSON.parse(orderData.paymentDetails);
+          const onlinePayment = details.find((d: any) => d.method === 'ONLINE');
+          if (onlinePayment) {
+            amountToCharge = onlinePayment.amount;
+          }
+        } catch (e) {
+          console.error("Error parsing payment details", e);
+        }
+      }
+
+      if ((orderData.discountAmount && orderData.discountAmount > 0) || amountToCharge !== orderData.total) {
+        finalItems = [{
+          name: `Pedido #${orderData.displayId}`,
+          quantity: 1,
+          unit_amount: Math.round(amountToCharge * 100)
+        }];
+      }
+
+      const body = {
+        reference_id: orderData.id,
+        customer: {
+          name: orderData.customerName || 'Cliente Restaurante',
+          email: 'cliente@email.com', // Placeholder or from customer data if available
+          tax_id: '12345678909', // Placeholder or from customer data
+          phone: {
+            country: '55',
+            area: orderData.customerPhone?.slice(0, 2) || '11',
+            number: orderData.customerPhone?.slice(2) || '999999999'
+          }
+        },
+        items: finalItems,
+        redirect_url: `${storeUrl}?payment=success&orderId=${orderData.id}`,
+        notification_urls: [`${storeUrl}/api/webhooks/pagbank`], // Placeholder for webhook
+        payment_methods: [
+          { type: 'CREDIT_CARD' },
+          { type: 'DEBIT_CARD' },
+          { type: 'BOLETO' },
+          { type: 'PIX' }
+        ]
+      };
+
+      const response = await fetch(`${baseUrl}/checkouts`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+         console.error('PagBank Order Error Details:', JSON.stringify(data, null, 2));
+         throw new Error(data.message || (data.error_messages ? data.error_messages.map((m: any) => m.description).join(', ') : 'Erro ao criar pedido no PagBank'));
+      }
+
+      // Find the redirect link
+      const checkoutLink = data.links.find((l: any) => l.rel === 'PAY')?.href;
+      res.json({ checkout_url: checkoutLink, id: data.id });
+    } catch (error: any) {
+      console.error('Erro PagBank Create Order:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

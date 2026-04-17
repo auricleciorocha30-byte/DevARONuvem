@@ -837,6 +837,31 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
           }
         }
 
+        if ((payment === 'ONLINE' || combinedPayment === 'ONLINE') && settings.onlinePaymentProvider === 'pagbank') {
+          try {
+            const response = await fetch('/api/pagbank/create-checkout', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                token: settings.onlinePaymentAccessToken,
+                environment: settings.pagbankEnvironment || 'sandbox',
+                orderData: finalOrder,
+                storeUrl: window.location.href.split('?')[0]
+              })
+            });
+            const data = await response.json();
+            if (data.checkout_url) {
+              window.location.href = data.checkout_url;
+              return; // Stop execution to allow redirect
+            } else {
+              alert('Erro ao gerar link de pagamento PagBank: ' + (data.error || 'Verifique suas configurações.'));
+            }
+          } catch (err) {
+            console.error('Erro no pagamento online PagBank:', err);
+            alert('Erro ao gerar link de pagamento PagBank. O pedido foi salvo.');
+          }
+        }
+
         setCheckoutStep('success'); 
     } catch (err: any) { 
         alert(`Erro ao enviar pedido: ${err.message}`); 

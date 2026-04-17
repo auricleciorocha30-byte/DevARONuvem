@@ -11,7 +11,8 @@ import {
   AlertCircle,
   Key,
   Lock,
-  Upload
+  Upload,
+  Loader2
 } from 'lucide-react';
 import { StoreSettings } from '../types';
 
@@ -29,9 +30,44 @@ export default function IntegrationsPage({ settings, onSave }: Props) {
     onlinePaymentProvider: settings.onlinePaymentProvider || 'mercado_pago',
     onlinePaymentAccessToken: settings.onlinePaymentAccessToken || '',
     onlinePaymentPublicKey: settings.onlinePaymentPublicKey || '',
+    pagbankEnvironment: settings.pagbankEnvironment || 'sandbox',
     isOnlinePaymentActive: settings.isOnlinePaymentActive || false,
     mercadoPagoPointDeviceId: settings.mercadoPagoPointDeviceId || '',
   });
+
+  const [isGeneratingKey, setIsGeneratingKey] = useState(false);
+
+  const handleGeneratePagBankKey = async () => {
+    if (!formData.onlinePaymentAccessToken) {
+      alert('Informe o Token (Chave Privada) antes de gerar a Chave Pública.');
+      return;
+    }
+    
+    setIsGeneratingKey(true);
+    try {
+      const response = await fetch('/api/pagbank/public-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: formData.onlinePaymentAccessToken,
+          environment: formData.pagbankEnvironment
+        })
+      });
+      
+      const data = await response.json();
+      if (response.ok && data.public_key) {
+        setFormData({ ...formData, onlinePaymentPublicKey: data.public_key });
+        alert('Chave Pública gerada e preenchida com sucesso!');
+      } else {
+        alert('Erro ao gerar chave pública: ' + (data.error || 'Verifique seu token.'));
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Erro ao comunicar com o servidor.');
+    } finally {
+      setIsGeneratingKey(false);
+    }
+  };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -186,10 +222,10 @@ export default function IntegrationsPage({ settings, onSave }: Props) {
                     Mercado Pago
                   </button>
                   <button
-                    onClick={() => setFormData({ ...formData, onlinePaymentProvider: 'pagseguro' })}
-                    className={`py-3 rounded-xl font-bold text-[10px] transition-all border ${formData.onlinePaymentProvider === 'pagseguro' ? 'bg-green-600 text-white border-green-600 shadow-md' : 'bg-gray-50 text-gray-400 border-gray-100'}`}
+                    onClick={() => setFormData({ ...formData, onlinePaymentProvider: 'pagbank' })}
+                    className={`py-3 rounded-xl font-bold text-[10px] transition-all border ${formData.onlinePaymentProvider === 'pagbank' ? 'bg-green-600 text-white border-green-600 shadow-md' : 'bg-gray-50 text-gray-400 border-gray-100'}`}
                   >
-                    PagSeguro
+                    PagBank
                   </button>
                   <button
                     onClick={() => setFormData({ ...formData, onlinePaymentProvider: 'asaas' })}
@@ -200,8 +236,30 @@ export default function IntegrationsPage({ settings, onSave }: Props) {
                 </div>
               </div>
 
+              {formData.onlinePaymentProvider === 'pagbank' && (
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">Ambiente PagBank</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setFormData({ ...formData, pagbankEnvironment: 'sandbox' })}
+                      className={`py-3 rounded-xl font-bold text-xs transition-all border ${formData.pagbankEnvironment === 'sandbox' ? 'bg-orange-600 text-white border-orange-600 shadow-md' : 'bg-gray-50 text-gray-400 border-gray-100'}`}
+                    >
+                      Sandbox (Testes)
+                    </button>
+                    <button
+                      onClick={() => setFormData({ ...formData, pagbankEnvironment: 'production' })}
+                      className={`py-3 rounded-xl font-bold text-xs transition-all border ${formData.pagbankEnvironment === 'production' ? 'bg-primary text-white border-primary shadow-md' : 'bg-gray-50 text-gray-400 border-gray-100'}`}
+                    >
+                      Produção (Real)
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div>
-                <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">Access Token (Chave Privada)</label>
+                <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">
+                  Access Token (Chave Privada)
+                </label>
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
                   <input
@@ -215,17 +273,35 @@ export default function IntegrationsPage({ settings, onSave }: Props) {
               </div>
 
               <div>
-                <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">Public Key (Chave Pública)</label>
-                <div className="relative">
-                  <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                  <input
-                    type="text"
-                    value={formData.onlinePaymentPublicKey}
-                    onChange={(e) => setFormData({ ...formData, onlinePaymentPublicKey: e.target.value })}
-                    className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-mono text-sm"
-                    placeholder="APP_USR-..."
-                  />
+                <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">
+                  Public Key (Chave Pública)
+                </label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                    <input
+                      type="text"
+                      value={formData.onlinePaymentPublicKey}
+                      onChange={(e) => setFormData({ ...formData, onlinePaymentPublicKey: e.target.value })}
+                      className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-mono text-sm"
+                      placeholder="Identificador da Chave..."
+                    />
+                  </div>
+                  {formData.onlinePaymentProvider === 'pagbank' && (
+                    <button
+                      onClick={handleGeneratePagBankKey}
+                      disabled={isGeneratingKey}
+                      className="px-6 bg-green-50 text-green-600 border border-green-100 rounded-2xl font-bold text-xs hover:bg-green-100 transition-all disabled:opacity-50"
+                    >
+                      {isGeneratingKey ? <Loader2 className="animate-spin" size={18} /> : 'Gerar Chave'}
+                    </button>
+                  )}
                 </div>
+                {formData.onlinePaymentProvider === 'pagbank' && (
+                  <p className="text-[10px] text-gray-400 mt-2 ml-1 italic">
+                    * Clique em "Gerar Chave" para obter a chave pública automaticamente usando seu Access Token.
+                  </p>
+                )}
               </div>
 
               {formData.onlinePaymentProvider === 'mercado_pago' && (
