@@ -37,7 +37,8 @@ import {
   UserRound,
   ArrowLeft,
   Award,
-  Clock
+  Clock,
+  QrCode
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Product, StoreSettings, Order, OrderItem, OrderType, PaymentMethod, Waitstaff } from '../types';
@@ -1303,8 +1304,10 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Método de Pagamento</p>
                            <div className="grid grid-cols-3 gap-2">
                               {[
-                                {id: 'PIX', icon: <DollarSign size={18}/>, label: 'PIX'},
-                                {id: 'CARTAO', icon: <CreditCard size={18}/>, label: 'Cartão'},
+                                ...(settings.isOnlinePaymentActive ? [] : [
+                                  {id: 'PIX', icon: <DollarSign size={18}/>, label: 'PIX'},
+                                  {id: 'CARTAO', icon: <CreditCard size={18}/>, label: 'Cartão'},
+                                ]),
                                 {id: 'DINHEIRO', icon: <Banknote size={18}/>, label: 'Dinheiro'},
                                 ...(settings.isOnlinePaymentActive && settings.onlinePaymentProvider ? [{id: 'ONLINE', icon: <CreditCard size={18}/>, label: 'Pagar Online'}] : []),
                                 ...(orderType === 'ENTREGA' ? [{id: 'A_PAGAR', icon: <Wallet size={18}/>, label: 'Pagar na Entrega'}] : []),

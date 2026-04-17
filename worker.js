@@ -328,9 +328,12 @@ export default {
           },
           auto_return: 'approved',
           payment_methods: {
+            excluded_payment_methods: [],
             excluded_payment_types: [
-              { id: "ticket" } // Exclude boleto usually to just show card and pix
-            ]
+              { id: "ticket" } 
+            ],
+            installments: 12,
+            default_payment_method_id: null
           }
         };
 

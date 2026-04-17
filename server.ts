@@ -219,9 +219,16 @@ async function startServer() {
     try {
       const resp = await fetch(`${baseUrl}/public-keys`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'card' }) });
       const data = await resp.json();
-      if (!resp.ok) throw new Error(data.message || 'Erro gerar chave');
+      if (!resp.ok) {
+        console.error('PagBank Key Error:', data);
+        const errDetail = data.error_messages ? data.error_messages.map((m: any) => m.description).join(', ') : (data.message || JSON.stringify(data));
+        throw new Error(errDetail || 'Erro ao gerar chave no PagBank');
+      }
       res.json(data);
-    } catch (error: any) { res.status(500).json({ error: error.message }); }
+    } catch (error: any) { 
+      console.error('PagBank generate-key catch:', error);
+      res.status(500).json({ error: error.message }); 
+    }
   });
 
   // Catch-all for API router to log 404s within the API prefix
