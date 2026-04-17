@@ -32,7 +32,8 @@ import {
   Camera,
   Award,
   MessageCircle,
-  Zap
+  Zap,
+  Globe
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Product, Order, OrderItem, StoreSettings, Waitstaff, PaymentMethod, Customer, OrderStatus } from '../types';
@@ -111,6 +112,8 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
   const [installments, setInstallments] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPointProcessing, setIsPointProcessing] = useState(false);
+  const [isOnlineProcessing, setIsOnlineProcessing] = useState(false);
+  const [onlineCheckoutUrl, setOnlineCheckoutUrl] = useState<string | null>(null);
   const [pointPaymentId, setPointPaymentId] = useState<string | null>(null);
   const [pointStatus, setPointStatus] = useState<string | null>(null);
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
@@ -1207,6 +1210,54 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
 
   const handleRemovePayment = (index: number) => {
     setPayments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleOnlinePayment = async () => {
+    const amount = parseFloat(currentPaymentAmount);
+    if (isNaN(amount) || amount <= 0) return;
+    if (!settings.onlinePaymentAccessToken || settings.onlinePaymentProvider !== 'pagbank') {
+        alert("Configuração do PagBank incompleta ou provedor não suportado para geração de link no PDV.");
+        return;
+    }
+
+    setIsOnlineProcessing(true);
+    
+    try {
+        // Mock order data for checkout
+        const mockOrder = {
+          id: `pos_${Date.now()}`,
+          displayId: 'PDV',
+          total: amount,
+          items: cart.length > 0 ? cart : [{ name: 'Venda Diversa', quantity: 1, price: amount }],
+          customerName: selectedCustomer?.name || 'Cliente PDV',
+          customerPhone: selectedCustomer?.phone || ''
+        };
+
+        const response = await fetch('/api/pagbank/create-checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                token: settings.onlinePaymentAccessToken,
+                environment: settings.pagbankEnvironment || 'sandbox',
+                orderData: mockOrder,
+                storeUrl: window.location.href.split('?')[0]
+            })
+        });
+
+        const data = await response.json();
+        if (data.checkout_url) {
+            setOnlineCheckoutUrl(data.checkout_url);
+            // Optionally open in new tab or show QR (if we had a QR lib)
+            window.open(data.checkout_url, '_blank');
+            alert("Link de pagamento gerado e aberto em nova aba. Após a confirmação do cliente, adicione o pagamento.");
+        } else {
+            throw new Error(data.error || 'Erro ao gerar checkout.');
+        }
+    } catch (err: any) {
+        alert(err.message);
+    } finally {
+        setIsOnlineProcessing(false);
+    }
   };
 
   const handlePointPayment = async () => {
@@ -3112,18 +3163,46 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                                           <option value="DEBITO">Débito</option>
                                           <option value="VALES">Vales</option>
                                           <option value="PIX">Pix</option>
+                                          {settings.isOnlinePaymentActive && (
+                                              <option value="ONLINE">Pagamento Online</option>
+                                          )}
                                           {settings.onlinePaymentProvider === 'mercado_pago' && settings.mercadoPagoPointDeviceId && (
                                               <option value="MAQUININHA">Maquininha Point</option>
                                           )}
                                       </select>
                                       <button 
-                                          onClick={currentPaymentMethod === 'MAQUININHA' ? handlePointPayment : handleAddPayment}
-                                          disabled={isPointProcessing}
-                                          className={`p-3 text-white rounded-xl ${isPointProcessing ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`}
+                                          onClick={currentPaymentMethod === 'MAQUININHA' ? handlePointPayment : (currentPaymentMethod === 'ONLINE' && settings.onlinePaymentProvider === 'pagbank' && !onlineCheckoutUrl ? handleOnlinePayment : handleAddPayment)}
+                                          disabled={isPointProcessing || isOnlineProcessing}
+                                          className={`p-3 text-white rounded-xl ${isPointProcessing || isOnlineProcessing ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`}
                                       >
-                                          {isPointProcessing ? <Loader2 className="animate-spin" size={20} /> : <Plus size={20} />}
+                                          {isPointProcessing || isOnlineProcessing ? <Loader2 className="animate-spin" size={20} /> : (currentPaymentMethod === 'ONLINE' && settings.onlinePaymentProvider === 'pagbank' && !onlineCheckoutUrl ? <Zap size={20} /> : <Plus size={20} />)}
                                       </button>
                                   </div>
+
+                                  {isOnlineProcessing && (
+                                      <div className="p-3 bg-green-50 rounded-xl border border-green-100 flex items-center gap-3 animate-pulse">
+                                          <Loader2 className="animate-spin text-green-600" size={20} />
+                                          <span className="text-sm font-bold text-green-800">Gerando link PagBank...</span>
+                                      </div>
+                                  )}
+
+                                  {currentPaymentMethod === 'ONLINE' && onlineCheckoutUrl && (
+                                      <div className="p-3 bg-green-50 rounded-xl border border-green-100 space-y-2">
+                                          <div className="flex justify-between items-center">
+                                              <span className="text-xs font-bold text-green-800 uppercase tracking-widest">Link de Pagamento Ativo</span>
+                                              <button onClick={() => setOnlineCheckoutUrl(null)} className="text-red-500 hover:text-red-700">
+                                                  <X size={14} />
+                                              </button>
+                                          </div>
+                                          <button 
+                                              onClick={() => window.open(onlineCheckoutUrl, '_blank')}
+                                              className="w-full py-2 bg-white border border-green-200 text-green-700 rounded-lg text-xs font-bold flex items-center justify-center gap-2"
+                                          >
+                                              <Globe size={14} /> Abrir Link Novamente
+                                          </button>
+                                          <p className="text-[10px] text-green-600 italic">* Após receber a confirmação no celular do cliente, clique no botão (+) acima para confirmar no PDV.</p>
+                                      </div>
+                                  )}
 
                                   {isPointProcessing && (
                                       <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 flex items-center gap-3 animate-pulse">
