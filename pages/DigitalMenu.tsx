@@ -831,7 +831,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
               body: JSON.stringify({
                 accessToken: settings.onlinePaymentAccessToken,
                 orderData: finalOrder,
-                storeUrl: window.location.href.split('?')[0]
+                storeUrl: window.location.href
               })
             });
             const data = await response.json();
@@ -849,6 +849,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
 
         if ((payment === 'ONLINE' || combinedPayment === 'ONLINE') && settings.onlinePaymentProvider === 'pagbank') {
           try {
+            const redirectStoreUrl = `${window.location.origin}${window.location.pathname}?loja=${settings.slug}`;
             const response = await fetch('/api/v1/process-payment', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -856,7 +857,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                 token: settings.onlinePaymentAccessToken,
                 environment: settings.pagbankEnvironment || 'sandbox',
                 orderData: finalOrder,
-                storeUrl: window.location.href // Use full URL with loja param
+                storeUrl: redirectStoreUrl
               })
             });
             

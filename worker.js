@@ -119,7 +119,10 @@ export default {
         };
 
         if (orderData.customerName && orderData.customerName !== 'Cliente PDV') {
-          pagbankBody.customer = { name: orderData.customerName, email: 'cliente@email.com' };
+          const nameParts = orderData.customerName.trim().split(' ');
+          if (nameParts.length >= 2) {
+            pagbankBody.customer = { name: orderData.customerName, email: 'cliente@email.com' };
+          }
         }
 
         const resp = await fetch(`${baseUrl}/checkouts`, {

@@ -478,6 +478,7 @@ function StoreContext() {
 
   const addOrder = async (order: Order) => {
     const dbOrder = {
+      id: Number(order.id),
       store_id: currentStore?.id,
       type: order.type,
       items: JSON.stringify(order.items),

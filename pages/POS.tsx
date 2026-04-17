@@ -1239,6 +1239,8 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
           customerPhone: finalCustomerPhone
         };
 
+        const redirectStoreUrl = `${window.location.origin}${window.location.pathname}?loja=${settings.slug}`;
+
         const response = await fetch('/api/v1/process-payment', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1247,7 +1249,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                 environment: settings.pagbankEnvironment || 'sandbox',
                 orderData: mockOrder,
                 status: 'pending',
-                storeUrl: window.location.href // Keep full URL including ?loja=...
+                storeUrl: redirectStoreUrl
             })
         });
 
