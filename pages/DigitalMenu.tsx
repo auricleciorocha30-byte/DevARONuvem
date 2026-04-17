@@ -72,6 +72,8 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const [checkoutStep, setCheckoutStep] = useState<'cart' | 'details' | 'success'>(paymentStatus ? 'success' : 'cart');
   const [activeCategory, setActiveCategory] = useState('Todos');
   const [searchTerm, setSearchTerm] = useState('');
+  const [generatedDisplayId, setGeneratedDisplayId] = useState<string | null>(null);
+  const [generatedPix, setGeneratedPix] = useState<{qr_code: string, qr_code_base64: string} | null>(null);
   
   const [weightProduct, setWeightProduct] = useState<Product | null>(null);
   const [selectedWeightGrams, setSelectedWeightGrams] = useState<string>("");
@@ -183,7 +185,6 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const [useCashback, setUseCashback] = useState(false);
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [referencePoint, setReferencePoint] = useState('');
-  const [generatedDisplayId, setGeneratedDisplayId] = useState('');
   const [isConsulting, setIsConsulting] = useState(false);
   
   const [deliveryFee, setDeliveryFee] = useState<number | null>(null);
@@ -823,6 +824,27 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
         setCombinedPayment('PIX');
         if (!effectiveTable) setManualTable('');
         
+        if ((payment === 'PIX' || combinedPayment === 'PIX') && settings.onlinePaymentProvider === 'mercado_pago' && settings.onlinePaymentAccessToken) {
+          try {
+             const response = await fetch('/api/mercado-pago/create-pix', {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify({
+                 accessToken: settings.onlinePaymentAccessToken,
+                 orderData: finalOrder,
+                 storeSlug: settings.slug || storeSlug,
+               })
+             });
+             const data = await response.json();
+             if (data.qr_code) {
+               setGeneratedPix({ qr_code: data.qr_code, qr_code_base64: data.qr_code_base64 });
+               setCheckoutStep('success'); // Show success component with QR code
+             }
+          } catch(err) {
+             console.error("Erro gerando Pix MP", err);
+          }
+        }
+        
         if ((payment === 'ONLINE' || combinedPayment === 'ONLINE') && settings.onlinePaymentProvider === 'mercado_pago') {
           try {
             const redirectStoreUrl = `${window.location.origin}${window.location.pathname}#/cardapio?loja=${settings.slug || storeSlug}`;
@@ -1363,6 +1385,22 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                         <div className="flex justify-between items-center"><span className="text-[10px] font-black text-gray-400 uppercase">Senha do Pedido</span><span className="text-xl font-black text-primary">#{generatedDisplayId || paymentOrderId?.slice(-4)}</span></div>
                         <p className="text-[10px] text-gray-400 leading-snug">Fique atento ao painel da loja ou aguarde nosso atendente chamar.</p>
                      </div>
+
+                     {generatedPix && (
+                        <div className="bg-white p-6 rounded-3xl border border-gray-200 text-center space-y-4 shadow-xl">
+                           <h4 className="font-bold text-gray-800 text-sm">Pague agora com Pix (Mercado Pago)</h4>
+                           <img src={`data:image/jpeg;base64,${generatedPix.qr_code_base64}`} alt="QR Code Pix" className="mx-auto w-48 h-48" />
+                           <div className="bg-gray-50 p-3 rounded-xl">
+                              <p className="text-[9px] text-gray-500 break-all select-all font-mono">{generatedPix.qr_code}</p>
+                           </div>
+                           <button onClick={() => {
+                              navigator.clipboard.writeText(generatedPix.qr_code);
+                              alert("Código Copia e Cola copiado!");
+                           }} className="w-full py-4 bg-purple-100 text-purple-700 font-bold rounded-xl text-sm mt-2 flex items-center justify-center gap-2">
+                              <QrCode size={16}/> Copiar Código Pix
+                           </button>
+                        </div>
+                     )}
                      
                      {(orderType === 'ENTREGA' || orderType === 'BALCAO') && customerPhone && (
                        <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100 text-left space-y-2">

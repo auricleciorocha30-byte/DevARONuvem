@@ -326,7 +326,12 @@ export default {
             failure: storeUrl.includes('?') ? `${storeUrl}&payment=failure&orderId=${orderData.id}` : `${storeUrl}?payment=failure&orderId=${orderData.id}`,
             pending: storeUrl.includes('?') ? `${storeUrl}&payment=pending&orderId=${orderData.id}` : `${storeUrl}?payment=pending&orderId=${orderData.id}`
           },
-          auto_return: 'approved'
+          auto_return: 'approved',
+          payment_methods: {
+            excluded_payment_types: [
+              { id: "ticket" } // Exclude boleto usually to just show card and pix
+            ]
+          }
         };
 
         const resp = await fetch('https://api.mercadopago.com/checkout/preferences', {
@@ -345,6 +350,66 @@ export default {
         }
 
         return new Response(JSON.stringify({ init_point: data.init_point, id: data.id }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      } catch (error) {
+        return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
+      }
+    }
+
+    // MERCADO PAGO CREATE PIX
+    if (url.pathname === "/api/mercado-pago/create-pix" && request.method === "POST") {
+      try {
+        const body = await request.json();
+        const { accessToken, orderData, storeSlug } = body;
+
+        if (!accessToken) {
+          return new Response(JSON.stringify({ error: "Access Token não fornecido." }), { status: 400, headers: corsHeaders });
+        }
+
+        let amountToCharge = Number(orderData.total);
+        if (orderData.paymentDetails) {
+          try {
+            const details = JSON.parse(orderData.paymentDetails);
+            const onlinePayment = details.find((d) => d.method === 'ONLINE' || d.method === 'PIX');
+            if (onlinePayment) amountToCharge = Number(onlinePayment.amount);
+          } catch (e) {}
+        }
+
+        const payload = {
+          transaction_amount: Number(amountToCharge.toFixed(2)),
+          description: `Pedido #${orderData.displayId || ''}`,
+          payment_method_id: "pix",
+          external_reference: String(orderData.id),
+          notification_url: `${new URL(request.url).origin}/api/webhooks/mercadopago?slug=${storeSlug}`,
+          payer: {
+            email: "cliente@email.com",
+            first_name: orderData.customerName ? orderData.customerName.split(' ')[0] : "Cliente"
+          }
+        };
+
+        const resp = await fetch('https://api.mercadopago.com/v1/payments', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'X-Idempotency-Key': String(orderData.id) + '-' + new Date().getTime(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await resp.json();
+        if (!resp.ok) {
+           console.error("Mercado Pago Pix Error:", data);
+           throw new Error(data.message || JSON.stringify(data) || 'Erro ao gerar Pix no Mercado Pago');
+        }
+
+        return new Response(JSON.stringify({ 
+          qr_code: data.point_of_interaction?.transaction_data?.qr_code,
+          qr_code_base64: data.point_of_interaction?.transaction_data?.qr_code_base64,
+          id: data.id 
+        }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
