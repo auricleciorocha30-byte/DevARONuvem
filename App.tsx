@@ -50,9 +50,9 @@ const SOUNDS = {
   ORDER_READY: 'https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3'
 };
 
-const SESSION_KEY = 'gc-conveniencia-session-v1';
-const METADATA_CACHE_KEY = 'gc-metadata-cache-v1';
-const ORDERS_CACHE_KEY = 'gc-orders-cache-v1';
+const SESSION_KEY = 'gc-conveniencia-session-v2';
+// Removed METADATA_CACHE_KEY as per user request to disable menu cache
+const ORDERS_CACHE_KEY = 'gc-orders-cache-v2';
 
 export default function App() {
   return (
@@ -204,9 +204,6 @@ function StoreContext() {
           return;
       }
 
-      // Ensure we are on Main DB to fetch profile
-      (supabase as any).disconnectStore();
-
       console.log(`Fetching store profile for slug: ${normalizedSlug}`);
 
       const { data, error } = await supabase
@@ -283,11 +280,11 @@ function StoreContext() {
     }
 
     return {
-      id: dbOrder.id.toString(),
-      type: dbOrder.type,
+      id: dbOrder.id ? dbOrder.id.toString() : crypto.randomUUID(),
+      type: dbOrder.type || 'BALCAO',
       items: items,
-      status: dbOrder.status,
-      total: Number(dbOrder.total),
+      status: dbOrder.status || 'NOVO',
+      total: Number(dbOrder.total || 0),
       createdAt: Number(dbOrder.createdAt || dbOrder.createdat || dbOrder.created_at || Date.now()),
       tableNumber: dbOrder.tableNumber || dbOrder.tablenumber || dbOrder.table_number,
       customerName: dbOrder.customerName || dbOrder.customername || dbOrder.customer_name,
@@ -314,11 +311,11 @@ function StoreContext() {
   }, []);
 
   const mapProductFromDb = useCallback((p: any): Product => ({
-    id: p.id.toString(),
-    name: p.name,
+    id: p.id ? p.id.toString() : (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9)),
+    name: p.name || 'Sem nome',
     description: p.description || '',
-    price: Number(p.price),
-    category: p.category,
+    price: Number(p.price || 0),
+    category: p.category || 'Geral',
     imageUrl: p.imageUrl || p.imageurl || p.image_url || '',
     isActive: p.isActive ?? p.isactive ?? p.is_active ?? true,
     featuredDay: p.featuredDay ?? p.featuredday ?? p.featured_day,
@@ -327,7 +324,11 @@ function StoreContext() {
     barcode: p.barcode || undefined,
     stock: p.stock != null ? Number(p.stock) : undefined,
     fractions: p.fractions != null ? Number(p.fractions) : undefined,
-    fractionPrice: p.fractionPrice != null || p.fractionprice != null || p.fraction_price != null ? Number(p.fractionPrice || p.fractionprice || p.fraction_price) : undefined
+    units: p.units != null ? Number(p.units) : undefined,
+    fractionPrice: p.fractionPrice != null || p.fractionprice != null || p.fraction_price != null ? Number(p.fractionPrice || p.fractionprice || p.fraction_price) : undefined,
+    ncm: p.ncm || undefined,
+    cfop: p.cfop || undefined,
+    icms_situacao_tributaria: p.icms_situacao_tributaria || p.icms_situacaotributaria || undefined
   }), []);
 
   const syncOrders = useCallback(async () => {
@@ -388,48 +389,31 @@ function StoreContext() {
         }
     }
 
-    const fetchMetadata = async (forceRefresh = false) => {
-      const cached = localStorage.getItem(`${METADATA_CACHE_KEY}_${currentStore.id}`);
-      if (cached && !forceRefresh) {
-        try {
-            const { products: p, categories: c, time } = JSON.parse(cached);
-            // Use cache if offline or if cache is less than 1 hour old
-            if (!navigator.onLine || (Date.now() - time < 3600000)) { 
-              setProducts(p);
-              setCategories(c);
-              return; // Skip fetching from DB!
-            }
-        } catch (e) {
-            console.error("Error parsing cached metadata:", e);
-        }
-      }
+    const fetchMetadata = async () => {
+      if (!navigator.onLine || !currentStore) return;
 
-      if (!navigator.onLine) return;
-
-      const [pRes, cRes] = await Promise.all([
-        supabase.from('products').select('*').eq('store_id', currentStore.id),
-        supabase.from('categories').select('*').eq('store_id', currentStore.id)
-      ]);
-      
-      let mappedP: Product[] = [];
-      let cats: string[] = [];
-
-      if (pRes.data) {
-        mappedP = pRes.data.map(mapProductFromDb);
-        setProducts(mappedP);
-      }
-
-      if (cRes.data) {
-        cats = cRes.data.map((c: any) => c.name);
-        setCategories(cats);
-      }
+      try {
+        const [pRes, cRes] = await Promise.all([
+          supabase.from('products').select('*').eq('store_id', currentStore.id),
+          supabase.from('categories').select('*').eq('store_id', currentStore.id)
+        ]);
         
-      if (pRes.data || cRes.data) {
-        localStorage.setItem(`${METADATA_CACHE_KEY}_${currentStore.id}`, JSON.stringify({
-          products: mappedP,
-          categories: cats,
-          time: Date.now()
-        }));
+        if (pRes.error) {
+            console.error("Error fetching products:", pRes.error);
+            alert(`Erro ao buscar produtos: ${pRes.error.message || JSON.stringify(pRes.error)}`);
+        } else if (pRes.data) {
+          const mappedP = pRes.data.map(mapProductFromDb);
+          setProducts(mappedP);
+        }
+
+        if (cRes.error) {
+            console.error("Error fetching categories:", cRes.error);
+        } else if (cRes.data) {
+          const cats = cRes.data.map((c: any) => c.name);
+          setCategories(cats);
+        }
+      } catch (err: any) {
+          console.error("Error fetching metadata:", err);
       }
     };
 
@@ -437,8 +421,17 @@ function StoreContext() {
     syncOrders();
 
     const startPolling = () => {
+      const syncs = settings?.syncIntervals;
+      let intervalSec = 20;
+
+      if (location.pathname.includes('/cozinha')) intervalSec = syncs?.kitchen || 20;
+      else if (location.pathname.includes('/tv')) intervalSec = syncs?.tv || 20;
+      else if (location.pathname.includes('/atendimento')) intervalSec = syncs?.waitress || 20;
+      else if (location.pathname === '/' || location.pathname.includes('/pedidos')) intervalSec = syncs?.admin || 20;
+      
+      const intervalMs = intervalSec * 1000;
       if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
-      syncIntervalRef.current = setInterval(syncOrders, 20000); 
+      syncIntervalRef.current = setInterval(syncOrders, intervalMs); 
     };
 
     const handleVisibilityChange = () => {
@@ -457,7 +450,7 @@ function StoreContext() {
       if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [currentStore, mapOrderFromDb, mapProductFromDb, syncOrders]);
+  }, [currentStore, mapOrderFromDb, mapProductFromDb, syncOrders, settings?.syncIntervals, location.pathname]);
 
   const addOrder = async (order: Order) => {
     const dbOrder = {
@@ -693,6 +686,19 @@ function StoreContext() {
     }
   };
 
+  const updateOrder = useCallback(async (id: string, updates: Partial<Order>) => {
+    try {
+      // Local check if ID is local_ but usually we update persisted ones
+      if (id.startsWith('local_')) return;
+
+      const { error } = await supabase.from('orders').eq('id', id).update(updates);
+      if (error) throw error;
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, ...updates } : o));
+    } catch (err) {
+      console.error("Erro ao atualizar pedido:", err);
+    }
+  }, []);
+
   const handleUpdateSettings = async (newSettings: StoreSettings) => {
     if (currentStore) {
       await supabase.from('store_profiles').eq('id', currentStore.id).update({ settings: JSON.stringify(newSettings) });
@@ -771,7 +777,7 @@ function StoreContext() {
           <Navigate to={loginRedirect} replace />
         )
       } />
-      <Route path="/cardapio" element={<DigitalMenu storeId={currentStore?.id} products={products} categories={categories} settings={settings} orders={orders} addOrder={addOrder} tableNumber={activeTable} onLogout={() => setActiveTable(null)} isWaitstaff={!!adminUser} />} />
+      <Route path="/cardapio/*" element={<DigitalMenu storeId={currentStore?.id} products={products} categories={categories} settings={settings} orders={orders} addOrder={addOrder} tableNumber={activeTable} onLogout={() => setActiveTable(null)} isWaitstaff={!!adminUser} />} />
       <Route path="/master" element={<SuperAdminPanel />} />
       <Route path="/login" element={<LoginPage onLoginSuccess={handleSetUser} />} />
 
@@ -822,7 +828,10 @@ function StoreContext() {
 
           // NeonBridge upsert returns { data: [result], error } directly. No .select() needed.
           const { data, error } = await supabase.from('products').upsert([payload]);
-          if (error) throw error;
+          if (error) {
+              alert(`Erro na API ao salvar produto: ${error.message || JSON.stringify(error)}`);
+              throw error;
+          }
 
           if (data && data.length > 0) {
             const savedProduct = mapProductFromDb(data[0]);
@@ -834,20 +843,16 @@ function StoreContext() {
               return [...prev, savedProduct];
             });
           }
-
-          localStorage.removeItem(`${METADATA_CACHE_KEY}_${currentStore?.id}`);
         }} deleteProduct={async (id) => {
           const { error } = await supabase.from('products').eq('id', id).delete();
           if (error) throw error;
 
           // Update local state immediately
           setProducts(prev => prev.filter(item => item.id !== id));
-
-          localStorage.removeItem(`${METADATA_CACHE_KEY}_${currentStore?.id}`);
         }} categories={categories} setCategories={setCategories} onCategoryChange={() => {
-          localStorage.removeItem(`${METADATA_CACHE_KEY}_${currentStore?.id}`);
+          // No cache to clear
         }} />} />
-        <Route path="pedidos" element={<OrdersList orders={orders} updateStatus={updateOrderStatus} products={products} addOrder={addOrder} settings={settings} />} />
+        <Route path="pedidos" element={<OrdersList orders={orders} updateStatus={updateOrderStatus} products={products} addOrder={addOrder} settings={settings} updateOrder={updateOrder} />} />
         <Route path="equipe" element={<WaitstaffManagement currentStore={currentStore!} settings={settings} onUpdateSettings={handleUpdateSettings} />} />
         <Route path="clientes" element={<CustomerManagement storeId={currentStore?.id} />} />
         <Route path="integracoes" element={<IntegrationsPage settings={settings} onSave={handleUpdateSettings} />} />

@@ -26,6 +26,34 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
   const [isSavingCategory, setIsSavingCategory] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
 
+  const [isSearchingBarcode, setIsSearchingBarcode] = useState(false);
+
+  const handleBarcodeLookup = async (code: string) => {
+    if (!code || code.length < 8) return;
+    setIsSearchingBarcode(true);
+    try {
+      const response = await fetch(`/api/barcode-lookup/${code}`);
+      if (response.ok) {
+        const data = await response.json();
+        setEditingProduct(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            name: prev.name || data.name,
+            description: prev.description || data.description,
+            ncm: prev.ncm || data.ncm,
+            cfop: prev.cfop || '5102',
+            icms_situacao_tributaria: prev.icms_situacao_tributaria || '102'
+          };
+        });
+      }
+    } catch (error) {
+      console.error("Erro ao consultar código de barras:", error);
+    } finally {
+      setIsSearchingBarcode(false);
+    }
+  };
+
   useEffect(() => {
     let html5QrCode: Html5Qrcode | null = null;
 
@@ -42,6 +70,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
             },
             (decodedText) => {
               setEditingProduct(prev => prev ? { ...prev, barcode: decodedText } : null);
+              handleBarcodeLookup(decodedText);
               html5QrCode?.stop().then(() => {
                 setShowScanner(false);
               }).catch(console.error);
@@ -167,7 +196,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
     try {
       const { error } = await supabase.from('categories').insert([{ name: trimmedName, store_id: storeId }]);
       if (error) {
-         if (error.code === '23505') { // Unique violation
+         if (String(error.code) === '23505' || String(error).includes('UNIQUE constraint failed') || error.message?.includes('UNIQUE constraint failed')) { // Unique violation
              // If it exists in DB but not locally, add it to local state so user can use it
              if (!categories.includes(trimmedName)) {
                  setCategories([...categories, trimmedName]);
@@ -472,7 +501,24 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
               <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Código de Barras (Opcional)</label>
                   <div className="flex gap-2">
-                    <input type="text" value={editingProduct?.barcode || ''} onChange={(e) => setEditingProduct({...editingProduct, barcode: e.target.value})} className="flex-1 p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500" placeholder="EAN / Código" />
+                    <div className="relative flex-1">
+                      <input 
+                        type="text" 
+                        value={editingProduct?.barcode || ''} 
+                        onChange={(e) => setEditingProduct({...editingProduct, barcode: e.target.value})} 
+                        onBlur={(e) => handleBarcodeLookup(e.target.value)}
+                        className="w-full p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500" 
+                        placeholder="EAN / Código" 
+                      />
+                      {isSearchingBarcode && (
+                        <div className="absolute right-2 top-2">
+                          <Loader2 className="animate-spin text-orange-500" size={20} />
+                        </div>
+                      )}
+                    </div>
+                    <button type="button" onClick={() => editingProduct?.barcode && handleBarcodeLookup(editingProduct.barcode)} className="p-2 bg-orange-100 text-orange-600 rounded-lg hover:bg-orange-200 transition-colors flex items-center justify-center" title="Consultar dados">
+                      <Search size={20} />
+                    </button>
                     <button type="button" onClick={() => setShowScanner(!showScanner)} className="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center" title="Ler com a câmera">
                       <ScanLine size={20} />
                     </button>
@@ -490,6 +536,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                             try {
                               const decodedText = await html5QrCode.scanFile(file, true);
                               setEditingProduct(prev => prev ? { ...prev, barcode: decodedText } : null);
+                              handleBarcodeLookup(decodedText);
                               alert("Código lido com sucesso!");
                             } catch (err) {
                               alert("Não foi possível ler o código na imagem.");

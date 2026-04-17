@@ -169,6 +169,34 @@ async function startServer() {
     }
   });
 
+  // API Route for Barcode Lookup (EAN/GTIN)
+  app.get('/api/barcode-lookup/:code', async (req, res) => {
+    const { code } = req.params;
+    
+    try {
+      // Using OpenFoodFacts as a free fallback for product names
+      const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
+      const data = await response.json();
+      
+      if (data.status === 1) {
+        res.json({
+          name: data.product.product_name || '',
+          description: data.product.generic_name || data.product.product_name || '',
+          brand: data.product.brands || '',
+          // NCM is not provided by OpenFoodFacts typically, 
+          // but we can suggest 21069090 (common for food) or let the user fill it.
+          // Professional APIs like Bluesoft Cosmos would provide NCM.
+          ncm: '21069090' 
+        });
+      } else {
+        res.status(404).json({ error: 'Produto não encontrado na base pública.' });
+      }
+    } catch (error) {
+      console.error('Erro ao consultar código de barras:', error);
+      res.status(500).json({ error: 'Erro ao consultar serviço de código de barras.' });
+    }
+  });
+
   // API Route for Focus NFe NFC-e Emission
   app.post('/api/focus-nfe/emit-nfce', async (req, res) => {
     const { token, environment, nfceData, reference } = req.body;
@@ -198,6 +226,68 @@ async function startServer() {
     } catch (error) {
       console.error('Erro ao comunicar com Focus NFe:', error);
       res.status(500).json({ error: 'Erro interno ao comunicar com a API de Notas Fiscais.' });
+    }
+  });
+
+  // API Route for Focus NFe NFC-e Consultation
+  app.get('/api/focus-nfe/consult-nfce', async (req, res) => {
+    const { token, environment, reference } = req.query;
+
+    if (!token || !reference) {
+      return res.status(400).json({ error: 'Token ou referência não fornecidos.' });
+    }
+
+    const baseUrl = environment === 'production' 
+      ? 'https://api.focusnfe.com.br' 
+      : 'https://homologacao.focusnfe.com.br';
+
+    const url = `${baseUrl}/v2/nfce/${reference}`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Basic ${Buffer.from(token + ':').toString('base64')}`
+        }
+      });
+
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } catch (error) {
+      console.error('Erro ao consultar NFC-e:', error);
+      res.status(500).json({ error: 'Erro interno ao consultar NFC-e.' });
+    }
+  });
+
+  // API Route for Focus NFe NFC-e Cancellation
+  app.delete('/api/focus-nfe/cancel-nfce', async (req, res) => {
+    const { token, environment, reference, justificativa } = req.body;
+
+    if (!token || !reference) {
+      return res.status(400).json({ error: 'Token ou referência não fornecidos.' });
+    }
+
+    const baseUrl = environment === 'production' 
+      ? 'https://api.focusnfe.com.br' 
+      : 'https://homologacao.focusnfe.com.br';
+
+    const url = `${baseUrl}/v2/nfce/${reference}`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Basic ${Buffer.from(token + ':').toString('base64')}`
+        },
+        body: JSON.stringify({ justificativa: justificativa || 'Cancelamento por erro de preenchimento ou desistência do cliente.' })
+      });
+
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } catch (error) {
+      console.error('Erro ao cancelar NFC-e:', error);
+      res.status(500).json({ error: 'Erro interno ao cancelar NFC-e.' });
     }
   });
 

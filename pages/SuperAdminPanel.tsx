@@ -34,7 +34,8 @@ import {
   EyeOff,
   LogOut,
   Download,
-  Upload
+  Upload,
+  Clock
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { StoreProfile, Product, Waitstaff } from '../types';
@@ -130,14 +131,38 @@ export default function SuperAdminPanel() {
   const [activeSubTab, setActiveSubTab] = useState<'perfil' | 'inventario' | 'equipe'>('perfil');
 
   // Estados para Edição de Perfil
-  const [editProfileData, setEditProfileData] = useState({
+  const [editProfileData, setEditProfileData] = useState<{
+    name: string;
+    slug: string;
+    address: string;
+    whatsapp: string;
+    logoUrl: string;
+    dbUrl: string;
+    dbAuthToken: string;
+    syncIntervals: {
+        pos?: number;
+        waitress?: number;
+        kitchen?: number;
+        delivery?: number;
+        tv?: number;
+        admin?: number;
+    }
+  }>({
     name: '',
     slug: '',
     address: '',
     whatsapp: '',
     logoUrl: '',
     dbUrl: '',
-    dbAuthToken: ''
+    dbAuthToken: '',
+    syncIntervals: {
+        pos: 20,
+        waitress: 20,
+        kitchen: 20,
+        delivery: 20,
+        tv: 20,
+        admin: 20
+    }
   });
 
   // Estados para Gerenciamento de Equipe
@@ -270,7 +295,15 @@ export default function SuperAdminPanel() {
         whatsapp: fullStore.whatsapp,
         logoUrl: fullStore.logoUrl,
         dbUrl: (fullStore as any).dbUrl || '',
-        dbAuthToken: (fullStore as any).dbAuthToken || ''
+        dbAuthToken: (fullStore as any).dbAuthToken || '',
+        syncIntervals: fullStore.settings?.syncIntervals || {
+            pos: 20,
+            waitress: 20,
+            kitchen: 20,
+            delivery: 20,
+            tv: 20,
+            admin: 20
+        }
       });
       setIsManagingContent(true);
       setActiveSubTab('perfil');
@@ -328,7 +361,8 @@ export default function SuperAdminPanel() {
         storeName: editProfileData.name,
         logoUrl: editProfileData.logoUrl,
         address: editProfileData.address,
-        whatsapp: editProfileData.whatsapp
+        whatsapp: editProfileData.whatsapp,
+        syncIntervals: editProfileData.syncIntervals
     };
 
     const { error } = await supabase
@@ -700,6 +734,41 @@ export default function SuperAdminPanel() {
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Endereço</label>
                             <input type="text" value={editProfileData.address} onChange={e => setEditProfileData({...editProfileData, address: e.target.value})} className="w-full px-6 py-4 bg-slate-50 rounded-2xl outline-none font-bold border border-transparent focus:border-slate-200" />
+                        </div>
+                    </div>
+
+                    <div className="space-y-4 pt-4 border-t border-slate-100">
+                        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                             <Clock size={16} className="text-secondary" /> Tempos de Sincronismo (Segundos)
+                        </h3>
+                        <p className="text-[10px] text-slate-400 ml-6">Defina o tempo de atualização automática para cada painel.</p>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            {[
+                                { id: 'pos', label: 'PDV / Terminal' },
+                                { id: 'waitress', label: 'Atendente' },
+                                { id: 'kitchen', label: 'Produção (KDS)' },
+                                { id: 'delivery', label: 'Entregas' },
+                                { id: 'tv', label: 'Painel TV' },
+                                { id: 'admin', label: 'Gerência' }
+                            ].map(item => (
+                                <div key={item.id} className="space-y-1">
+                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">{item.label}</label>
+                                    <input 
+                                        type="number" 
+                                        min="5"
+                                        max="3600"
+                                        value={(editProfileData.syncIntervals as any)?.[item.id] || 20} 
+                                        onChange={e => setEditProfileData({
+                                            ...editProfileData, 
+                                            syncIntervals: {
+                                                ...editProfileData.syncIntervals,
+                                                [item.id]: Number(e.target.value)
+                                            }
+                                        })} 
+                                        className="w-full px-4 py-3 bg-slate-50 rounded-xl outline-none font-bold text-xs border border-transparent focus:border-slate-200" 
+                                    />
+                                </div>
+                            ))}
                         </div>
                     </div>
 

@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Order, OrderStatus, Product, OrderType, OrderItem, StoreSettings } from '../types';
-import { Clock, Printer, UserRound, CheckCircle2, DollarSign, AlertCircle, MapPin, Phone, MessageSquare, Ticket, Percent, Navigation, CreditCard, Wallet, Banknote, FileText, Loader2 } from 'lucide-react';
+import { Clock, Printer, UserRound, CheckCircle2, DollarSign, AlertCircle, MapPin, Phone, MessageSquare, Ticket, Percent, Navigation, CreditCard, Wallet, Banknote, FileText, Loader2, Search, Trash2 } from 'lucide-react';
 
 interface Props {
   orders: Order[];
@@ -9,6 +9,7 @@ interface Props {
   products: Product[];
   addOrder: (order: Order) => void;
   settings: StoreSettings;
+  updateOrder: (id: string, updates: Partial<Order>) => Promise<void>;
 }
 
 interface GroupedOrder {
@@ -33,9 +34,11 @@ interface GroupedOrder {
   couponApplied?: string;
   discountAmount?: number;
   deliveryFee?: number;
+  nfceReference?: string;
+  nfceStatus?: string;
 }
 
-const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder, settings }) => {
+const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder, settings, updateOrder }) => {
   console.log("OrdersList received orders:", orders);
   const [filterType, setFilterType] = useState<'TODOS' | OrderType | 'FINALIZADOS'>('TODOS');
   const [printOrder, setPrintOrder] = useState<GroupedOrder | null>(null);
@@ -95,7 +98,9 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                 changeFor: order.changeFor,
                 couponApplied: order.couponApplied,
                 discountAmount: order.discountAmount,
-                deliveryFee: order.deliveryFee
+                deliveryFee: order.deliveryFee,
+                nfceReference: order.nfce_reference,
+                nfceStatus: order.nfce_status
             });
         }
     });
@@ -114,6 +119,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
     }
 
     setIsEmittingNfce(group.id);
+    const reference = `order_${group.id}_${Date.now()}`;
     try {
       const nfceData = {
         cnpj_emitente: settings.cnpj.replace(/\D/g, ''),
@@ -131,8 +137,10 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
             quantidade: item.quantity,
             unidade_comercial: item.isByWeight ? 'KG' : 'UN',
             valor_unitario: item.price,
-            ncm: product?.ncm || '21069090', // Default NCM if not set
+            valor_total: item.price * item.quantity,
+            ncm: product?.ncm || '21069090', 
             cfop: product?.cfop || (group.type === 'ENTREGA' ? '5102' : '5102'),
+            icms_origem: 0,
             icms_situacao_tributaria: product?.icms_situacao_tributaria || '102'
           };
         }),
@@ -154,7 +162,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
           token: settings.focusNfeToken,
           environment: settings.focusNfeEnvironment,
           nfceData,
-          reference: `order_${group.id}_${Date.now()}`
+          reference: reference
         })
       });
 
@@ -162,6 +170,13 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
 
       if (response.ok) {
         alert("NFC-e emitida com sucesso!");
+        // Update each order in the group with reference and status
+        for (const orderId of group.originalOrderIds) {
+            await updateOrder(orderId, {
+                nfce_reference: reference,
+                nfce_status: 'AUTHORIZED'
+            });
+        }
         if (result.caminho_xml_nota_fiscal) {
            window.open(`https://${settings.focusNfeEnvironment === 'production' ? 'api' : 'homologacao'}.focusnfe.com.br${result.caminho_xml_nota_fiscal}`, '_blank');
         }
@@ -174,6 +189,68 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
       alert("Erro de conexão ao emitir NFC-e.");
     } finally {
       setIsEmittingNfce(null);
+    }
+  };
+
+  const handleConsultNfce = async (group: GroupedOrder) => {
+    if (!group.nfceReference || !settings.focusNfeToken) return;
+
+    setIsEmittingNfce(group.id);
+    try {
+        const queryParams = new URLSearchParams({
+            token: settings.focusNfeToken,
+            environment: settings.focusNfeEnvironment || 'homologation',
+            reference: group.nfceReference
+        });
+        const response = await fetch(`/api/focus-nfe/consult-nfce?${queryParams.toString()}`);
+        const result = await response.json();
+
+        if (response.ok) {
+            alert(`NFC-e Status: ${result.status}\nMensagem: ${result.mensagem_sefaz || 'Sem mensagem'}`);
+            if (result.caminho_xml_nota_fiscal) {
+                window.open(`https://${settings.focusNfeEnvironment === 'production' ? 'api' : 'homologacao'}.focusnfe.com.br${result.caminho_xml_nota_fiscal}`, '_blank');
+            }
+        } else {
+            alert(`Erro ao consultar NFC-e: ${result.mensagem || JSON.stringify(result)}`);
+        }
+    } catch (err) {
+        console.error("Erro Consultar NFC-e:", err);
+    } finally {
+        setIsEmittingNfce(null);
+    }
+  };
+
+  const handleCancelNfce = async (group: GroupedOrder) => {
+    if (!group.nfceReference || !settings.focusNfeToken) return;
+    if (!window.confirm("Deseja realmente cancelar esta NFC-e?")) return;
+
+    setIsEmittingNfce(group.id);
+    try {
+        const response = await fetch('/api/focus-nfe/cancel-nfce', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                token: settings.focusNfeToken,
+                environment: settings.focusNfeEnvironment,
+                reference: group.nfceReference
+            })
+        });
+        const result = await response.json();
+
+        if (response.ok) {
+            alert("NFC-e cancelada com sucesso!");
+            for (const orderId of group.originalOrderIds) {
+                await updateOrder(orderId, {
+                    nfce_status: 'CANCELLED'
+                });
+            }
+        } else {
+            alert(`Erro ao cancelar NFC-e: ${result.mensagem || JSON.stringify(result)}`);
+        }
+    } catch (err) {
+        console.error("Erro Cancelar NFC-e:", err);
+    } finally {
+        setIsEmittingNfce(null);
     }
   };
 
@@ -373,14 +450,39 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                  )}
                  
                  {settings.focusNfeToken && (
-                   <button 
-                    disabled={isEmittingNfce === group.id}
-                    onClick={() => handleEmitNfce(group)} 
-                    className={`flex-1 py-3.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 ${isEmittingNfce === group.id ? 'opacity-50 cursor-not-allowed' : ''}`}
-                   >
-                    {isEmittingNfce === group.id ? <Loader2 className="animate-spin" size={14} /> : <FileText size={14} />}
-                    Emitir NFC-e
-                   </button>
+                   <div className="flex-1 flex gap-2 min-w-full">
+                     {!group.nfceReference ? (
+                        <button
+                          onClick={() => handleEmitNfce(group)}
+                          disabled={isEmittingNfce === group.id}
+                          className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg"
+                        >
+                          {isEmittingNfce === group.id ? <Loader2 className="animate-spin" size={14} /> : <FileText size={14} />}
+                          EMITIR NFC-E
+                        </button>
+                     ) : (
+                       <>
+                        <button
+                          onClick={() => handleConsultNfce(group)}
+                          disabled={isEmittingNfce === group.id}
+                          className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg"
+                        >
+                          {isEmittingNfce === group.id ? <Loader2 className="animate-spin" size={14} /> : <Search size={14} />}
+                          CONSULTAR
+                        </button>
+                        {group.nfceStatus !== 'CANCELLED' && (
+                          <button
+                            onClick={() => handleCancelNfce(group)}
+                            disabled={isEmittingNfce === group.id}
+                            className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg"
+                          >
+                            {isEmittingNfce === group.id ? <Loader2 className="animate-spin" size={14} /> : <Trash2 size={14} />}
+                            CANCELAR
+                          </button>
+                        )}
+                       </>
+                     )}
+                   </div>
                  )}
 
                  {group.status !== 'ENTREGUE' && (

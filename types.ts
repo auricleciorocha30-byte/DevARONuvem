@@ -93,6 +93,8 @@ export interface Order {
   paymentDetails?: string; // JSON string of { method: string, amount: number }[]
   session_id?: string;
   stockDeducted?: boolean;
+  nfce_reference?: string;
+  nfce_status?: string;
 }
 
 export interface CashMovement {
@@ -179,4 +181,12 @@ export interface StoreSettings {
   onlinePaymentPublicKey?: string;
   isOnlinePaymentActive?: boolean;
   mercadoPagoPointDeviceId?: string;
+  syncIntervals?: {
+    pos?: number;
+    waitress?: number;
+    kitchen?: number;
+    delivery?: number;
+    tv?: number;
+    admin?: number;
+  };
 }

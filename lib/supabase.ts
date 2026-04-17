@@ -149,7 +149,10 @@ const SCHEMA_STATEMENTS = [
     showInMenu INTEGER DEFAULT 1,
     fractions INTEGER,
     units INTEGER,
-    fractionPrice REAL
+    fractionPrice REAL,
+    ncm TEXT,
+    cfop TEXT,
+    icms_situacao_tributaria TEXT
   )`,
   `CREATE TABLE IF NOT EXISTS waitstaff (
     id TEXT PRIMARY KEY,
@@ -306,6 +309,15 @@ async function ensureSchema() {
           if (!productColumns.includes('fractionPrice')) {
               try { await client.execute(`ALTER TABLE products ADD COLUMN fractionPrice REAL`); } catch (e) { console.warn(e); }
           }
+          if (!productColumns.includes('ncm')) {
+              try { await client.execute(`ALTER TABLE products ADD COLUMN ncm TEXT`); } catch (e) { console.warn(e); }
+          }
+          if (!productColumns.includes('cfop')) {
+              try { await client.execute(`ALTER TABLE products ADD COLUMN cfop TEXT`); } catch (e) { console.warn(e); }
+          }
+          if (!productColumns.includes('icms_situacao_tributaria')) {
+              try { await client.execute(`ALTER TABLE products ADD COLUMN icms_situacao_tributaria TEXT`); } catch (e) { console.warn(e); }
+          }
 
           const cashMovementsTableInfo = await client.execute(`PRAGMA table_info(cash_movements)`);
           const cashMovementsColumns = cashMovementsTableInfo.rows.map((row: any) => row.name);
@@ -450,6 +462,15 @@ class TursoBridge {
             }
             if (!productColumns.includes('fractionPrice')) {
                 try { await this.executeSqlCustom(url, token, `ALTER TABLE products ADD COLUMN fractionPrice REAL`); } catch (e) { console.warn(e); }
+            }
+            if (!productColumns.includes('ncm')) {
+                try { await this.executeSqlCustom(url, token, `ALTER TABLE products ADD COLUMN ncm TEXT`); } catch (e) { console.warn(e); }
+            }
+            if (!productColumns.includes('cfop')) {
+                try { await this.executeSqlCustom(url, token, `ALTER TABLE products ADD COLUMN cfop TEXT`); } catch (e) { console.warn(e); }
+            }
+            if (!productColumns.includes('icms_situacao_tributaria')) {
+                try { await this.executeSqlCustom(url, token, `ALTER TABLE products ADD COLUMN icms_situacao_tributaria TEXT`); } catch (e) { console.warn(e); }
             }
 
             const cashMovementsTableInfo = await this.executeSqlCustom(url, token, `PRAGMA table_info(cash_movements)`);
@@ -763,7 +784,7 @@ class TursoBridge {
         const valCopy = { ...val };
 
         if (!valCopy.id && (this.tableName === 'store_profiles' || this.tableName === 'waitstaff' || this.tableName === 'products')) {
-             valCopy.id = crypto.randomUUID();
+             valCopy.id = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9);
         }
 
         if (this.tableName === 'store_profiles' && valCopy.settings && typeof valCopy.settings === 'object') {
