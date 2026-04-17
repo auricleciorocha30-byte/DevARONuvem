@@ -29,6 +29,47 @@ export default {
       });
     }
 
+    // PAGBANK WEBHOOK
+    if (url.pathname === "/api/webhooks/pagbank") {
+      try {
+        const body = await request.clone().json();
+        console.log("PagBank Webhook received:", body);
+        
+        const { reference_id, status } = body;
+        
+        if (reference_id) {
+          const tursoUrl = "https://produtodevaro-auricleciorocha30-byte.aws-us-east-1.turso.io";
+          const tursoToken = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzIxMzYwOTMsImlkIjoiMDE5YzliNzctZGMwMS03MmIwLWFmYWItYWRlOGY0MjM5YTBjIiwicmlkIjoiYTQyYjFmY2EtYjc0YS00MGMwLTk3M2QtODlmNmFlMTBkYzFiIn0.A7LAbG4yZ70-XPczvHXgaVUm2t_rJuTlsMpefd86FVprMb50rPZU5aICZdVvQvXpdnwOiav_nNMRCOOmi2cQDQ";
+          
+          let newStatus = 'PENDENTE';
+          if (status === 'PAID' || status === 'COMPLETED' || status === 'AUTHORIZED') {
+            newStatus = 'PAGO';
+          } else if (status === 'CANCELED' || status === 'DECLINED') {
+            newStatus = 'CANCELADO';
+          }
+
+          const updateSql = `UPDATE orders SET status = '${newStatus}' WHERE id = '${reference_id}'`;
+          await fetch(tursoUrl, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${tursoToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              statements: [{ q: updateSql, params: [] }]
+            })
+          });
+          
+          return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
+        }
+        
+        return new Response("OK", { status: 200, headers: corsHeaders });
+      } catch (error) {
+        console.error("Webhook Error:", error);
+        return new Response("OK", { status: 200, headers: corsHeaders }); // Always return 200 to PagBank
+      }
+    }
+
     // PAGBANK CHECKOUT (Unified Path)
     if (url.pathname === "/api/pbank/checkout" || url.pathname === "/api/v1/process-payment" || url.pathname === "/api/v1/process-payment/") {
       if (request.method !== "POST") {
@@ -63,13 +104,17 @@ export default {
           } catch (e) {}
         }
 
+        const redirectUrl = storeUrl.includes('?') 
+          ? `${storeUrl}&payment=success&orderId=${orderData.id}` 
+          : `${storeUrl}?payment=success&orderId=${orderData.id}`;
+
         const pagbankBody = {
           reference_id: orderData.id,
           items: (orderData.discountAmount > 0 || amountToCharge !== orderData.total) 
             ? [{ name: `Pedido #${orderData.displayId}`, quantity: 1, unit_amount: Math.round(amountToCharge * 100) }]
             : items,
-          redirect_url: `${storeUrl}?payment=success&orderId=${orderData.id}`,
-          notification_urls: [`${storeUrl}/api/webhooks/pagbank`],
+          redirect_url: redirectUrl,
+          notification_urls: [`${new URL(request.url).origin}/api/webhooks/pagbank`],
           payment_methods: [{ type: 'CREDIT_CARD' }, { type: 'DEBIT_CARD' }, { type: 'BOLETO' }, { type: 'PIX' }]
         };
 

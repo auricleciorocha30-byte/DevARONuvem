@@ -93,9 +93,15 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
       const updatePaymentStatus = async () => {
         try {
           if (paymentStatus === 'success') {
-            await supabase.from('orders').eq('id', paymentOrderId).update({ paymentDetails: JSON.stringify([{ method: 'ONLINE', status: 'approved' }]) });
+            await supabase.from('orders').eq('id', paymentOrderId).update({ 
+               status: 'PAGO',
+               paymentDetails: JSON.stringify([{ method: 'ONLINE', status: 'approved' }]) 
+            });
           } else if (paymentStatus === 'failure') {
-            await supabase.from('orders').eq('id', paymentOrderId).update({ paymentDetails: JSON.stringify([{ method: 'ONLINE', status: 'rejected' }]) });
+            await supabase.from('orders').eq('id', paymentOrderId).update({ 
+               status: 'CANCELADO',
+               paymentDetails: JSON.stringify([{ method: 'ONLINE', status: 'rejected' }]) 
+            });
           }
         } catch (error) {
           console.error('Erro ao atualizar status do pagamento:', error);
@@ -437,6 +443,8 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const getStatusText = (status: string) => {
     switch (status) {
       case 'PENDENTE': return 'Pendente';
+      case 'AGUARDANDO_PAGAMENTO': return 'Aguardando Pagamento';
+      case 'PAGO': return 'Pago';
       case 'PREPARANDO': return 'Preparando';
       case 'PRONTO': return 'Pronto';
       case 'ENVIADO_PARA_ENTREGA': return 'Saiu para Entrega';
@@ -449,6 +457,8 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'PENDENTE': return 'bg-yellow-100 text-yellow-800';
+      case 'AGUARDANDO_PAGAMENTO': return 'bg-orange-100 text-orange-800';
+      case 'PAGO': return 'bg-green-100 text-green-800';
       case 'PREPARANDO': return 'bg-blue-100 text-blue-800';
       case 'PRONTO': return 'bg-green-100 text-green-800';
       case 'ENVIADO_PARA_ENTREGA': return 'bg-purple-100 text-purple-800';
@@ -778,7 +788,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
           displayId: displayId,
           type: orderType, 
           items: cart, 
-          status: 'AGUARDANDO', 
+          status: (payment === 'ONLINE' || combinedPayment === 'ONLINE') ? 'AGUARDANDO_PAGAMENTO' : 'AGUARDANDO', 
           total: finalTotal, 
           serviceFee: serviceFee,
           createdAt: Date.now(), 
@@ -839,14 +849,14 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
 
         if ((payment === 'ONLINE' || combinedPayment === 'ONLINE') && settings.onlinePaymentProvider === 'pagbank') {
           try {
-            const response = await fetch('/api/pbank/checkout', {
+            const response = await fetch('/api/v1/process-payment', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 token: settings.onlinePaymentAccessToken,
                 environment: settings.pagbankEnvironment || 'sandbox',
                 orderData: finalOrder,
-                storeUrl: window.location.href.split('?')[0]
+                storeUrl: window.location.href // Use full URL with loja param
               })
             });
             

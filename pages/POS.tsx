@@ -1223,14 +1223,20 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
     setIsOnlineProcessing(true);
     
     try {
-        // Mock order data for checkout
+        // Customer name is optional for PDV PIX to speed up
+        const finalCustomerName = selectedCustomer?.name || deliveryDetails.customerName || 'Cliente PDV';
+        const finalCustomerPhone = selectedCustomer?.phone || deliveryDetails.customerPhone || '';
+
+        // Generate a real order ID if possible, or use a temp one
+        const tempId = `pos_${Date.now()}`;
+
         const mockOrder = {
-          id: `pos_${Date.now()}`,
+          id: tempId,
           displayId: 'PDV',
           total: amount,
           items: cart.length > 0 ? cart : [{ name: 'Venda Diversa', quantity: 1, price: amount }],
-          customerName: selectedCustomer?.name || 'Cliente PDV',
-          customerPhone: selectedCustomer?.phone || ''
+          customerName: finalCustomerName,
+          customerPhone: finalCustomerPhone
         };
 
         const response = await fetch('/api/v1/process-payment', {
@@ -1241,7 +1247,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                 environment: settings.pagbankEnvironment || 'sandbox',
                 orderData: mockOrder,
                 status: 'pending',
-                storeUrl: window.location.href.split('?')[0]
+                storeUrl: window.location.href // Keep full URL including ?loja=...
             })
         });
 
