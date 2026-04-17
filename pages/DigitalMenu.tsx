@@ -863,7 +863,8 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
               window.location.href = data.checkout_url;
               return; // Stop execution to allow redirect
             } else {
-              alert('Erro ao gerar link de pagamento PagBank: ' + (data.error || 'Verifique suas configurações.'));
+              const errorMessage = data.error || (data.message) || (data.error_messages ? data.error_messages.map((m: any) => m.description).join(', ') : null);
+              alert('Erro ao gerar link de pagamento PagBank: ' + (errorMessage || `Status: ${response.status}`));
             }
           } catch (err: any) {
             console.error('Erro no pagamento online PagBank:', err);

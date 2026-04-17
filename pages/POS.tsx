@@ -1245,21 +1245,22 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         });
 
         const responseText = await response.text();
-        let data;
+        let data: any = {};
         try {
           data = responseText ? JSON.parse(responseText) : {};
         } catch (e) {
           console.error('Non-JSON response from PagBank API:', responseText);
-          throw new Error(`Erro no servidor ao gerar link. (Status: ${response.status})`);
+          throw new Error(`Resposta inválida do servidor (Status: ${response.status}). Verifique se o backend está rodando no Cloudflare.`);
         }
 
         if (data.checkout_url) {
             setOnlineCheckoutUrl(data.checkout_url);
-            // Optionally open in new tab or show QR (if we had a QR lib)
             window.open(data.checkout_url, '_blank');
             alert("Link de pagamento gerado e aberto em nova aba. Após a confirmação do cliente, adicione o pagamento.");
         } else {
-            throw new Error(data.error || 'Erro ao gerar checkout.');
+            console.error('Checkout failed. Data:', data);
+            const errorMessage = data.error || (data.message) || (data.error_messages ? data.error_messages.map((m: any) => m.description).join(', ') : null);
+            throw new Error(errorMessage || `Erro ao gerar checkout (Status: ${response.status}). Resposta: ${responseText.substring(0, 100)}`);
         }
     } catch (err: any) {
         alert(err.message);

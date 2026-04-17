@@ -66,7 +66,8 @@ export default function IntegrationsPage({ settings, onSave }: Props) {
         setFormData({ ...formData, onlinePaymentPublicKey: data.public_key });
         alert('Chave Pública gerada e preenchida com sucesso!');
       } else {
-        alert('Erro ao gerar chave pública: ' + (data.error || 'Verifique seu token.'));
+        const errorMessage = data.error || (data.message) || (data.error_messages ? data.error_messages.map((m: any) => m.description).join(', ') : null);
+        alert('Erro ao gerar chave pública: ' + (errorMessage || `Status: ${response.status}`));
       }
     } catch (error: any) {
       console.error(error);
