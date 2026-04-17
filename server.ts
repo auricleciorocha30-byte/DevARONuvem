@@ -50,11 +50,18 @@ async function startServer() {
     try {
       const client = new MercadoPagoConfig({ accessToken });
       const preference = new Preference(client);
+      
+      // Use quantity: 1 trick to avoid float errors with MP Pro
       const items = orderData.items.map((item: any) => ({
-        id: item.productId, title: item.name, quantity: item.quantity, unit_price: item.price, currency_id: 'BRL'
+        id: item.productId || item.id,
+        title: item.name,
+        quantity: 1,
+        unit_price: Number((Number(item.price) * Number(item.quantity)).toFixed(2)),
+        currency_id: 'BRL'
       }));
-      if (orderData.deliveryFee > 0) items.push({ id: 'delivery_fee', title: 'Taxa de Entrega', quantity: 1, unit_price: orderData.deliveryFee, currency_id: 'BRL' });
-      if (orderData.serviceFee > 0) items.push({ id: 'service_fee', title: 'Taxa de Serviço', quantity: 1, unit_price: orderData.serviceFee, currency_id: 'BRL' });
+
+      if (orderData.deliveryFee > 0) items.push({ id: 'delivery_fee', title: 'Taxa de Entrega', quantity: 1, unit_price: Number(orderData.deliveryFee), currency_id: 'BRL' });
+      if (orderData.serviceFee > 0) items.push({ id: 'service_fee', title: 'Taxa de Serviço', quantity: 1, unit_price: Number(orderData.serviceFee), currency_id: 'BRL' });
       
       let amountToCharge = orderData.total;
       if (orderData.paymentDetails) {
@@ -172,9 +179,15 @@ async function startServer() {
     if (!token) return res.status(400).json({ error: 'Token não fornecido.' });
     const baseUrl = environment === 'production' ? 'https://api.pagseguro.com' : 'https://sandbox.api.pagseguro.com';
     try {
-      const items = orderData.items.map((item: any) => ({ name: item.name, quantity: item.quantity, unit_amount: Math.round(item.price * 100) }));
-      if (orderData.deliveryFee > 0) items.push({ name: 'Taxa de Entrega', quantity: 1, unit_amount: Math.round(orderData.deliveryFee * 100) });
-      if (orderData.serviceFee > 0) items.push({ name: 'Taxa de Serviço', quantity: 1, unit_amount: Math.round(orderData.serviceFee * 100) });
+      // Use quantity: 1 trick for PagBank as well to avoid float quantity issues
+      const items = orderData.items.map((item: any) => ({ 
+        name: item.name, 
+        quantity: 1, 
+        unit_amount: Math.round(Number(item.price) * Number(item.quantity) * 100) 
+      }));
+
+      if (orderData.deliveryFee > 0) items.push({ name: 'Taxa de Entrega', quantity: 1, unit_amount: Math.round(Number(orderData.deliveryFee) * 100) });
+      if (orderData.serviceFee > 0) items.push({ name: 'Taxa de Serviço', quantity: 1, unit_amount: Math.round(Number(orderData.serviceFee) * 100) });
       
       let amountToCharge = orderData.total;
       if (orderData.paymentDetails) {
@@ -204,12 +217,24 @@ async function startServer() {
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.message || 'Erro no PagBank');
+      
+      const responseText = await resp.text();
+      let data;
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch (e) {
+        console.error('PagBank Checkout Non-JSON:', responseText);
+        throw new Error(`PagBank retornou resposta inválida (${resp.status}): ${responseText.substring(0, 100)}`);
+      }
+
+      if (!resp.ok) throw new Error(data.message || (data.error_messages ? data.error_messages.map((m: any) => m.description).join(', ') : 'Erro no PagBank'));
       const checkoutLink = data.links?.find((l: any) => l.rel === 'PAY')?.href;
-      if (!checkoutLink) throw new Error('Link PAY não encontrado.');
+      if (!checkoutLink) throw new Error('Link PAY não encontrado na resposta do PagBank.');
       res.json({ checkout_url: checkoutLink, id: data.id });
-    } catch (error: any) { res.status(500).json({ error: error.message }); }
+    } catch (error: any) { 
+      console.error('PagBank Checkout Error:', error);
+      res.status(500).json({ error: error.message }); 
+    }
   });
 
   apiRouter.post('/pagbank/public-key', async (req, res) => {
@@ -218,7 +243,16 @@ async function startServer() {
     const baseUrl = environment === 'production' ? 'https://api.pagseguro.com' : 'https://sandbox.api.pagseguro.com';
     try {
       const resp = await fetch(`${baseUrl}/public-keys`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'card' }) });
-      const data = await resp.json();
+      
+      const responseText = await resp.text();
+      let data;
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch (e) {
+        console.error('PagBank Key Non-JSON:', responseText);
+        throw new Error(`PagBank retornou resposta inválida (${resp.status}): ${responseText.substring(0, 100)}`);
+      }
+
       if (!resp.ok) {
         console.error('PagBank Key Error:', data);
         const errDetail = data.error_messages ? data.error_messages.map((m: any) => m.description).join(', ') : (data.message || JSON.stringify(data));

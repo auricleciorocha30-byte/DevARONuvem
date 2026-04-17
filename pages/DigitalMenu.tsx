@@ -1333,8 +1333,10 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                </div>
                                <div className="grid grid-cols-3 gap-2">
                                   {[
-                                    {id: 'PIX', icon: <DollarSign size={18}/>, label: 'PIX'},
-                                    {id: 'CARTAO', icon: <CreditCard size={18}/>, label: 'Cartão'},
+                                    ...(!settings.isOnlinePaymentActive ? [
+                                      {id: 'PIX', icon: <DollarSign size={18}/>, label: 'PIX'},
+                                      {id: 'CARTAO', icon: <CreditCard size={18}/>, label: 'Cartão'},
+                                    ] : []),
                                     {id: 'DINHEIRO', icon: <Banknote size={18}/>, label: 'Dinheiro'},
                                     ...(settings.isOnlinePaymentActive && settings.onlinePaymentProvider ? [{id: 'ONLINE', icon: <CreditCard size={18}/>, label: 'Pagar Online'}] : []),
                                     ...(orderType === 'ENTREGA' ? [{id: 'A_PAGAR', icon: <Wallet size={18}/>, label: 'Pagar na Entrega'}] : []),

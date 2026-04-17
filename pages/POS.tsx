@@ -3218,18 +3218,18 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                                           )}
                                       </select>
                                       <button 
-                                          onClick={currentPaymentMethod === 'MAQUININHA' ? handlePointPayment : (currentPaymentMethod === 'ONLINE' && settings.onlinePaymentProvider === 'pagbank' && !onlineCheckoutUrl ? handleOnlinePayment : handleAddPayment)}
+                                          onClick={currentPaymentMethod === 'MAQUININHA' ? handlePointPayment : (currentPaymentMethod === 'ONLINE' && !onlineCheckoutUrl ? handleOnlinePayment : handleAddPayment)}
                                           disabled={isPointProcessing || isOnlineProcessing}
                                           className={`p-3 text-white rounded-xl ${isPointProcessing || isOnlineProcessing ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`}
                                       >
-                                          {isPointProcessing || isOnlineProcessing ? <Loader2 className="animate-spin" size={20} /> : (currentPaymentMethod === 'ONLINE' && settings.onlinePaymentProvider === 'pagbank' && !onlineCheckoutUrl ? <Zap size={20} /> : <Plus size={20} />)}
+                                          {isPointProcessing || isOnlineProcessing ? <Loader2 className="animate-spin" size={20} /> : (currentPaymentMethod === 'ONLINE' && !onlineCheckoutUrl ? <Zap size={20} /> : <Plus size={20} />)}
                                       </button>
                                   </div>
 
                                   {isOnlineProcessing && (
                                       <div className="p-3 bg-green-50 rounded-xl border border-green-100 flex items-center gap-3 animate-pulse">
                                           <Loader2 className="animate-spin text-green-600" size={20} />
-                                          <span className="text-sm font-bold text-green-800">Gerando link PagBank...</span>
+                                          <span className="text-sm font-bold text-green-800">Gerando link de pagamento...</span>
                                       </div>
                                   )}
 

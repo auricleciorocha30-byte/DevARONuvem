@@ -215,12 +215,12 @@ export default {
         
         const items = orderData.items.map((item) => ({ 
           name: item.name, 
-          quantity: item.quantity, 
-          unit_amount: Math.round(item.price * 100) 
+          quantity: 1, 
+          unit_amount: Math.round(Number(item.price) * Number(item.quantity) * 100) 
         }));
         
-        if (orderData.deliveryFee > 0) items.push({ name: 'Taxa de Entrega', quantity: 1, unit_amount: Math.round(orderData.deliveryFee * 100) });
-        if (orderData.serviceFee > 0) items.push({ name: 'Taxa de Serviço', quantity: 1, unit_amount: Math.round(orderData.serviceFee * 100) });
+        if (orderData.deliveryFee > 0) items.push({ name: 'Taxa de Entrega', quantity: 1, unit_amount: Math.round(Number(orderData.deliveryFee) * 100) });
+        if (orderData.serviceFee > 0) items.push({ name: 'Taxa de Serviço', quantity: 1, unit_amount: Math.round(Number(orderData.serviceFee) * 100) });
 
         let amountToCharge = orderData.total;
         if (orderData.paymentDetails) {
@@ -266,15 +266,27 @@ export default {
           body: JSON.stringify(pagbankBody)
         });
 
-        const data = await resp.json();
+        const responseText = await resp.text();
+        let data;
+        try {
+          data = responseText ? JSON.parse(responseText) : {};
+        } catch (e) {
+          console.error("PagBank Checkout Non-JSON:", responseText);
+          return new Response(JSON.stringify({ error: `PagBank retornou resposta inválida (${resp.status}): ${responseText.substring(0, 100)}` }), { status: 500, headers: corsHeaders });
+        }
+
         if (!resp.ok) {
-          return new Response(JSON.stringify({ error: data.message || "Erro no PagBank" }), { 
+          const detail = data.error_messages ? data.error_messages.map(m => m.description).join(', ') : (data.message || JSON.stringify(data));
+          return new Response(JSON.stringify({ error: detail || "Erro no PagBank" }), { 
               status: resp.status,
               headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         }
 
         const checkoutLink = data.links?.find((l) => l.rel === 'PAY')?.href;
+        if (!checkoutLink) {
+          return new Response(JSON.stringify({ error: 'Link PAY não encontrado na resposta do PagBank' }), { status: 500, headers: corsHeaders });
+        }
         return new Response(JSON.stringify({ checkout_url: checkoutLink, id: data.id }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -356,6 +368,38 @@ export default {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
+      } catch (error) {
+        return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
+      }
+    }
+
+    // PAGBANK PUBLIC KEY
+    if (url.pathname === "/api/pagbank/public-key" && request.method === "POST") {
+      try {
+        const body = await request.json();
+        const { token, environment } = body;
+        if (!token) return new Response(JSON.stringify({ error: 'Token não fornecido.' }), { status: 400, headers: corsHeaders });
+        const baseUrl = environment === 'production' ? 'https://api.pagseguro.com' : 'https://sandbox.api.pagseguro.com';
+        
+        const resp = await fetch(`${baseUrl}/public-keys`, { 
+          method: 'POST', 
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Accept': 'application/json' }, 
+          body: JSON.stringify({ type: 'card' }) 
+        });
+        
+        const responseText = await resp.text();
+        let data;
+        try {
+          data = responseText ? JSON.parse(responseText) : {};
+        } catch (e) {
+           return new Response(JSON.stringify({ error: `PagBank retornou resposta inválida (${resp.status})` }), { status: 500, headers: corsHeaders });
+        }
+
+        if (!resp.ok) {
+           const detail = data.error_messages ? data.error_messages.map(m => m.description).join(', ') : (data.message || JSON.stringify(data));
+           return new Response(JSON.stringify({ error: detail || 'Erro ao gerar chave' }), { status: resp.status, headers: corsHeaders });
+        }
+        return new Response(JSON.stringify(data), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       } catch (error) {
         return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
       }
