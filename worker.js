@@ -22,14 +22,14 @@ export default {
     if (url.pathname === "/api-health") {
       return new Response(JSON.stringify({ 
         status: "ok", 
-        platform: "Cloudflare _worker.js",
-        env: "Cloudflare Pages Advanced Worker" 
+        platform: "Cloudflare Worker",
+        version: "1.0.1"
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
 
-    // PAGBANK CHECKOUT (Unified Path) - Generic name to bypass WAF
+    // PAGBANK CHECKOUT (Unified Path)
     if (url.pathname === "/api/pbank/checkout" || url.pathname === "/api/v1/process-payment" || url.pathname === "/api/v1/process-payment/") {
       if (request.method !== "POST") {
         return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405, headers: corsHeaders });
@@ -106,8 +106,7 @@ export default {
       }
     }
 
-    // FALLBACK TO STATIC ASSETS
-    // This is mandatory for Cloudflare Pages _worker.js
+    // ASSET FALLBACK
     return env.ASSETS.fetch(request);
   }
 };

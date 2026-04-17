@@ -1,5 +1,6 @@
 {
-  "name": "erp-com-painel",
+  "name": "devaronuvem",
+  "main": "worker.js",
   "compatibility_date": "2026-03-10",
   "assets": {
     "directory": "./dist"
