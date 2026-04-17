@@ -746,20 +746,33 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
         }
 
         if (settings.isCashbackActive && finalCustomerId) {
-            if (amountToUse > 0) {
-                // Fetch latest points to avoid race conditions
-                const { data: latestCustomer } = await supabase
-                    .from('customers')
-                    .eq('id', finalCustomerId)
-                    .maybeSingle();
-                
-                const currentPoints = latestCustomer ? Number(latestCustomer.points || 0) : Number(customerPoints || 0);
+            const isTableOrCommand = orderType === 'MESA' || orderType === 'COMANDA';
+            
+            // For MESA/COMANDA, the payment and cashback are handled in POS upon final checkout.
+            // For DELIVERY/PICKUP, we handle it here to ensure the customer receives their points.
+            if (!isTableOrCommand) {
+                const cashbackPercentage = Number(settings.cashbackPercentage) || 0;
+                const cashbackEarned = Number(finalTotal) * (cashbackPercentage / 100);
 
-                const newBalance = currentPoints - amountToUse;
-                await supabase
-                    .from('customers')
-                    .eq('id', finalCustomerId)
-                    .update({ points: Math.max(0, newBalance) });
+                if (amountToUse > 0 || cashbackEarned > 0) {
+                    // Fetch latest points to avoid race conditions
+                    const { data: latestCustomer } = await supabase
+                        .from('customers')
+                        .eq('id', finalCustomerId)
+                        .maybeSingle();
+                    
+                    const currentPoints = latestCustomer ? Number(latestCustomer.points || 0) : Number(customerPoints || 0);
+
+                    const newBalance = currentPoints - amountToUse + cashbackEarned;
+                    await supabase
+                        .from('customers')
+                        .eq('id', finalCustomerId)
+                        .update({ points: Math.max(0, newBalance) });
+                    
+                    if (typeof setCustomerPoints === 'function') {
+                        setCustomerPoints(Math.max(0, newBalance));
+                    }
+                }
             }
         }
 
