@@ -1228,8 +1228,8 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
   const handleOnlinePayment = async () => {
     const amount = parseFloat(currentPaymentAmount);
     if (isNaN(amount) || amount <= 0) return;
-    if (!settings.onlinePaymentAccessToken || settings.onlinePaymentProvider !== 'pagbank') {
-        alert("Configuração do PagBank incompleta ou provedor não suportado para geração de link no PDV.");
+    if (!settings.onlinePaymentAccessToken) {
+        alert("Token de pagamento online não configurado.");
         return;
     }
 
@@ -1254,11 +1254,14 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
 
         const redirectStoreUrl = `${window.location.origin}/pagamento-ok`;
 
-        const response = await fetch('/api/v1/process-payment', {
+        const endpoint = settings.onlinePaymentProvider === 'mercado_pago' ? '/api/mercado-pago/create-preference' : '/api/v1/process-payment';
+        
+        const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 token: settings.onlinePaymentAccessToken,
+                accessToken: settings.onlinePaymentAccessToken,
                 environment: settings.pagbankEnvironment || 'sandbox',
                 orderData: mockOrder,
                 status: 'pending',

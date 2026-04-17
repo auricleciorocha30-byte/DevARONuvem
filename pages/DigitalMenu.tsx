@@ -825,13 +825,15 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
         
         if ((payment === 'ONLINE' || combinedPayment === 'ONLINE') && settings.onlinePaymentProvider === 'mercado_pago') {
           try {
+            const redirectStoreUrl = `${window.location.origin}${window.location.pathname}#/cardapio?loja=${settings.slug || storeSlug}`;
             const response = await fetch('/api/mercado-pago/create-preference', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 accessToken: settings.onlinePaymentAccessToken,
                 orderData: finalOrder,
-                storeUrl: window.location.href
+                storeUrl: redirectStoreUrl,
+                storeSlug: settings.slug || storeSlug,
               })
             });
             const data = await response.json();
