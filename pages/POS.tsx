@@ -1248,9 +1248,13 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         let data: any = {};
         try {
           data = responseText ? JSON.parse(responseText) : {};
-        } catch (e) {
-          console.error('Non-JSON response from PagBank API:', responseText);
-          throw new Error(`Resposta inválida do servidor (Status: ${response.status}). Verifique se o backend está rodando no Cloudflare.`);
+        } catch (e: any) {
+          console.error('API integration error:', e);
+          const is404 = response.status === 404;
+          const helpMsg = is404 
+            ? ' (Erro 404: Verifique se as rotas de API no server.ts estão ativas ou se há bloqueio do Proxy/WAF).' 
+            : '';
+          throw new Error(`Erro de comunicação (Status: ${response.status})${helpMsg}. Resposta: ${responseText.substring(0, 50)}`);
         }
 
         if (data.checkout_url) {

@@ -20,10 +20,8 @@ async function startServer() {
     res.json({
       status: 'ok',
       message: 'Server is running',
-      env: process.env.NODE_ENV || 'development',
-      time: new Date().toISOString(),
-      url: req.url,
-      method: req.method
+      env: process.env.NODE_ENV || 'production',
+      time: new Date().toISOString()
     });
   });
 
@@ -237,34 +235,36 @@ async function startServer() {
     });
   });
 
-  // Vite middleware for development
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server listening on http://localhost:${PORT}`);
+  });
+
+  // Vite middleware for development (Loaded asynchronously to not block listener)
   if (process.env.NODE_ENV !== 'production') {
-    console.log('Initializing Vite in development mode...');
-    try {
-      const vite = await createViteServer({
-        server: { middlewareMode: true },
-        appType: 'spa',
-      });
+    console.log('Initializing Vite in background...');
+    createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    }).then(vite => {
       app.use(vite.middlewares);
-      console.log('Vite middleware integrated.');
-    } catch (e) {
-      console.error('Failed to initialize Vite:', e);
-    }
+      console.log('Vite integrated.');
+    }).catch(e => {
+      console.error('Vite failed to start:', e);
+    });
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get(['/', '/POS', '/DigitalMenu', '/Configuration', '/Inventory', '/Kitchen', '/TV', '/Fidelity', '/Auth', '/Integrations'], (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
-    // Final fallback
+    // SPA Fallback
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
-
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
 }
 
-startServer();
+startServer().catch(err => {
+  console.error('SERVER CRASH AT STARTUP:', err);
+  // Still listen on port 3000 to avoid "Please wait" hang even if it just shows an error
+  const emergencyApp = express();
+  emergencyApp.get('*', (req, res) => res.send('Server failed to start. Check logs.'));
+  emergencyApp.listen(3000, '0.0.0.0');
+});
