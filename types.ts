@@ -134,6 +134,8 @@ export interface Customer {
 }
 
 export interface StoreSettings {
+  id?: string;
+  slug?: string;
   isStoreOpen?: boolean;
   isDeliveryActive: boolean;
   isTableOrderActive: boolean;

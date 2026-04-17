@@ -1290,9 +1290,10 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
           throw new Error(`Resposta inválida do servidor. Verifique se o app está rodando como "estático" em vez de "full-stack".`);
         }
 
-        if (data.checkout_url) {
-            setOnlineCheckoutUrl(data.checkout_url);
-            window.open(data.checkout_url, '_blank');
+        if (data.checkout_url || data.init_point) {
+            const link = data.init_point || data.checkout_url;
+            setOnlineCheckoutUrl(link);
+            window.open(link, '_blank');
             alert("Link de pagamento gerado e aberto em nova aba. Após a confirmação do cliente, adicione o pagamento.");
         } else {
             console.error('Checkout failed. Data:', data);

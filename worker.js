@@ -289,37 +289,37 @@ export default {
     if (url.pathname === "/api/mercado-pago/create-preference" && request.method === "POST") {
       try {
         const body = await request.json();
-        const { accessToken, orderData, storeUrl } = body;
+        const { accessToken, orderData, storeUrl, storeSlug } = body;
 
         if (!accessToken) {
           return new Response(JSON.stringify({ error: "Access Token não fornecido." }), { status: 400, headers: corsHeaders });
         }
 
         const items = orderData.items.map((item) => ({
-          id: item.productId || item.id,
-          title: item.name,
-          quantity: item.quantity,
-          unit_price: item.price,
+          id: String(item.productId || item.id || 'item').substring(0, 256),
+          title: String(item.name || 'Item').substring(0, 256),
+          quantity: 1, // MP requires integer, so we set 1 and multiply price
+          unit_price: Number((Number(item.price || 0) * Number(item.quantity || 1)).toFixed(2)),
           currency_id: 'BRL'
         }));
         
-        if (orderData.deliveryFee > 0) items.push({ id: 'delivery_fee', title: 'Taxa de Entrega', quantity: 1, unit_price: orderData.deliveryFee, currency_id: 'BRL' });
-        if (orderData.serviceFee > 0) items.push({ id: 'service_fee', title: 'Taxa de Serviço', quantity: 1, unit_price: orderData.serviceFee, currency_id: 'BRL' });
+        if (orderData.deliveryFee > 0) items.push({ id: 'delivery_fee', title: 'Taxa de Entrega', quantity: 1, unit_price: Number(orderData.deliveryFee), currency_id: 'BRL' });
+        if (orderData.serviceFee > 0) items.push({ id: 'service_fee', title: 'Taxa de Serviço', quantity: 1, unit_price: Number(orderData.serviceFee), currency_id: 'BRL' });
         
-        let amountToCharge = orderData.total;
+        let amountToCharge = Number(orderData.total);
         if (orderData.paymentDetails) {
           try {
             const details = JSON.parse(orderData.paymentDetails);
             const onlinePayment = details.find((d) => d.method === 'ONLINE');
-            if (onlinePayment) amountToCharge = onlinePayment.amount;
+            if (onlinePayment) amountToCharge = Number(onlinePayment.amount);
           } catch (e) {}
         }
 
         const payload = {
           items: (orderData.discountAmount > 0 || amountToCharge !== orderData.total) 
-            ? [{ id: orderData.id, title: `Pedido #${orderData.displayId}`, quantity: 1, unit_price: amountToCharge, currency_id: 'BRL' }]
+            ? [{ id: String(orderData.id).substring(0, 256), title: `Pedido #${orderData.displayId || ''}`, quantity: 1, unit_price: Number(amountToCharge), currency_id: 'BRL' }]
             : items,
-          external_reference: orderData.id,
+          external_reference: String(orderData.id),
           notification_url: `${new URL(request.url).origin}/api/webhooks/mercadopago?slug=${storeSlug}`,
           back_urls: {
             success: storeUrl.includes('?') ? `${storeUrl}&payment=success&orderId=${orderData.id}` : `${storeUrl}?payment=success&orderId=${orderData.id}`,
@@ -340,7 +340,8 @@ export default {
 
         const data = await resp.json();
         if (!resp.ok) {
-           throw new Error(data.message || 'Erro ao criar preferência do Mercado Pago');
+           console.error("Mercado Pago Error:", data);
+           throw new Error(data.message || JSON.stringify(data) || 'Erro ao criar preferência do Mercado Pago');
         }
 
         return new Response(JSON.stringify({ init_point: data.init_point, id: data.id }), {
