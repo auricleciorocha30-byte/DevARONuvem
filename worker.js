@@ -35,7 +35,13 @@ export default {
         const body = await request.clone().json();
         console.log("PagBank Webhook received:", body);
         
-        const { reference_id, status } = body;
+        let reference_id = body.reference_id;
+        let status = body.status;
+
+        if (body.charges && body.charges.length > 0) {
+            status = body.charges[0].status;
+            reference_id = body.charges[0].reference_id || reference_id;
+        }
         
         if (reference_id) {
           const tursoUrl = "https://produtodevaro-auricleciorocha30-byte.aws-us-east-1.turso.io";
@@ -48,7 +54,7 @@ export default {
             newStatus = 'CANCELADO';
           }
 
-          const updateSql = `UPDATE orders SET status = '${newStatus}' WHERE id = '${reference_id}'`;
+          const updateSql = `UPDATE orders SET status = '${newStatus}' WHERE id = '${reference_id}' OR id = ${isNaN(Number(reference_id)) ? -1 : Number(reference_id)}`;
           await fetch(tursoUrl, {
             method: 'POST',
             headers: {

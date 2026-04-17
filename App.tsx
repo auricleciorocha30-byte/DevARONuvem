@@ -22,7 +22,8 @@ import {
   ShieldAlert,
   MessageCircle,
   AlertTriangle,
-  Truck
+  Truck,
+  CheckCircle2
 } from 'lucide-react';
 import { supabase } from './lib/supabase.ts';
 import { Product, Order, StoreSettings, Waitstaff, OrderStatus, StoreProfile } from './types.ts';
@@ -806,6 +807,23 @@ function StoreContext() {
       <Route path="/master" element={<SuperAdminPanel />} />
       <Route path="/login" element={<LoginPage onLoginSuccess={handleSetUser} />} />
 
+      <Route path="/pagamento-ok" element={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+          <div className="bg-white p-8 rounded-2xl shadow-xl max-w-sm w-full text-center space-y-4 border border-gray-100">
+            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <CheckCircle2 size={40} className="text-green-600" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-800">Pagamento Autorizado</h1>
+            <p className="text-gray-500 text-sm">O processamento foi concluído. Você já pode fechar esta aba e retornar ao PDV principal.</p>
+            <button 
+              onClick={() => window.close()}
+              className="mt-6 w-full py-3 bg-gray-800 text-white font-bold rounded-xl hover:bg-gray-900 transition-colors"
+            >
+              Fechar Aba
+            </button>
+          </div>
+        </div>
+      } />
       <Route path="/pdv" element={
         adminUser && (adminUser.role === 'ATENDENTE' || adminUser.role === 'GERENTE') && adminUser.store_id === currentStore?.id ? (
           <POS 

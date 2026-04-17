@@ -379,7 +379,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
             .select('*')
             .eq('store_id', storeId)
             .eq('type', type)
-            .in('status', ['AGUARDANDO', 'PREPARANDO', 'PRONTO', 'ENVIADO_PARA_ENTREGA', 'SAIU_PARA_ENTREGA', 'CHEGUEI_NA_ORIGEM'])
+            .in('status', ['AGUARDANDO', 'AGUARDANDO_PAGAMENTO', 'PAGO', 'PREPARANDO', 'PRONTO', 'ENVIADO_PARA_ENTREGA', 'SAIU_PARA_ENTREGA', 'CHEGUEI_NA_ORIGEM'])
             .gte('createdAt', Date.now() - 24 * 60 * 60 * 1000);
 
         if (type === 'MESA' || type === 'COMANDA') {
@@ -524,8 +524,16 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                     if (order.paymentDetails) {
                         try {
                             const parsed = JSON.parse(order.paymentDetails);
-                            mergedPayments.push(...parsed);
-                        } catch (e) {}
+                            if (parsed.length === 0 && order.status === 'PAGO') {
+                                mergedPayments.push({ method: order.paymentMethod || 'ONLINE', amount: order.total });
+                            } else {
+                                mergedPayments.push(...parsed);
+                            }
+                        } catch (e) {
+                            if (order.status === 'PAGO') mergedPayments.push({ method: order.paymentMethod || 'ONLINE', amount: order.total });
+                        }
+                    } else if (order.status === 'PAGO') {
+                        mergedPayments.push({ method: order.paymentMethod || 'ONLINE', amount: order.total });
                     }
                 }
             });
@@ -585,7 +593,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
           .from('orders')
           .select('type')
           .eq('store_id', storeId)
-          .eq('status', 'AGUARDANDO');
+          .in('status', ['AGUARDANDO', 'AGUARDANDO_PAGAMENTO', 'PAGO']);
         
         if (error) throw error;
         
@@ -623,7 +631,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
             .select('*')
             .eq('store_id', storeId)
             .eq('type', type)
-            .in('status', ['AGUARDANDO', 'PREPARANDO', 'PRONTO', 'ENVIADO_PARA_ENTREGA', 'SAIU_PARA_ENTREGA', 'CHEGUEI_NA_ORIGEM'])
+            .in('status', ['AGUARDANDO', 'AGUARDANDO_PAGAMENTO', 'PAGO', 'PREPARANDO', 'PRONTO', 'ENVIADO_PARA_ENTREGA', 'SAIU_PARA_ENTREGA', 'CHEGUEI_NA_ORIGEM'])
             .gte('createdAt', Date.now() - 24 * 60 * 60 * 1000)
             .order('createdAt', { ascending: false });
 
@@ -767,12 +775,17 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
           
           if (order.paymentDetails) {
               try {
-                  setLoadedPayments(JSON.parse(order.paymentDetails));
+                  const parsed = JSON.parse(order.paymentDetails);
+                  if (parsed.length === 0 && order.status === 'PAGO') {
+                      setLoadedPayments([{ method: order.paymentMethod || 'ONLINE', amount: order.total }]);
+                  } else {
+                      setLoadedPayments(parsed);
+                  }
               } catch (e) {
-                  setLoadedPayments([]);
+                  setLoadedPayments(order.status === 'PAGO' ? [{ method: order.paymentMethod || 'ONLINE', amount: order.total }] : []);
               }
           } else {
-              setLoadedPayments([]);
+              setLoadedPayments(order.status === 'PAGO' ? [{ method: order.paymentMethod || 'ONLINE', amount: order.total }] : []);
           }
           
           setOrderType(order.type as any);
@@ -1239,7 +1252,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
           customerPhone: finalCustomerPhone
         };
 
-        const redirectStoreUrl = `${window.location.origin}${window.location.pathname}?loja=${settings.slug}`;
+        const redirectStoreUrl = `${window.location.origin}/pagamento-ok`;
 
         const response = await fetch('/api/v1/process-payment', {
             method: 'POST',
