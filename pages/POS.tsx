@@ -1240,21 +1240,28 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                 token: settings.onlinePaymentAccessToken,
                 environment: settings.pagbankEnvironment || 'sandbox',
                 orderData: mockOrder,
+                status: 'pending',
                 storeUrl: window.location.href.split('?')[0]
             })
         });
 
         const responseText = await response.text();
+        
+        if (!response.ok) {
+            console.error(`API Error ${response.status}:`, responseText);
+            const is404 = response.status === 404;
+            const helpMsg = is404 
+              ? ' (Erro 404: O servidor backend não foi encontrado ou o Proxy bloqueou a rota /api).' 
+              : '';
+            throw new Error(`Erro na API (${response.status})${helpMsg}. Detalhes: ${responseText.substring(0, 50)}`);
+        }
+
         let data: any = {};
         try {
-          data = responseText ? JSON.parse(responseText) : {};
+          data = JSON.parse(responseText);
         } catch (e: any) {
-          console.error('API integration error:', e);
-          const is404 = response.status === 404;
-          const helpMsg = is404 
-            ? ' (Erro 404: Verifique se as rotas de API no server.ts estão ativas ou se há bloqueio do Proxy/WAF).' 
-            : '';
-          throw new Error(`Erro de comunicação (Status: ${response.status})${helpMsg}. Resposta: ${responseText.substring(0, 50)}`);
+          console.error('Failed to parse API response:', responseText);
+          throw new Error(`Resposta inválida do servidor. Verifique se o app está rodando como "estático" em vez de "full-stack".`);
         }
 
         if (data.checkout_url) {

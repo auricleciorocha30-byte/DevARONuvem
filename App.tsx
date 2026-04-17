@@ -93,7 +93,31 @@ function StoreContext() {
   const [categories, setCategories] = useState<string[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [backendStatus, setBackendStatus] = useState<'checking' | 'ok' | 'fail'>('checking');
   
+  // Diagnostic backend check
+  useEffect(() => {
+    const checkBackend = async () => {
+      try {
+        const resp = await fetch('/api-health', { 
+            method: 'GET',
+            headers: { 'Cache-Control': 'no-cache' }
+        });
+        if (resp.ok) {
+            setBackendStatus('ok');
+            console.log('%c[BACKEND] OK - Rotas de API ativas.', 'color: #10b981; font-weight: bold;');
+        } else {
+            setBackendStatus('fail');
+            console.error('[BACKEND] Erro 404/Fail - O servidor não está respondendo corretamente.');
+        }
+      } catch (e) {
+        setBackendStatus('fail');
+        console.error('[BACKEND] Erro crítico de conexão com o servidor.', e);
+      }
+    };
+    checkBackend();
+  }, []);
+
   const [adminUser, setAdminUser] = useState<Waitstaff | null>(() => {
     try {
       const saved = localStorage.getItem(SESSION_KEY);

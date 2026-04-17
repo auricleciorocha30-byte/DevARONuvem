@@ -8,10 +8,10 @@ import { MercadoPagoConfig, Preference } from 'mercadopago';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-async function startServer() {
-  const app = express();
-  const PORT = 3000;
+export const app = express();
+const PORT = 3000;
 
+async function startServer() {
   app.use(cors());
   app.use(express.json({ limit: '10mb' }));
 
