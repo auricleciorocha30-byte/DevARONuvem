@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Product } from '../types';
-import { Plus, Search, Edit2, Trash2, Camera, Star, Tag, X, Loader2, Weight, Power, ListTree, ScanLine, FileText } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Camera, Star, Tag, X, Loader2, Weight, Power, ListTree, ScanLine, FileText, Printer } from 'lucide-react';
 import { Switch } from '../components/Switch';
 import { supabase } from '../lib/supabase';
 import { Html5Qrcode } from 'html5-qrcode';
@@ -267,18 +267,68 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
             className="w-full pl-10 pr-4 py-3 bg-white border border-gray-100 rounded-xl outline-none focus:ring-2 focus:ring-orange-500 shadow-sm"
           />
         </div>
-        <div className="flex gap-2 w-full md:w-auto">
+        <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+            <button 
+                onClick={() => {
+                  const printWindow = window.open('', '', 'width=800,height=600');
+                  if (printWindow) {
+                    printWindow.document.write(`
+                      <html>
+                        <head>
+                          <title>Cardápio</title>
+                          <style>
+                            body { font-family: sans-serif; padding: 20px; }
+                            h1 { text-align: center; font-size: 24px; margin-bottom: 20px; text-transform: uppercase; }
+                            .category { font-size: 18px; font-weight: bold; margin-top: 20px; border-bottom: 2px solid #ccc; padding-bottom: 5px; margin-bottom: 15px; text-transform: uppercase; }
+                            .product { display: flex; justify-content: space-between; margin-bottom: 10px; page-break-inside: avoid; border-bottom: 1px dashed #eee; padding-bottom: 8px; }
+                            .product-info { flex: 1; padding-right: 20px; }
+                            .product-name { font-weight: bold; font-size: 14px; }
+                            .product-desc { font-size: 11px; color: #666; margin-top: 4px; }
+                            .product-price { font-weight: bold; font-size: 14px; white-space: nowrap; }
+                            @media print { body { padding: 0; } }
+                          </style>
+                        </head>
+                        <body>
+                          <h1>Nosso Cardápio</h1>
+                          ${categories.map(cat => `
+                            <div class="category">${cat}</div>
+                            ${products.filter(p => p.category === cat && p.isActive).map(p => `
+                              <div class="product">
+                                <div class="product-info">
+                                  <div class="product-name">${p.name}</div>
+                                  ${p.description ? `<div class="product-desc">${p.description}</div>` : ''}
+                                </div>
+                                <div class="product-price">
+                                  ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p.price)}
+                                </div>
+                              </div>
+                            `).join('')}
+                          `).join('')}
+                        </body>
+                      </html>
+                    `);
+                    printWindow.document.close();
+                    setTimeout(() => {
+                      printWindow.print();
+                      printWindow.close();
+                    }, 500);
+                  }
+                }}
+                className="px-4 py-3 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors shadow-sm whitespace-nowrap"
+            >
+                <Printer size={18} /> Imprimir Cardápio
+            </button>
             <button 
                 onClick={() => setShowCategoryModal(true)}
-                className="px-6 py-3 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors shadow-sm flex-1 md:flex-none"
+                className="px-4 py-3 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors shadow-sm whitespace-nowrap"
             >
-                <ListTree size={20} /> Categorias
+                <ListTree size={18} /> Categorias
             </button>
             <button 
                 onClick={() => { setEditingProduct({ category: categories[0] || '', description: '', featuredDay: -1, isActive: true, showInMenu: true, isByWeight: false }); setShowProductModal(true); }}
-                className="px-6 py-3 bg-[#f68c3e] text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-orange-600 transition-colors shadow-md flex-1 md:flex-none"
+                className="px-4 py-3 bg-[#f68c3e] text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-orange-600 transition-colors shadow-md whitespace-nowrap"
             >
-                <Plus size={20} /> Novo Produto
+                <Plus size={18} /> Novo Produto
             </button>
         </div>
       </div>

@@ -35,6 +35,7 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
   const [searchParams] = useSearchParams();
   const [waitstaff, setWaitstaff] = useState<any[]>([]);
   const [isPrintingCommissionsOnly, setIsPrintingCommissionsOnly] = useState(false);
+  const [qrMode, setQrMode] = useState<'geral' | 'local' | 'externo'>('geral');
   
   const storeSlug = useMemo(() => {
     const slug = searchParams.get('loja');
@@ -463,15 +464,58 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
                     Divulgue seu cardápio para os clientes instalarem o WebApp da sua unidade.
                 </p>
 
-                <div className="bg-white p-6 rounded-[2.5rem] flex flex-col items-center mb-6 shadow-2xl">
-                    <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100 mb-4">
+                <div className="bg-white p-6 rounded-[2.5rem] flex flex-col items-center mb-6 shadow-2xl relative">
+                    <div className="flex gap-2 w-full mb-4">
+                       <button onClick={() => setQrMode('geral')} className={`flex-1 text-[9px] font-bold py-2 rounded-xl transition-all ${qrMode === 'geral' ? 'bg-primary text-white shadow' : 'bg-gray-100 text-gray-500'}`}>Geral</button>
+                       <button onClick={() => setQrMode('local')} className={`flex-1 text-[9px] font-bold py-2 rounded-xl transition-all ${qrMode === 'local' ? 'bg-primary text-white shadow' : 'bg-gray-100 text-gray-500'}`}>Interno</button>
+                       <button onClick={() => setQrMode('externo')} className={`flex-1 text-[9px] font-bold py-2 rounded-xl transition-all ${qrMode === 'externo' ? 'bg-primary text-white shadow' : 'bg-gray-100 text-gray-500'}`}>Externo</button>
+                    </div>
+
+                    <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100 mb-4" id="print-qr-target">
                         <img 
-                          src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${window.location.origin}/#/cardapio?loja=${storeSlug}`)}`} 
-                          alt="QR Code da Loja"
-                          className="w-32 h-32"
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(`${window.location.origin}/#/cardapio${lojaParam}${qrMode === 'local' ? '&modo=local' : qrMode === 'externo' ? '&modo=externo' : ''}`)}`} 
+                          alt={`QR Code ${qrMode}`}
+                          className="w-36 h-36"
                         />
                     </div>
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">QR Code para Mesas ou Delivery</p>
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest text-center mb-4">
+                        QR Code {qrMode === 'geral' ? 'Completo' : qrMode === 'local' ? 'Atendimento Local' : 'para Delivery/Retirada'}
+                    </p>
+                    
+                    <button 
+                        onClick={() => {
+                            const params = qrMode === 'local' ? '&modo=local' : qrMode === 'externo' ? '&modo=externo' : '';
+                            const finalUrl = `${window.location.origin}/#/cardapio${lojaParam}${params.replace('&', '%26')}`;
+                            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(finalUrl)}`;
+                            const printWindow = window.open('', '', 'width=600,height=800');
+                            if(printWindow) {
+                                printWindow.document.write(`
+                                    <html>
+                                        <head>
+                                            <title>Imprimir QR Code</title>
+                                            <style>
+                                                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; flex-direction: column; align-items: center; justify-center: center; text-align: center; height: 100vh; padding: 20px; }
+                                                h1 { font-size: 28px; margin-bottom: 5px; color: #111; }
+                                                p { font-size: 16px; color: #666; margin-bottom: 30px; }
+                                                img { width: 300px; height: 300px; }
+                                                .footer { margin-top: 30px; font-weight: bold; font-size: 18px; }
+                                            </style>
+                                        </head>
+                                        <body>
+                                            <h1>Escaneie para Acessar</h1>
+                                            <p>Acesse nosso ${qrMode === 'local' ? 'Cardápio Local' : qrMode === 'externo' ? 'Cardápio de Delivery' : 'Cardápio Digital'}</p>
+                                            <img src="${qrUrl}" onload="window.print();window.close()" />
+                                            <div class="footer">${settings?.storeName || 'Nossa Loja'}</div>
+                                        </body>
+                                    </html>
+                                `);
+                                printWindow.document.close();
+                            }
+                        }}
+                        className="flex items-center justify-center gap-2 w-full py-3 bg-secondary/10 text-secondary rounded-xl font-bold hover:bg-secondary/20 transition-colors"
+                    >
+                        <Printer size={16} /> Imprimir QR Code
+                    </button>
                 </div>
 
                 <div className="space-y-3">

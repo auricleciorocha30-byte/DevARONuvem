@@ -20,6 +20,7 @@ export interface Waitstaff {
   store_id?: string;
   name: string;
   password?: string;
+  phone?: string;
   role: 'GERENTE' | 'ATENDENTE' | 'ENTREGADOR';
 }
 

@@ -29,6 +29,7 @@ const WaitstaffManagement: React.FC<Props> = ({ currentStore, settings, onUpdate
   const [loading, setLoading] = useState(true);
   const [newName, setNewName] = useState('');
   const [newPass, setNewPass] = useState('');
+  const [newPhone, setNewPhone] = useState('');
   const [newRole, setNewRole] = useState<'GERENTE' | 'ATENDENTE' | 'ENTREGADOR'>('ATENDENTE');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -62,11 +63,13 @@ const WaitstaffManagement: React.FC<Props> = ({ currentStore, settings, onUpdate
         store_id: currentStore.id,
         name: newName, 
         password: newPass,
+        phone: newPhone,
         role: newRole 
       }]);
       if (error) throw error;
       setNewName('');
       setNewPass('');
+      setNewPhone('');
       setNewRole('ATENDENTE');
       fetchStaff();
     } catch (err: any) {
@@ -155,6 +158,15 @@ const WaitstaffManagement: React.FC<Props> = ({ currentStore, settings, onUpdate
                 className="p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-orange-500 font-medium"
                 required
               />
+              {newRole === 'ENTREGADOR' && (
+                <input 
+                  type="tel" 
+                  placeholder="Telefone/WhatsApp do Entregador" 
+                  value={newPhone}
+                  onChange={e => setNewPhone(e.target.value)}
+                  className="p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-orange-500 font-medium"
+                />
+              )}
               <div className="flex bg-gray-50 p-1 rounded-2xl border border-gray-100">
                 {(['ATENDENTE', 'GERENTE', 'ENTREGADOR'] as const).map(role => (
                    <button 

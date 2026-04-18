@@ -3442,6 +3442,18 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider bg-yellow-100 text-yellow-700 flex items-center gap-1">
                                             <Truck size={10} />
                                             {couriers.find(c => c.id === order.deliveryDriverId)?.name || 'Entregador'}
+                                            {couriers.find(c => c.id === order.deliveryDriverId)?.phone && (
+                                              <a 
+                                                href={`https://wa.me/55${couriers.find(c => c.id === order.deliveryDriverId)?.phone?.replace(/\D/g, '')}`}
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                className="ml-1 text-green-600 hover:text-green-700 hover:scale-110 transition-transform"
+                                                onClick={e => e.stopPropagation()}
+                                                title="WhatsApp do Entregador"
+                                              >
+                                                <MessageCircle size={12} />
+                                              </a>
+                                            )}
                                         </span>
                                     )}
                                 </div>
