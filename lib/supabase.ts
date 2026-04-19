@@ -733,9 +733,20 @@ class TursoBridge {
     }
   }
 
-  async maybeSingle() {
+  async single() {
+    this.limitCount = 1;
     if (this.tableName === 'store_profiles') await ensureSchema();
-    const { data } = await this.get();
+    const { data, error } = await this.get();
+    if (error) return { data: null, error };
+    if (!data || data.length === 0) return { data: null, error: { message: "Row not found" } };
+    return { data: data[0], error: null };
+  }
+
+  async maybeSingle() {
+    this.limitCount = 1;
+    if (this.tableName === 'store_profiles') await ensureSchema();
+    const { data, error } = await this.get();
+    if (error) return { data: null, error };
     return { data: data && data.length > 0 ? data[0] : null, error: null };
   }
 
