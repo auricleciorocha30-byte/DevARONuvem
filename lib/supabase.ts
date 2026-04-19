@@ -487,6 +487,13 @@ class TursoBridge {
             if (!cashMovementsColumns.includes('session_id')) {
                 try { await this.executeSqlCustom(url, token, `ALTER TABLE cash_movements ADD COLUMN session_id TEXT`); } catch (e) { console.warn(e); }
             }
+            
+            const waitstaffTableInfo = await this.executeSqlCustom(url, token, `PRAGMA table_info(waitstaff)`);
+            const waitstaffColumns = waitstaffTableInfo.rows.map((row: any) => row.name);
+            
+            if (!waitstaffColumns.includes('phone')) {
+                try { await this.executeSqlCustom(url, token, `ALTER TABLE waitstaff ADD COLUMN phone TEXT`); } catch (e) { console.warn(e); }
+            }
 
             const customersTableInfo = await this.executeSqlCustom(url, token, `PRAGMA table_info(customers)`);
             const customerColumns = customersTableInfo.rows.map((row: any) => row.name);
