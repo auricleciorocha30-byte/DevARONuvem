@@ -171,6 +171,20 @@ export default function DeliveryPanel({ storeId, user, settings, storeSlug, onLo
 
   const acceptDelivery = async (orderId: string) => {
     if (!orderId) return;
+    
+    // Check if it's already accepted
+    const { data: currentOrder } = await supabase
+      .from('orders')
+      .select('deliveryDriverId')
+      .eq('id', orderId)
+      .single();
+      
+    if (currentOrder && currentOrder.deliveryDriverId && currentOrder.deliveryDriverId !== '' && currentOrder.deliveryDriverId !== 'null' && currentOrder.deliveryDriverId !== 'undefined') {
+      alert("Ops! Esta entrega já foi aceita por outro entregador.");
+      fetchDeliveries();
+      return;
+    }
+
     await supabase
       .from('orders')
       .eq('id', orderId)
