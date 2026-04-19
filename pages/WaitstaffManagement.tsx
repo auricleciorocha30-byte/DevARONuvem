@@ -14,7 +14,10 @@ import {
   ShieldAlert,
   Crown,
   AlertCircle,
-  Truck
+  Truck,
+  Edit2,
+  Save,
+  X
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -32,6 +35,7 @@ const WaitstaffManagement: React.FC<Props> = ({ currentStore, settings, onUpdate
   const [newPhone, setNewPhone] = useState('');
   const [newRole, setNewRole] = useState<'GERENTE' | 'ATENDENTE' | 'ENTREGADOR'>('ATENDENTE');
   const [isSaving, setIsSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchStaff();
@@ -59,24 +63,47 @@ const WaitstaffManagement: React.FC<Props> = ({ currentStore, settings, onUpdate
     if (!newName || !newPass) return;
     setIsSaving(true);
     try {
-      const { error } = await supabase.from('waitstaff').insert([{ 
-        store_id: currentStore.id,
-        name: newName, 
-        password: newPass,
-        phone: newPhone,
-        role: newRole 
-      }]);
-      if (error) throw error;
-      setNewName('');
-      setNewPass('');
-      setNewPhone('');
-      setNewRole('ATENDENTE');
+      if (editingId) {
+        const { error } = await supabase.from('waitstaff').update({
+          name: newName, 
+          password: newPass,
+          phone: newPhone,
+          role: newRole
+        }).eq('id', editingId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('waitstaff').insert([{ 
+          store_id: currentStore.id,
+          name: newName, 
+          password: newPass,
+          phone: newPhone,
+          role: newRole 
+        }]);
+        if (error) throw error;
+      }
+      resetForm();
       fetchStaff();
     } catch (err: any) {
-      alert("Erro ao adicionar colaborador: " + err.message);
+      alert(`Erro ao ${editingId ? 'editar' : 'adicionar'} colaborador: ` + err.message);
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const resetForm = () => {
+    setNewName('');
+    setNewPass('');
+    setNewPhone('');
+    setNewRole('ATENDENTE');
+    setEditingId(null);
+  };
+
+  const handleEditStaff = (member: Waitstaff) => {
+    setNewName(member.name);
+    setNewPass(member.password || '');
+    setNewPhone(member.phone || '');
+    setNewRole(member.role);
+    setEditingId(member.id);
   };
 
   const handleDeleteStaff = async (id: string) => {
@@ -134,10 +161,10 @@ const WaitstaffManagement: React.FC<Props> = ({ currentStore, settings, onUpdate
 
         <section className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
           <div className="flex items-center gap-4 mb-8">
-            <div className="p-3 bg-orange-500 rounded-2xl text-white shadow-lg">
-              <UserPlus size={24} />
+            <div className={`p-3 rounded-2xl text-white shadow-lg ${editingId ? 'bg-blue-500' : 'bg-orange-500'}`}>
+              {editingId ? <Edit2 size={24} /> : <UserPlus size={24} />}
             </div>
-            <h2 className="text-xl font-bold text-gray-800">Novo Membro</h2>
+            <h2 className="text-xl font-bold text-gray-800">{editingId ? 'Editar Membro' : 'Novo Membro'}</h2>
           </div>
           
           <form onSubmit={handleAddStaff} className="space-y-4 mb-8">
@@ -181,14 +208,25 @@ const WaitstaffManagement: React.FC<Props> = ({ currentStore, settings, onUpdate
                 ))}
               </div>
             </div>
-            <button 
-              type="submit" 
-              disabled={isSaving}
-              className="w-full py-4 bg-primary text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all"
-            >
-              {isSaving ? <Loader2 className="animate-spin" /> : <UserPlus size={20}/>}
-              Adicionar à Equipe
-            </button>
+            <div className="flex gap-2">
+              <button 
+                type="submit" 
+                disabled={isSaving}
+                className="flex-1 py-4 bg-primary text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all"
+              >
+                {isSaving ? <Loader2 className="animate-spin" /> : (editingId ? <Save size={20}/> : <UserPlus size={20}/>)}
+                {editingId ? 'Salvar Alterações' : 'Adicionar à Equipe'}
+              </button>
+              {editingId && (
+                <button 
+                  type="button"
+                  onClick={resetForm}
+                  className="px-6 py-4 bg-gray-100 text-gray-500 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-gray-200 active:scale-95 transition-all"
+                >
+                  <X size={20}/>
+                </button>
+              )}
+            </div>
           </form>
 
           <div className="space-y-3">
@@ -225,6 +263,7 @@ const WaitstaffManagement: React.FC<Props> = ({ currentStore, settings, onUpdate
                         </div>
                       </div>
                     )}
+                    <button onClick={() => handleEditStaff(member)} className="p-2 text-blue-300 hover:text-blue-500 transition-colors"><Edit2 size={18}/></button>
                     <button onClick={() => handleDeleteStaff(member.id)} className="p-2 text-red-300 hover:text-red-500 transition-colors"><Trash2 size={18}/></button>
                   </div>
                 </div>

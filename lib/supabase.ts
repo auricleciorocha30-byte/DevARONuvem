@@ -159,7 +159,8 @@ const SCHEMA_STATEMENTS = [
     store_id TEXT,
     name TEXT NOT NULL,
     password TEXT NOT NULL,
-    role TEXT NOT NULL
+    role TEXT NOT NULL,
+    phone TEXT
   )`,
   `CREATE TABLE IF NOT EXISTS orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -324,6 +325,13 @@ async function ensureSchema() {
           
           if (!cashMovementsColumns.includes('session_id')) {
               try { await client.execute(`ALTER TABLE cash_movements ADD COLUMN session_id TEXT`); } catch (e) { console.warn(e); }
+          }
+          
+          const waitstaffTableInfo = await client.execute(`PRAGMA table_info(waitstaff)`);
+          const waitstaffColumns = waitstaffTableInfo.rows.map((row: any) => row.name);
+          
+          if (!waitstaffColumns.includes('phone')) {
+              try { await client.execute(`ALTER TABLE waitstaff ADD COLUMN phone TEXT`); } catch (e) { console.warn(e); }
           }
 
           const customersTableInfo = await client.execute(`PRAGMA table_info(customers)`);
