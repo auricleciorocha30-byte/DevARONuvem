@@ -445,53 +445,69 @@ export default function DeliveryPanel({ storeId, user, settings, storeSlug, onLo
                     </div>
                   )}
 
-                  <div className="pt-4 border-t border-gray-100 flex justify-between items-center">
-                    <div className="flex flex-col">
-                        <span className="text-xs text-gray-500 font-bold uppercase">Pagamento</span>
-                        {(() => {
-                            let payments: { method: string, amount: number }[] = [];
-                            if (order.paymentDetails) {
-                                try {
-                                    payments = JSON.parse(order.paymentDetails);
-                                } catch (e) {
+                  <div className="pt-4 border-t border-gray-100 flex justify-between items-start flex-col gap-4">
+                    
+                    <div className="flex justify-between w-full items-center">
+                        <div className="flex flex-col">
+                            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Taxa de Entrega</span>
+                            <span className="text-3xl font-black text-blue-600 leading-none">
+                                {Number(order.deliveryFee) > 0 ? formatCurrency(Number(order.deliveryFee)) : 'GRÁTIS'}
+                            </span>
+                        </div>
+                        <div className="flex flex-col items-end text-right">
+                            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Total do Pedido</span>
+                            <span className="text-xl font-black text-gray-900 leading-none">{formatCurrency(order.total)}</span>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col w-full bg-gray-50 p-3 rounded-xl border border-gray-100">
+                        <span className="text-[10px] text-gray-500 font-bold uppercase mb-2">O que cobrar do cliente</span>
+                        <div className="flex flex-col gap-2">
+                            {(() => {
+                                let payments: { method: string, amount: number }[] = [];
+                                if (order.paymentDetails) {
+                                    try {
+                                        payments = JSON.parse(order.paymentDetails);
+                                    } catch (e) {
+                                        payments = [{ method: order.paymentMethod || 'A_PAGAR', amount: order.total }];
+                                    }
+                                } else {
                                     payments = [{ method: order.paymentMethod || 'A_PAGAR', amount: order.total }];
                                 }
-                            } else {
-                                payments = [{ method: order.paymentMethod || 'A_PAGAR', amount: order.total }];
-                            }
-                            
-                            return payments.map((p, idx) => {
-                                const isCashback = p.method === 'CASHBACK';
-                                const colorClass = isCashback ? 'text-purple-600 bg-purple-100 text-[10px] px-2 py-0.5' : 'text-red-700 bg-red-100 text-sm md:text-base px-3 py-1 border border-red-200 shadow-sm';
                                 
-                                let methodLabel = p.method;
-                                if (p.method === 'A_PAGAR') methodLabel = 'Pagar na Entrega';
-                                if (p.method === 'CARTAO') methodLabel = 'Cartão';
-                                if (p.method === 'DINHEIRO') methodLabel = 'Dinheiro';
-                                
-                                const label = isCashback ? 'Cashback Utilizado' : `Cobrar (${methodLabel})`;
-                                
-                                return (
-                                    <div key={idx} className="flex flex-col">
-                                        <span className={`font-black uppercase rounded mt-1 inline-block w-max mr-1 ${colorClass}`}>
-                                            {label}: {formatCurrency(p.amount)}
-                                        </span>
-                                        {p.method === 'DINHEIRO' && order.changeFor && order.changeFor > 0 && (
-                                            <span className="text-sm font-black text-orange-700 uppercase bg-orange-100 border border-orange-200 shadow-sm px-3 py-1 rounded mt-1 inline-block w-max">
-                                                Troco para: {formatCurrency(order.changeFor)} (Devolver: {formatCurrency(order.changeFor - p.amount)})
-                                            </span>
-                                        )}
-                                    </div>
-                                );
-                            });
-                        })()}
-                        {Number(order.deliveryFee) > 0 ? (
-                            <span className="text-[10px] font-bold text-blue-600 uppercase bg-blue-100 px-2 py-0.5 rounded mt-1 inline-block w-max">
-                                Taxa de Entrega: {formatCurrency(Number(order.deliveryFee))}
-                            </span>
-                        ) : null}
+                                return payments.map((p, idx) => {
+                                    const isCashback = p.method === 'CASHBACK';
+                                    const colorClass = isCashback ? 'text-purple-600 bg-purple-100' : p.method === 'ONLINE' ? 'text-green-700 bg-green-100 border border-green-200' : 'text-red-700 bg-red-100 border border-red-200';
+                                    
+                                    let methodLabel = p.method;
+                                    if (p.method === 'A_PAGAR') methodLabel = 'Cobrar na Entrega';
+                                    if (p.method === 'CARTAO') methodLabel = 'Cobrar (Cartão)';
+                                    if (p.method === 'DINHEIRO') methodLabel = 'Cobrar (Dinheiro)';
+                                    if (p.method === 'ONLINE') methodLabel = 'Já Pago (Online)';
+                                    
+                                    const label = isCashback ? 'Cashback' : methodLabel;
+                                    
+                                    return (
+                                        <div key={idx} className="flex flex-col items-start w-full">
+                                            <div className="flex justify-between items-center w-full">
+                                                <span className={`font-black uppercase text-sm md:text-base px-3 py-1 rounded shadow-sm ${colorClass}`}>
+                                                    {label}
+                                                </span>
+                                                <span className={`font-black text-lg ${p.method === 'ONLINE' ? 'text-green-600' : 'text-red-600'}`}>
+                                                    {formatCurrency(p.amount || 0)}
+                                                </span>
+                                            </div>
+                                            {p.method === 'DINHEIRO' && order.changeFor && order.changeFor > 0 && (
+                                                <span className="text-[11px] font-black text-orange-700 uppercase bg-orange-100 border border-orange-200 shadow-sm px-2 py-1 rounded mt-2 inline-block">
+                                                    Levar troco para: {formatCurrency(order.changeFor)} (Devolver: {formatCurrency(order.changeFor - p.amount)})
+                                                </span>
+                                            )}
+                                        </div>
+                                    );
+                                });
+                            })()}
+                        </div>
                     </div>
-                    <span className="text-xl font-black text-gray-900">{formatCurrency(order.total)}</span>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 pt-2">

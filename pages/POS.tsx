@@ -527,7 +527,11 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                             if (parsed.length === 0 && order.status === 'PAGO') {
                                 mergedPayments.push({ method: order.paymentMethod || 'ONLINE', amount: order.total });
                             } else {
-                                mergedPayments.push(...parsed);
+                                const parsedWithAmounts = parsed.map((p: any) => ({
+                                    ...p,
+                                    amount: p.amount ?? order.total
+                                }));
+                                mergedPayments.push(...parsedWithAmounts);
                             }
                         } catch (e) {
                             if (order.status === 'PAGO') mergedPayments.push({ method: order.paymentMethod || 'ONLINE', amount: order.total });
@@ -894,8 +898,10 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
   const [bleedAmount, setBleedAmount] = useState('');
   const [bleedReason, setBleedReason] = useState('');
 
-  const formatCurrency = (val: number) => 
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const formatCurrency = (val: number | undefined | null) => {
+    if (val === undefined || val === null || isNaN(val)) return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(0);
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  };
 
   useEffect(() => {
     fetchProducts();
