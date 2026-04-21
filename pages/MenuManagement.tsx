@@ -166,7 +166,8 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
             fractionPrice: (editingProduct.fractionPrice != null && !isNaN(Number(editingProduct.fractionPrice))) ? Number(editingProduct.fractionPrice) : null,
             ncm: editingProduct.ncm || undefined,
             cfop: editingProduct.cfop || undefined,
-            icms_situacao_tributaria: editingProduct.icms_situacao_tributaria || undefined
+            icms_situacao_tributaria: editingProduct.icms_situacao_tributaria || undefined,
+            complements: editingProduct.complements || []
         };
 
         await saveProduct(productData);

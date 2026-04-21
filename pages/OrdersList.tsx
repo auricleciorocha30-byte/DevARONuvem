@@ -442,6 +442,15 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
               )}
 
               <div className="flex flex-wrap gap-2">
+                 {['AGUARDANDO', 'PAGO', 'NOVO', 'AGUARDANDO_PAGAMENTO', 'PENDENTE'].includes(group.status || 'NOVO') && (
+                   <button 
+                    disabled={isProcessing}
+                    onClick={() => handleStatusUpdate(group, 'PREPARANDO')} 
+                    className={`flex-1 py-3.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                   >
+                    Aceitar (Preparar)
+                   </button>
+                 )}
                  {group.status === 'PREPARANDO' && (
                    <button 
                     disabled={isProcessing}
@@ -454,10 +463,10 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                  {group.status !== 'ENTREGUE' && (
                    <button 
                     disabled={isProcessing}
-                    onClick={() => handleStatusUpdate(group, group.type === 'ENTREGA' ? 'ENVIADO_PARA_ENTREGA' : 'ENTREGUE')} 
+                    onClick={() => handleStatusUpdate(group, (group.type === 'ENTREGA' && group.status !== 'ENVIADO_PARA_ENTREGA') ? 'ENVIADO_PARA_ENTREGA' : 'ENTREGUE')} 
                     className={`flex-1 py-3.5 bg-green-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
                    >
-                    {group.type === 'ENTREGA' ? 'Enviar p/ Entrega' : 'Finalizar'}
+                    {group.type === 'ENTREGA' && group.status !== 'ENVIADO_PARA_ENTREGA' ? 'Enviar p/ Entrega' : 'Finalizar'}
                    </button>
                  )}
                  

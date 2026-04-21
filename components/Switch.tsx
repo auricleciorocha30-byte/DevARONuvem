@@ -9,6 +9,7 @@ interface Props {
 export const Switch: React.FC<Props> = ({ checked, onChange }) => {
   return (
     <button
+      type="button"
       onClick={() => onChange(!checked)}
       className={`w-12 h-6 rounded-full transition-colors relative ${checked ? 'bg-[#f68c3e]' : 'bg-gray-300'}`}
     >
