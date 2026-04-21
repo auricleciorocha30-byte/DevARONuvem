@@ -353,7 +353,15 @@ function StoreContext() {
     fractionPrice: p.fractionPrice != null || p.fractionprice != null || p.fraction_price != null ? Number(p.fractionPrice || p.fractionprice || p.fraction_price) : undefined,
     ncm: p.ncm || undefined,
     cfop: p.cfop || undefined,
-    icms_situacao_tributaria: p.icms_situacao_tributaria || p.icms_situacaotributaria || undefined
+    icms_situacao_tributaria: p.icms_situacao_tributaria || p.icms_situacaotributaria || undefined,
+    complements: (() => {
+      if (!p.complements) return undefined;
+      try {
+        return typeof p.complements === 'string' ? JSON.parse(p.complements) : p.complements;
+      } catch (e) {
+        return undefined;
+      }
+    })()
   }), []);
 
   const syncOrders = useCallback(async () => {
@@ -866,7 +874,10 @@ function StoreContext() {
       }>
         <Route index element={<AdminDashboard orders={orders} products={products} settings={settings} storeId={currentStore?.id} onLogout={() => handleSetUser(null)} />} />
         <Route path="cardapio-admin" element={<MenuManagement storeId={currentStore?.id} products={products} saveProduct={async (p) => { 
-          const payload = { ...p, store_id: currentStore?.id };
+          const payload: any = { ...p, store_id: currentStore?.id };
+          if (payload.complements !== undefined) {
+             payload.complements = payload.complements ? JSON.stringify(payload.complements) : null;
+          }
           if (!payload.id) delete payload.id;
 
           // NeonBridge upsert returns { data: [result], error } directly. No .select() needed.

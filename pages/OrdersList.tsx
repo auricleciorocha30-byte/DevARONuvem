@@ -310,7 +310,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
           ))}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 ${filterType === 'FINALIZADOS' ? 'max-h-[calc(100vh-200px)] overflow-y-auto pr-2 pb-10 custom-scrollbar' : ''}`}>
         {displayGroups.map(group => (
           <div key={group.id} className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 flex flex-col hover:shadow-xl transition-all relative overflow-hidden group">
             <div className="absolute top-0 right-0 p-2 bg-gray-50 rounded-bl-2xl">
@@ -362,12 +362,24 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
 
             <div className="flex-1 space-y-2 mb-6 border-t pt-4 max-h-48 overflow-y-auto custom-scrollbar">
               {group.items.map((item, idx) => (
-                <div key={idx} className="flex justify-between items-center text-sm">
-                  <span className="text-gray-700 font-medium">
-                    <strong className="bg-zinc-100 px-1.5 py-0.5 rounded mr-1.5">{item.isByWeight ? `${item.quantity.toFixed(3)}kg` : `${item.quantity}x`}</strong> 
-                    {item.name}
-                  </span>
-                  <span className="font-mono font-bold text-xs text-gray-400">R$ {(item.price * item.quantity).toFixed(2)}</span>
+                <div key={idx} className="flex flex-col text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-700 font-medium">
+                      <strong className="bg-zinc-100 px-1.5 py-0.5 rounded mr-1.5">{item.isByWeight ? `${item.quantity.toFixed(3)}kg` : `${item.quantity}x`}</strong> 
+                      {item.name}
+                    </span>
+                    <span className="font-mono font-bold text-xs text-gray-400">R$ {(item.price * item.quantity).toFixed(2)}</span>
+                  </div>
+                  {item.complements && item.complements.length > 0 && (
+                     <div className="ml-8 mt-0.5">
+                        {item.complements.map((comp, cIdx) => (
+                           <div key={cIdx} className="text-[10px] text-gray-500 flex justify-between">
+                              <span><span className="text-gray-400">{comp.quantity}x</span> {comp.name}</span>
+                              {comp.price > 0 ? <span>+R$ {(comp.price * comp.quantity).toFixed(2)}</span> : <span />}
+                           </div>
+                        ))}
+                     </div>
+                  )}
                 </div>
               ))}
               {group.deliveryFee && group.deliveryFee > 0 ? (
@@ -530,12 +542,24 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <tbody>
                       {printOrder.items.map((it, i) => (
-                        <tr key={i}>
-                          <td style={{ fontSize: '9pt', padding: '1.5mm 0' }}>
-                            {it.isByWeight ? `${it.quantity.toFixed(3)}kg` : `${it.quantity}x`} {it.name.toUpperCase()}
-                          </td>
-                          <td style={{ textAlign: 'right', fontSize: '9pt' }}>{(it.price * it.quantity).toFixed(2)}</td>
-                        </tr>
+                        <React.Fragment key={i}>
+                            <tr>
+                              <td style={{ fontSize: '9pt', padding: '1.5mm 0 0 0' }}>
+                                {it.isByWeight ? `${it.quantity.toFixed(3)}kg` : `${it.quantity}x`} {it.name.toUpperCase()}
+                              </td>
+                              <td style={{ textAlign: 'right', fontSize: '9pt', padding: '1.5mm 0 0 0' }}>{(it.price * it.quantity).toFixed(2)}</td>
+                            </tr>
+                            {it.complements && it.complements.length > 0 && it.complements.map((comp, cIdx) => (
+                               <tr key={`c-${i}-${cIdx}`}>
+                                 <td style={{ fontSize: '8pt', padding: '0 0 0 4mm' }}>
+                                   {comp.quantity}x {comp.name.toUpperCase()}
+                                 </td>
+                                 <td style={{ textAlign: 'right', fontSize: '8pt' }}>
+                                   {comp.price > 0 ? (comp.price * comp.quantity).toFixed(2) : ''}
+                                 </td>
+                               </tr>
+                            ))}
+                        </React.Fragment>
                       ))}
                     </tbody>
                   </table>

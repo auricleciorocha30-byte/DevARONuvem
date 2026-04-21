@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Product } from '../types';
 import { Plus, Search, Edit2, Trash2, Camera, Star, Tag, X, Loader2, Weight, Power, ListTree, ScanLine, FileText, Printer } from 'lucide-react';
 import { Switch } from '../components/Switch';
+import { ComplementBuilder } from '../components/ComplementBuilder';
 import { supabase } from '../lib/supabase';
 import { Html5Qrcode } from 'html5-qrcode';
 
@@ -25,6 +26,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
   const [newCategoryName, setNewCategoryName] = useState('');
   const [isSavingCategory, setIsSavingCategory] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+  const [productTab, setProductTab] = useState<'INFO' | 'OPCOES'>('INFO');
 
   const [isSearchingBarcode, setIsSearchingBarcode] = useState(false);
 
@@ -325,7 +327,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                 <ListTree size={18} /> Categorias
             </button>
             <button 
-                onClick={() => { setEditingProduct({ category: categories[0] || '', description: '', featuredDay: -1, isActive: true, showInMenu: true, isByWeight: false }); setShowProductModal(true); }}
+                onClick={() => { setEditingProduct({ category: categories[0] || '', description: '', featuredDay: -1, isActive: true, showInMenu: true, isByWeight: false, complements: [] }); setProductTab('INFO'); setShowProductModal(true); }}
                 className="px-4 py-3 bg-[#f68c3e] text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-orange-600 transition-colors shadow-md whitespace-nowrap"
             >
                 <Plus size={18} /> Novo Produto
@@ -337,7 +339,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
         {filtered.map(product => (
           <div key={product.id} className={`bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 group relative ${!product.isActive ? 'opacity-50 grayscale' : ''}`}>
             <div className="absolute top-2 right-2 flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10">
-              <button onClick={() => { setEditingProduct(product); setShowProductModal(true); }} className="p-2 bg-white rounded-lg shadow text-blue-500 hover:bg-blue-50">
+              <button onClick={() => { setEditingProduct(product); setProductTab('INFO'); setShowProductModal(true); }} className="p-2 bg-white rounded-lg shadow text-blue-500 hover:bg-blue-50">
                 <Edit2 size={16} />
               </button>
               <button onClick={() => handleDelete(product.id)} className="p-2 bg-white rounded-lg shadow text-red-500 hover:bg-red-50">
@@ -431,6 +433,24 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
               <h2 className="text-xl font-bold">{editingProduct?.id ? 'Editar Produto' : 'Cadastrar Produto'}</h2>
               <button onClick={() => setShowProductModal(false)} className="text-gray-400 p-2 hover:bg-gray-100 rounded-full transition-colors"><X /></button>
             </div>
+            
+            <div className="flex border-b">
+                <button
+                    type="button"
+                    onClick={() => setProductTab('INFO')}
+                    className={`flex-1 py-3 text-sm font-bold text-center transition-colors ${productTab === 'INFO' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                    Informações
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setProductTab('OPCOES')}
+                    className={`flex-1 py-3 text-sm font-bold text-center transition-colors ${productTab === 'OPCOES' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                    Opções & Complementos
+                </button>
+            </div>
+
             <form 
               onSubmit={handleSaveProduct} 
               onKeyDown={(e) => {
@@ -438,24 +458,25 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                   e.preventDefault();
                 }
               }}
-              className="p-6 space-y-4 max-h-[80vh] overflow-y-auto custom-scrollbar"
+              className="p-6 space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar"
             >
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="bg-orange-50 p-3 rounded-xl flex items-center justify-between border border-orange-100">
-                    <div className="flex items-center gap-2">
-                        <Power size={14} className={editingProduct?.isActive ? 'text-green-600' : 'text-gray-400'} />
-                        <span className="text-[10px] font-bold uppercase text-gray-500">Disponível</span>
-                    </div>
-                    <Switch checked={editingProduct?.isActive ?? true} onChange={(v) => setEditingProduct({...editingProduct, isActive: v})} />
+              <div className={`${productTab === 'INFO' ? 'block' : 'hidden'} space-y-4`}>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="bg-orange-50 p-3 rounded-xl flex items-center justify-between border border-orange-100">
+                        <div className="flex items-center gap-2">
+                            <Power size={14} className={editingProduct?.isActive ? 'text-green-600' : 'text-gray-400'} />
+                            <span className="text-[10px] font-bold uppercase text-gray-500">Disponível</span>
+                        </div>
+                        <Switch checked={editingProduct?.isActive ?? true} onChange={(v) => setEditingProduct({...editingProduct, isActive: v})} />
+                      </div>
+                      <div className="bg-purple-50 p-3 rounded-xl flex items-center justify-between border border-purple-100">
+                        <div className="flex items-center gap-2">
+                            <ListTree size={14} className={editingProduct?.showInMenu !== false ? 'text-purple-600' : 'text-gray-400'} />
+                            <span className="text-[10px] font-bold uppercase text-gray-500">No Cardápio</span>
+                        </div>
+                        <Switch checked={editingProduct?.showInMenu ?? true} onChange={(v) => setEditingProduct({...editingProduct, showInMenu: v})} />
+                      </div>
                   </div>
-                  <div className="bg-purple-50 p-3 rounded-xl flex items-center justify-between border border-purple-100">
-                    <div className="flex items-center gap-2">
-                        <ListTree size={14} className={editingProduct?.showInMenu !== false ? 'text-purple-600' : 'text-gray-400'} />
-                        <span className="text-[10px] font-bold uppercase text-gray-500">No Cardápio</span>
-                    </div>
-                    <Switch checked={editingProduct?.showInMenu ?? true} onChange={(v) => setEditingProduct({...editingProduct, showInMenu: v})} />
-                  </div>
-              </div>
 
               <div className="grid grid-cols-1 gap-4">
                   <div className="bg-blue-50 p-3 rounded-xl flex items-center justify-between border border-blue-100">
@@ -655,6 +676,14 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                   />
                 </div>
               </div>
+              </div>
+
+              {productTab === 'OPCOES' && (
+                  <ComplementBuilder 
+                    complements={editingProduct?.complements || []}
+                    onChange={(complements) => setEditingProduct({ ...editingProduct, complements })}
+                  />
+              )}
 
               <div className="pt-4 flex gap-3">
                 <button type="button" onClick={() => setShowProductModal(false)} className="flex-1 py-3 text-gray-400 font-bold">Cancelar</button>

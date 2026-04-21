@@ -24,6 +24,32 @@ export interface Waitstaff {
   role: 'GERENTE' | 'ATENDENTE' | 'ENTREGADOR';
 }
 
+export interface ComplementItem {
+  id: string;
+  name: string;
+  description?: string;
+  price: number;
+  imageUrl?: string;
+}
+
+export interface ComplementCategory {
+  id: string;
+  name: string;
+  isRequired: boolean;
+  minQuantity: number;
+  maxQuantity: number;
+  items: ComplementItem[];
+}
+
+export interface CartComplementItem {
+  categoryId: string;
+  categoryName: string;
+  itemId: string;
+  name: string;
+  price: number;
+  quantity: number;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -44,6 +70,7 @@ export interface Product {
   ncm?: string;
   cfop?: string;
   icms_situacao_tributaria?: string;
+  complements?: ComplementCategory[];
 }
 
 export interface OrderItem {
@@ -63,6 +90,7 @@ export interface OrderItem {
     name: string;
     price: number;
   }[];
+  complements?: CartComplementItem[];
 }
 
 export interface Order {

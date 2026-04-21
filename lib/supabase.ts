@@ -319,6 +319,9 @@ async function ensureSchema() {
           if (!productColumns.includes('icms_situacao_tributaria')) {
               try { await client.execute(`ALTER TABLE products ADD COLUMN icms_situacao_tributaria TEXT`); } catch (e) { console.warn(e); }
           }
+          if (!productColumns.includes('complements')) {
+              try { await client.execute(`ALTER TABLE products ADD COLUMN complements TEXT`); } catch (e) { console.warn(e); }
+          }
 
           const cashMovementsTableInfo = await client.execute(`PRAGMA table_info(cash_movements)`);
           const cashMovementsColumns = cashMovementsTableInfo.rows.map((row: any) => row.name);

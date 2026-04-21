@@ -64,12 +64,12 @@ const WaitstaffManagement: React.FC<Props> = ({ currentStore, settings, onUpdate
     setIsSaving(true);
     try {
       if (editingId) {
-        const { error } = await supabase.from('waitstaff').update({
+        const { error } = await supabase.from('waitstaff').eq('id', editingId).update({
           name: newName, 
           password: newPass,
           phone: newPhone,
           role: newRole
-        }).eq('id', editingId);
+        });
         if (error) throw error;
       } else {
         const { error } = await supabase.from('waitstaff').insert([{ 

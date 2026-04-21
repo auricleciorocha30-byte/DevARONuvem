@@ -36,9 +36,10 @@ import {
   Globe
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { Product, Order, OrderItem, StoreSettings, Waitstaff, PaymentMethod, Customer, OrderStatus } from '../types';
+import { Product, Order, OrderItem, StoreSettings, Waitstaff, PaymentMethod, Customer, OrderStatus, CartComplementItem, ComplementCategory } from '../types';
 import { useNavigate } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
+import { ComplementsModal } from '../components/ComplementsModal';
 
 import InstallPrompt from '../components/InstallPrompt';
 
@@ -828,6 +829,11 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
   const [fractionalModal, setFractionalModal] = useState<{ isOpen: boolean, product: Product | null }>({ isOpen: false, product: null });
   const [selectedFractions, setSelectedFractions] = useState<(Product | null)[]>([]);
 
+  // Complements Modal
+  const [complementsProduct, setComplementsProduct] = useState<Product | null>(null);
+  const [selectedComplements, setSelectedComplements] = useState<CartComplementItem[]>([]);
+  const [complementsQuantity, setComplementsQuantity] = useState<number>(1);
+
   // Scale Integration
   const [scaleWeight, setScaleWeight] = useState<number | null>(null);
   const [isScaleConnected, setIsScaleConnected] = useState(false);
@@ -1056,6 +1062,13 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
       return;
     }
 
+    if (product.complements && product.complements.length > 0 && !product.isByWeight && Number(product.fractions || 0) <= 1) {
+      setComplementsProduct(product);
+      setSelectedComplements([]);
+      setComplementsQuantity(1);
+      return;
+    }
+
     if (product.isByWeight) {
       setWeightModal({ isOpen: true, product });
       setWeightInput('');
@@ -1068,7 +1081,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
     }
   };
 
-  const addToCart = (product: Product, quantity: number, fractionProducts?: Product[]) => {
+  const addToCart = (product: Product, quantity: number, fractionProducts?: Product[], complementsToAdd?: CartComplementItem[]) => {
     setCart(prev => {
       const numFractions = Number(product.fractions || 1);
       const isFractional = numFractions > 1 && fractionProducts && fractionProducts.length > 0;
@@ -1077,6 +1090,17 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
       let itemName = product.name;
       let itemPrice = product.price;
       let mappedFractionProducts = undefined;
+
+      if (complementsToAdd && complementsToAdd.length > 0) {
+        // Create unique ID by appending sorted complement item IDs
+        const sortedComplements = [...complementsToAdd].sort((a, b) => a.itemId.localeCompare(b.itemId));
+        const hash = sortedComplements.map(c => `${c.itemId}x${c.quantity}`).join('_');
+        cartItemId = `${product.id}_c_${hash}`;
+        
+        // Add complement prices to base item price
+        const complementsTotal = complementsToAdd.reduce((sum, c) => sum + (c.price * c.quantity), 0);
+        itemPrice += complementsTotal;
+      }
 
       if (isFractional && fractionProducts) {
         // Create a unique ID based on the selected flavors, sorted so order doesn't matter
@@ -1126,7 +1150,8 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         isFractional: isFractional,
         fractions: product.fractions,
         originalProductId: product.id,
-        fractionProducts: mappedFractionProducts
+        fractionProducts: mappedFractionProducts,
+        complements: complementsToAdd
       }];
     });
     setWeightModal({ isOpen: false, product: null });
@@ -2688,7 +2713,17 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
             cart.map(item => (
               <div key={item.productId} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
                 <div className="flex-1">
-                  <p className="font-bold text-sm text-gray-800 line-clamp-1">{item.name}</p>
+                  <p className="font-bold text-sm text-gray-800 line-clamp-1 break-words">{item.name}</p>
+                  {item.complements && item.complements.length > 0 && (
+                     <ul className="mt-1 space-y-0.5 mb-1">
+                        {item.complements.map((comp, idx) => (
+                           <li key={idx} className="text-[9px] text-gray-500 font-medium">
+                              <span className="text-gray-400 font-bold">{comp.quantity}x</span> {comp.name}
+                              {comp.price > 0 && <span className="text-gray-400"> (+ R$ {(comp.price * comp.quantity).toFixed(2)})</span>}
+                           </li>
+                        ))}
+                     </ul>
+                  )}
                   <p className="text-xs text-gray-500">{formatCurrency(item.price)} {item.isByWeight ? '/ kg' : 'un'}</p>
                 </div>
                 <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-1">
@@ -2870,6 +2905,66 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
             </div>
           </div>
         </div>
+      )}
+
+      {/* Complements Modal */}
+      {complementsProduct && (
+        <ComplementsModal
+          product={complementsProduct}
+          selectedComplements={selectedComplements}
+          quantity={complementsQuantity}
+          onClose={() => setComplementsProduct(null)}
+          onQuantityChange={setComplementsQuantity}
+          onToggleComplement={(category, item, currentQty, maxCategoryQty) => {
+             const catItems = selectedComplements.filter(sc => sc.categoryId === category.id);
+             const currentCatCount = catItems.reduce((sum, sc) => sum + sc.quantity, 0);
+
+             let newComplements = [...selectedComplements];
+
+             if (maxCategoryQty === 1) {
+                newComplements = newComplements.filter(sc => sc.categoryId !== category.id);
+                newComplements.push({
+                   categoryId: category.id,
+                   categoryName: category.name,
+                   itemId: item.id,
+                   name: item.name,
+                   price: item.price,
+                   quantity: 1
+                });
+             } else {
+                const existingIndex = newComplements.findIndex(sc => sc.categoryId === category.id && sc.itemId === item.id);
+                
+                if (existingIndex > -1) {
+                   const qty = newComplements[existingIndex].quantity;
+                   if (currentQty > qty) { 
+                      if (currentCatCount >= maxCategoryQty) return; 
+                      newComplements[existingIndex].quantity += 1;
+                   } else { 
+                      if (newComplements[existingIndex].quantity > 1) {
+                         newComplements[existingIndex].quantity -= 1;
+                      } else {
+                         newComplements.splice(existingIndex, 1);
+                      }
+                   }
+                } else { 
+                   if (currentCatCount >= maxCategoryQty) return; 
+                   newComplements.push({
+                      categoryId: category.id,
+                      categoryName: category.name,
+                      itemId: item.id,
+                      name: item.name,
+                      price: item.price,
+                      quantity: 1
+                   });
+                }
+             }
+             setSelectedComplements(newComplements);
+          }}
+          onConfirm={() => {
+             addToCart(complementsProduct, complementsQuantity, undefined, selectedComplements);
+             setComplementsProduct(null);
+          }}
+        />
       )}
 
       {/* Checkout Modal */}

@@ -41,8 +41,9 @@ import {
   QrCode
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { Product, StoreSettings, Order, OrderItem, OrderType, PaymentMethod, Waitstaff } from '../types';
+import { Product, StoreSettings, Order, OrderItem, OrderType, PaymentMethod, Waitstaff, CartComplementItem, ComplementCategory } from '../types';
 import InstallPrompt from '../components/InstallPrompt';
+import { ComplementsModal } from '../components/ComplementsModal';
 
 interface Props {
   storeId?: string;
@@ -81,6 +82,10 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
 
   const [fractionalProduct, setFractionalProduct] = useState<Product | null>(null);
   const [selectedFractions, setSelectedFractions] = useState<(Product | null)[]>([]);
+
+  const [complementsProduct, setComplementsProduct] = useState<Product | null>(null);
+  const [selectedComplements, setSelectedComplements] = useState<CartComplementItem[]>([]);
+  const [complementsQuantity, setComplementsQuantity] = useState<number>(1);
 
   const [isTrackingModalOpen, setIsTrackingModalOpen] = useState(false);
   const [trackingPhone, setTrackingPhone] = useState('');
@@ -473,10 +478,17 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
     }
   };
 
-  const handleAddToCart = (product: Product, fractionProducts?: Product[]) => {
+  const handleAddToCart = (product: Product, fractionProducts?: Product[], complementsToAdd?: CartComplementItem[], quantityToAdd: number = 1) => {
     if (!product.isActive) return;
     if (product.stock != null && product.stock <= 0) {
       alert("Produto sem estoque!");
+      return;
+    }
+
+    if (product.complements && product.complements.length > 0 && !complementsToAdd && !product.isByWeight && parseInt(String(product.fractions || 0)) <= 1) {
+      setComplementsProduct(product);
+      setSelectedComplements([]);
+      setComplementsQuantity(1);
       return;
     }
 
@@ -503,6 +515,17 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
       let itemPrice = product.price;
       let mappedFractionProducts = undefined;
 
+      if (complementsToAdd && complementsToAdd.length > 0) {
+        // Create unique ID by appending sorted complement item IDs
+        const sortedComplements = [...complementsToAdd].sort((a, b) => a.itemId.localeCompare(b.itemId));
+        const hash = sortedComplements.map(c => `${c.itemId}x${c.quantity}`).join('_');
+        cartItemId = `${product.id}_c_${hash}`;
+        
+        // Add complement prices to base item price
+        const complementsTotal = complementsToAdd.reduce((sum, c) => sum + (c.price * c.quantity), 0);
+        itemPrice += complementsTotal;
+      }
+
       if (isFractional && fractionProducts) {
         const sortedFlavors = [...fractionProducts].sort((a, b) => a.id.localeCompare(b.id));
         cartItemId = `${product.id}_${sortedFlavors.map(f => f.id).join('_')}`;
@@ -526,13 +549,13 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
       const existing = prev.find(item => item.productId === cartItemId);
       const currentQty = existing ? existing.quantity : 0;
       
-      if (product.stock != null && (currentQty + 1) > product.stock) {
+      if (product.stock != null && (currentQty + quantityToAdd) > product.stock) {
         alert(`Estoque insuficiente! Disponível: ${product.stock} un`);
         return prev;
       }
 
       if (existing) {
-        return prev.map(item => item.productId === cartItemId ? { ...item, quantity: item.quantity + 1 } : item);
+        return prev.map(item => item.productId === cartItemId ? { ...item, quantity: item.quantity + quantityToAdd } : item);
       }
       
       return [...prev, { 
@@ -540,12 +563,13 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
         name: itemName, 
         description: product.description,
         price: itemPrice, 
-        quantity: 1, 
+        quantity: quantityToAdd, 
         isByWeight: false,
         isFractional: isFractional,
         fractions: Number(product.fractions),
         originalProductId: product.id,
-        fractionProducts: mappedFractionProducts
+        fractionProducts: mappedFractionProducts,
+        complements: complementsToAdd
       }];
     });
     setFractionalProduct(null);
@@ -1173,7 +1197,17 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                             {cart.map(item => (
                               <div key={item.productId} className="flex items-center gap-4 bg-gray-50/50 p-4 rounded-3xl border border-gray-100 group">
                                  <div className="flex-1 min-w-0">
-                                    <h4 className="font-bold text-gray-800 truncate">{item.name}</h4>
+                                    <h4 className="font-bold text-gray-800 break-words">{item.name}</h4>
+                                    {item.complements && item.complements.length > 0 && (
+                                       <ul className="mt-1 space-y-1 mb-2">
+                                          {item.complements.map((comp, idx) => (
+                                             <li key={idx} className="text-[10px] text-gray-500 font-medium">
+                                                <span className="text-gray-400 font-bold">{comp.quantity}x</span> {comp.name}
+                                                {comp.price > 0 && <span className="text-gray-400"> (+ R$ {(comp.price * comp.quantity).toFixed(2)})</span>}
+                                             </li>
+                                          ))}
+                                       </ul>
+                                    )}
                                     <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">R$ {item.price.toFixed(2)} {item.isByWeight ? '/kg' : 'un'}</p>
                                  </div>
                                  <div className="flex items-center bg-white rounded-2xl border border-gray-100 p-1 shadow-sm">
@@ -1680,6 +1714,71 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
              </div>
           </div>
         </div>
+      )}
+
+      {/* MODAL DE COMPLEMENTOS */}
+      {complementsProduct && (
+        <ComplementsModal
+          product={complementsProduct}
+          selectedComplements={selectedComplements}
+          quantity={complementsQuantity}
+          onClose={() => setComplementsProduct(null)}
+          onQuantityChange={setComplementsQuantity}
+          onToggleComplement={(category, item, currentQty, maxCategoryQty) => {
+             const catItems = selectedComplements.filter(sc => sc.categoryId === category.id);
+             const currentCatCount = catItems.reduce((sum, sc) => sum + sc.quantity, 0);
+
+             let newComplements = [...selectedComplements];
+
+             if (maxCategoryQty === 1) {
+                // Radio behavior
+                newComplements = newComplements.filter(sc => sc.categoryId !== category.id);
+                newComplements.push({
+                   categoryId: category.id,
+                   categoryName: category.name,
+                   itemId: item.id,
+                   name: item.name,
+                   price: item.price,
+                   quantity: 1
+                });
+             } else {
+                // Counter behavior
+                const existingIndex = newComplements.findIndex(sc => sc.categoryId === category.id && sc.itemId === item.id);
+                
+                // If we are adding and not exceeding category max
+                if (existingIndex > -1) {
+                   const qty = newComplements[existingIndex].quantity;
+                   if (currentQty > qty) { // Adding
+                      if (currentCatCount >= maxCategoryQty) return; // Block
+                      newComplements[existingIndex].quantity += 1;
+                   } else { // Subtracting
+                      if (newComplements[existingIndex].quantity > 1) {
+                         newComplements[existingIndex].quantity -= 1;
+                      } else {
+                         newComplements.splice(existingIndex, 1);
+                      }
+                   }
+                } else { // Adding new item
+                   if (currentCatCount >= maxCategoryQty) return; // Block
+                   newComplements.push({
+                      categoryId: category.id,
+                      categoryName: category.name,
+                      itemId: item.id,
+                      name: item.name,
+                      price: item.price,
+                      quantity: 1
+                   });
+                }
+             }
+             setSelectedComplements(newComplements);
+          }}
+          onConfirm={() => {
+             handleAddToCart(complementsProduct, undefined, selectedComplements, complementsQuantity);
+             setComplementsProduct(null);
+             setIsCartOpen(true);
+             setCheckoutStep('cart');
+          }}
+        />
       )}
       
       <style>{`
