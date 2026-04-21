@@ -349,10 +349,14 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                   <div className="p-3 bg-gray-50 rounded-xl space-y-1">
                     <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Pedido Mínimo (R$)</label>
                     <input 
-                      type="number" 
+                      type="text" 
+                      inputMode="decimal"
                       placeholder="0.00" 
-                      value={localSettings.minDeliveryOrderValue || ''} 
-                      onChange={(e) => setLocalSettings({...localSettings, minDeliveryOrderValue: Number(e.target.value)})} 
+                      value={localSettings.minDeliveryOrderValue === 0 ? '' : (localSettings.minDeliveryOrderValue || '')} 
+                      onChange={(e) => {
+                        const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                        if (!isNaN(val)) setLocalSettings({...localSettings, minDeliveryOrderValue: val});
+                      }} 
                       className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 outline-none text-sm font-bold" 
                     />
                   </div>
@@ -376,10 +380,14 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                         <div className="space-y-1">
                           <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Tolerância Entrega Grátis (KM)</label>
                           <input 
-                            type="number" 
+                            type="text" 
+                            inputMode="numeric"
                             placeholder="Ex: 2" 
-                            value={localSettings.freeDeliveryToleranceKm || ''} 
-                            onChange={(e) => setLocalSettings({...localSettings, freeDeliveryToleranceKm: Number(e.target.value)})} 
+                            value={localSettings.freeDeliveryToleranceKm === 0 ? '' : (localSettings.freeDeliveryToleranceKm || '')} 
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+                              if (!isNaN(val)) setLocalSettings({...localSettings, freeDeliveryToleranceKm: val});
+                            }} 
                             className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 outline-none text-sm font-bold" 
                           />
                         </div>
@@ -403,12 +411,16 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                               <div className="flex-1">
                                 <span className="text-[10px] text-gray-400 block ml-1">Até (KM)</span>
                                 <input 
-                                  type="number" 
-                                  value={rule.upToKm} 
+                                  type="text" 
+                                  inputMode="numeric"
+                                  value={rule.upToKm === 0 ? '' : rule.upToKm} 
                                   onChange={(e) => {
-                                    const newRules = [...(localSettings.deliveryFeeRules || [])];
-                                    newRules[idx].upToKm = Number(e.target.value);
-                                    setLocalSettings({...localSettings, deliveryFeeRules: newRules});
+                                    const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+                                    if (!isNaN(val)) {
+                                      const newRules = [...(localSettings.deliveryFeeRules || [])];
+                                      newRules[idx].upToKm = val;
+                                      setLocalSettings({...localSettings, deliveryFeeRules: newRules});
+                                    }
                                   }}
                                   className="w-full px-2 py-1.5 bg-white rounded-lg border border-gray-200 outline-none text-sm font-bold" 
                                 />
@@ -416,12 +428,16 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                               <div className="flex-1">
                                 <span className="text-[10px] text-gray-400 block ml-1">Valor (R$)</span>
                                 <input 
-                                  type="number" 
-                                  value={rule.fee} 
+                                  type="text" 
+                                  inputMode="decimal"
+                                  value={rule.fee === 0 ? '' : rule.fee} 
                                   onChange={(e) => {
-                                    const newRules = [...(localSettings.deliveryFeeRules || [])];
-                                    newRules[idx].fee = Number(e.target.value);
-                                    setLocalSettings({...localSettings, deliveryFeeRules: newRules});
+                                    const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                                    if (!isNaN(val)) {
+                                      const newRules = [...(localSettings.deliveryFeeRules || [])];
+                                      newRules[idx].fee = val;
+                                      setLocalSettings({...localSettings, deliveryFeeRules: newRules});
+                                    }
                                   }}
                                   className="w-full px-2 py-1.5 bg-white rounded-lg border border-gray-200 outline-none text-sm font-bold" 
                                 />

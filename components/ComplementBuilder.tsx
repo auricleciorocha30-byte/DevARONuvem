@@ -97,31 +97,37 @@ export const ComplementBuilder: React.FC<Props> = ({ complements, onChange }) =>
                   className="w-full text-lg font-bold bg-transparent border-b border-gray-300 focus:border-blue-500 outline-none px-1 py-1"
                 />
                 
-                <div className="flex items-center gap-4 text-sm bg-white p-2 border rounded-lg shadow-sm w-max">
-                  <label className="flex items-center gap-2 font-bold text-gray-600 cursor-pointer">
+                <div className="flex flex-wrap items-center gap-2 md:gap-4 text-sm bg-white p-2 border rounded-lg shadow-sm w-full md:w-max">
+                  <label className="flex items-center gap-2 font-bold text-gray-600 cursor-pointer min-w-max">
                     <Switch checked={category.isRequired} onChange={v => handleUpdateCategory(category.id, { isRequired: v })} />
                     Obrigatório
                   </label>
                   
-                  <div className="h-4 w-[1px] bg-gray-300"></div>
+                  <div className="hidden md:block h-4 w-[1px] bg-gray-300"></div>
 
                   <div className="flex items-center gap-2">
-                    <span className="text-gray-500 font-medium">Min:</span>
+                    <span className="text-gray-500 font-medium whitespace-nowrap">Min:</span>
                     <input 
-                      type="number" 
-                      min="0" 
-                      value={category.minQuantity} 
-                      onChange={e => handleUpdateCategory(category.id, { minQuantity: parseInt(e.target.value) || 0 })}
+                      type="text"
+                      inputMode="numeric"
+                      value={category.minQuantity === 0 && !category.isRequired ? '' : category.minQuantity} 
+                      onChange={e => {
+                        const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+                        if (!isNaN(val)) handleUpdateCategory(category.id, { minQuantity: val });
+                      }}
                       className="w-12 border rounded bg-gray-50 px-1 text-center outline-none"
                     />
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-gray-500 font-medium">Máx:</span>
+                    <span className="text-gray-500 font-medium whitespace-nowrap">Máx:</span>
                     <input 
-                      type="number" 
-                      min="1" 
-                      value={category.maxQuantity} 
-                      onChange={e => handleUpdateCategory(category.id, { maxQuantity: parseInt(e.target.value) || 1 })}
+                      type="text"
+                      inputMode="numeric"
+                      value={category.maxQuantity || ''} 
+                      onChange={e => {
+                        const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+                        if (!isNaN(val)) handleUpdateCategory(category.id, { maxQuantity: val });
+                      }}
                       className="w-12 border rounded bg-gray-50 px-1 text-center outline-none"
                     />
                   </div>
@@ -160,10 +166,13 @@ export const ComplementBuilder: React.FC<Props> = ({ complements, onChange }) =>
                      <div className="flex items-center gap-2">
                        <span className="text-gray-500 text-sm font-bold pl-2">R$</span>
                        <input 
-                         type="number" 
-                         step="0.01"
-                         value={item.price} 
-                         onChange={e => handleUpdateItem(category.id, item.id, { price: parseFloat(e.target.value) || 0 })}
+                         type="text" 
+                         inputMode="decimal"
+                         value={item.price === 0 ? '' : item.price} 
+                         onChange={e => {
+                           const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                           if (!isNaN(val)) handleUpdateItem(category.id, item.id, { price: val });
+                         }}
                          placeholder="0.00"
                          className="flex-1 w-full p-2 text-sm border rounded-lg outline-none"
                        />

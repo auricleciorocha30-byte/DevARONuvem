@@ -152,7 +152,8 @@ const SCHEMA_STATEMENTS = [
     fractionPrice REAL,
     ncm TEXT,
     cfop TEXT,
-    icms_situacao_tributaria TEXT
+    icms_situacao_tributaria TEXT,
+    complements TEXT
   )`,
   `CREATE TABLE IF NOT EXISTS waitstaff (
     id TEXT PRIMARY KEY,
@@ -297,6 +298,9 @@ async function ensureSchema() {
           
           if (!productColumns.includes('stock')) {
               try { await client.execute(`ALTER TABLE products ADD COLUMN stock REAL`); } catch (e) { console.warn(e); }
+          }
+          if (!productColumns.includes('complements')) {
+              try { await client.execute(`ALTER TABLE products ADD COLUMN complements TEXT`); } catch (e) { console.warn(e); }
           }
           if (!productColumns.includes('showInMenu')) {
               try { await client.execute(`ALTER TABLE products ADD COLUMN showInMenu INTEGER DEFAULT 1`); } catch (e) { console.warn(e); }

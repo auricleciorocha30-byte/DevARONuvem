@@ -100,15 +100,17 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
       // Update order in database based on payment status
       const updatePaymentStatus = async () => {
         try {
-          const { data: currentOrder } = await supabase.from('orders').select('total').eq('id', paymentOrderId).single();
-          const amount = currentOrder ? currentOrder.total : 0;
+          const { data: currentOrder } = await supabase.from('orders').select('total, status').eq('id', paymentOrderId).single();
+          if (!currentOrder) return;
+          
+          const amount = currentOrder.total;
 
-          if (paymentStatus === 'success') {
+          if (paymentStatus === 'success' && currentOrder.status === 'AGUARDANDO_PAGAMENTO') {
             await supabase.from('orders').eq('id', paymentOrderId).update({ 
                status: 'PAGO',
                paymentDetails: JSON.stringify([{ method: 'ONLINE', status: 'approved', amount }]) 
             });
-          } else if (paymentStatus === 'failure') {
+          } else if (paymentStatus === 'failure' && currentOrder.status === 'AGUARDANDO_PAGAMENTO') {
             await supabase.from('orders').eq('id', paymentOrderId).update({ 
                status: 'CANCELADO',
                paymentDetails: JSON.stringify([{ method: 'ONLINE', status: 'rejected', amount }]) 
