@@ -527,7 +527,6 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
                 <div className="flex flex-col">
                   <span className="text-sm font-bold text-gray-700">Exigir Finalização no PDV</span>
-                  <span className="text-[10px] text-gray-400">Se desativado, atendentes podem finalizar pedidos no painel.</span>
                 </div>
                 <Switch 
                   checked={localSettings.requirePosFinalization === true} 
@@ -537,7 +536,6 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
                 <div className="flex flex-col">
                   <span className="text-sm font-bold text-gray-700">Entregas Diretas (Sem Cozinha)</span>
-                  <span className="text-[10px] text-gray-400">Se ativado, pedidos de entrega vão direto para o painel de entregadores como "Pronto".</span>
                 </div>
                 <Switch 
                   checked={localSettings.autoApproveDeliveries === true} 
