@@ -79,7 +79,7 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
   const activeOrders = useMemo(() => orders.filter(o => o.status !== 'ENTREGUE' && o.status !== 'CANCELADO'), [orders]);
 
   const newBalcaoEntregaOrders = useMemo(() => {
-    return activeOrders.filter(o => (o.type === 'BALCAO' || o.type === 'ENTREGA') && (o.status === 'AGUARDANDO' || o.status === 'AGUARDANDO_PAGAMENTO'));
+    return activeOrders.filter(o => (o.type === 'BALCAO' || o.type === 'ENTREGA') && (o.status === 'AGUARDANDO' || o.status === 'AGUARDANDO_PAGAMENTO' || o.status === 'PAGO'));
   }, [activeOrders]);
 
   const occupiedTables = useMemo(() => {
@@ -380,8 +380,8 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
         </>) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
             {displayOrders.map(order => (
-              <div key={order.id} className={`bg-white rounded-[2.5rem] p-6 shadow-xl flex flex-col border relative group ${((order.type === 'BALCAO' || order.type === 'ENTREGA') && order.status === 'AGUARDANDO') ? 'border-red-400 ring-2 ring-red-100' : 'border-gray-100'}`}>
-                {((order.type === 'BALCAO' || order.type === 'ENTREGA') && (order.status === 'AGUARDANDO' || order.status === 'AGUARDANDO_PAGAMENTO')) && (
+              <div key={order.id} className={`bg-white rounded-[2.5rem] p-6 shadow-xl flex flex-col border relative group ${((order.type === 'BALCAO' || order.type === 'ENTREGA') && (order.status === 'AGUARDANDO' || order.status === 'PAGO')) ? 'border-red-400 ring-2 ring-red-100' : 'border-gray-100'}`}>
+                {((order.type === 'BALCAO' || order.type === 'ENTREGA') && (order.status === 'AGUARDANDO' || order.status === 'AGUARDANDO_PAGAMENTO' || order.status === 'PAGO')) && (
                   <span className="absolute -top-2 -right-2 flex h-5 w-5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-5 w-5 bg-red-500 border-2 border-white"></span>
@@ -462,7 +462,7 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
                     </span>
                   </div>
                   <div className="flex gap-2">
-                    {(order.status === 'AGUARDANDO' || order.status === 'AGUARDANDO_PAGAMENTO') && (
+                    {(order.status === 'AGUARDANDO' || order.status === 'AGUARDANDO_PAGAMENTO' || order.status === 'PAGO') && (
                       <div className="flex gap-2 w-full">
                         <button 
                           disabled={isUpdating === order.id}

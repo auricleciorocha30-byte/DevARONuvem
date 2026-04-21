@@ -201,7 +201,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   };
 
   const [manualTable, setManualTable] = useState(effectiveTable || '');
-  const [payment, setPayment] = useState<PaymentMethod | 'CASHBACK'>('PIX');
+  const [payment, setPayment] = useState<PaymentMethod | 'CASHBACK' | ''>('');
   const [combinedPayment, setCombinedPayment] = useState<PaymentMethod>('PIX');
   const [changeFor, setChangeFor] = useState<string>('');
   const [notes, setNotes] = useState('');
@@ -669,6 +669,12 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
     if (orderType === 'BALCAO' && !customerName && !isWaitstaff) { showAlert('Informe o seu nome.'); return; }
     if (orderType === 'ENTREGA' && (!customerName || !customerPhone || !deliveryAddress)) { showAlert('Preencha os dados de entrega.'); return; }
     
+    // Check for payment method selection (except for waitstaff or table/command orders)
+    if (!isWaitstaff && orderType !== 'MESA' && orderType !== 'COMANDA' && !payment) {
+        showAlert('Selecione uma forma de pagamento.');
+        return;
+    }
+
     if (orderType === 'ENTREGA' && settings.isDeliveryFeeActive && !isFeeConfirmed) {
         showAlert('Confirme a taxa de entrega antes de finalizar o pedido.');
         return;
@@ -1116,7 +1122,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                   <p className="text-[9px] sm:text-[10px] text-gray-400 line-clamp-1 mt-0.5">{product.description}</p>
                 </div>
                 <div className="flex items-center justify-between mt-2 gap-1.5">
-                  <span className="font-bold text-secondary text-[10px] sm:text-xs md:text-sm whitespace-nowrap">R$ {product.price.toFixed(2)}{product.isByWeight ? '/kg' : ''}</span>
+                  {product.price > 0 && <span className="font-bold text-secondary text-[10px] sm:text-xs md:text-sm whitespace-nowrap">R$ {product.price.toFixed(2)}{product.isByWeight ? '/kg' : ''}</span>}
                   {!isStoreClosed && (
                     <button 
                       onClick={(e) => {
@@ -1192,7 +1198,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                           ))}
                                        </ul>
                                     )}
-                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">R$ {item.price.toFixed(2)} {item.isByWeight ? '/kg' : 'un'}</p>
+                                    {item.price > 0 && <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">R$ {item.price.toFixed(2)} {item.isByWeight ? '/kg' : 'un'}</p>}
                                  </div>
                                  <div className="flex items-center bg-white rounded-2xl border border-gray-100 p-1 shadow-sm">
                                     <button onClick={() => updateCartItemQuantity(item.productId, -1)} className="p-2 text-gray-400 hover:text-red-500 transition-colors"><MinusIcon size={14} /></button>
@@ -1508,7 +1514,14 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                     </div>
                  </div>
 
-                 <button onClick={() => setCheckoutStep('details')} className="w-full py-5 bg-secondary text-primary rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all">Prosseguir para Identificação</button>
+                 <div className="flex flex-col gap-3">
+                   <button onClick={() => setCheckoutStep('details')} className="w-full py-5 bg-secondary text-primary rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all">Prosseguir para Identificação</button>
+                   <button onClick={() => setIsCartOpen(false)} className="w-full py-4 bg-gray-100 text-gray-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-gray-200 transition-all">
+                     <div className="flex items-center justify-center gap-2">
+                       <PlusIcon size={16} /> Adicionar mais itens
+                     </div>
+                   </button>
+                 </div>
                </div>
              )}
           </div>
