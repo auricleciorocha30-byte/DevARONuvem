@@ -599,7 +599,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
       try {
         const { data, error } = await supabase
           .from('orders')
-          .select('type, status')
+          .select('type')
           .eq('store_id', storeId)
           .in('status', ['AGUARDANDO', 'AGUARDANDO_PAGAMENTO', 'PAGO']);
         
@@ -608,7 +608,6 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         if (data) {
           const counts = { ENTREGA: 0, BALCAO: 0, MESA: 0, COMANDA: 0 };
           data.forEach(order => {
-            if (settings?.hideUnpaidOnlineOrders && order.status === 'AGUARDANDO_PAGAMENTO') return;
             if (order.type in counts) {
               counts[order.type as keyof typeof counts]++;
             }
@@ -650,8 +649,6 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
             const unpaidData = data.filter(o => {
                 // 1. Never show cancelled orders
                 if (o.status === 'CANCELADO') return false;
-                
-                if (settings?.hideUnpaidOnlineOrders && o.status === 'AGUARDANDO_PAGAMENTO') return false;
                 
                 // 2. If it's finalized in a closed session, hide it
                 if (o.session_id === 'FECHADO') return false;

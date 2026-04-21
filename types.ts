@@ -175,7 +175,6 @@ export interface StoreSettings {
   isCashbackActive?: boolean;
   cashbackPercentage?: number;
   minCashbackToUse?: number;
-  hideUnpaidOnlineOrders?: boolean;
   storeName: string;
   cnpj?: string;
   logoUrl: string;

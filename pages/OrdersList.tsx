@@ -47,12 +47,6 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
 
   const displayGroups = useMemo(() => {
     let filteredOrders = orders;
-    
-    // Always filter out unpaid online orders if the setting is active
-    if (settings.hideUnpaidOnlineOrders) {
-        filteredOrders = filteredOrders.filter(o => o.status !== 'AGUARDANDO_PAGAMENTO');
-    }
-
     if (filterType === 'FINALIZADOS') {
       filteredOrders = orders.filter(o => o.status === 'ENTREGUE');
     } else {

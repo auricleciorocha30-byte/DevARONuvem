@@ -389,16 +389,7 @@ function StoreContext() {
       if (data) {
         const newOrders = data.map(mapOrderFromDb);
         if (!initialLoadRef.current) {
-          const getVisibleCount = (list: Order[]) => {
-              if (settings?.hideUnpaidOnlineOrders) {
-                  return list.filter(o => o.status !== 'AGUARDANDO_PAGAMENTO').length;
-              }
-              return list.length;
-          };
-          
-          if (getVisibleCount(newOrders) > getVisibleCount(ordersRef.current)) {
-              playAudio(SOUNDS.NEW_ORDER);
-          }
+          if (newOrders.length > ordersRef.current.length) playAudio(SOUNDS.NEW_ORDER);
           newOrders.forEach(no => {
             const old = ordersRef.current.find(oo => oo.id === no.id);
             if (old && old.status !== 'PRONTO' && no.status === 'PRONTO') playAudio(SOUNDS.ORDER_READY);

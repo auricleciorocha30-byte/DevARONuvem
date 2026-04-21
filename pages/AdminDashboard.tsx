@@ -79,8 +79,6 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
 
   const filteredOrders = useMemo(() => {
     return orders.filter(order => {
-      if (settings?.hideUnpaidOnlineOrders && order.status === 'AGUARDANDO_PAGAMENTO') return false;
-
       const orderDate = new Date(order.createdAt);
       
       if (filterMonth === -1) {
@@ -94,7 +92,7 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
       const matchesDay = filterDay === 0 || orderDate.getDate() === filterDay;
       return matchesYear && matchesMonth && matchesDay;
     });
-  }, [orders, settings?.hideUnpaidOnlineOrders, filterDay, filterYear, filterMonth, currentMonthValue, currentYearValue, previousMonthValue, previousYearValue]);
+  }, [orders, filterDay, filterYear, filterMonth, currentMonthValue, currentYearValue, previousMonthValue, previousYearValue]);
 
   const totalSales = useMemo(() => filteredOrders
     .filter(o => o.status !== 'CANCELADO' && o.status !== 'PREPARANDO')
