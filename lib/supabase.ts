@@ -751,7 +751,7 @@ class TursoBridge {
 
   async maybeSingle() {
     this.limitCount = 1;
-    if (this.tableName === 'store_profiles') await ensureSchema();
+    await ensureSchema();
     const { data, error } = await this.get();
     if (error) return { data: null, error };
     return { data: data && data.length > 0 ? data[0] : null, error: null };
@@ -810,7 +810,7 @@ class TursoBridge {
   }
 
   async insert(values: any[]) {
-    if (this.tableName === 'store_profiles') await ensureSchema();
+    await ensureSchema();
     try {
       const results = [];
       for (const val of values) {
@@ -873,7 +873,7 @@ class TursoBridge {
   }
 
   async upsert(values: any[]) {
-    if (this.tableName === 'store_profiles') await ensureSchema();
+    await ensureSchema();
     try {
         const results = [];
         for (const val of values) {
@@ -906,7 +906,7 @@ class TursoBridge {
   }
 
   async update(values: any) {
-    if (this.tableName === 'store_profiles') await ensureSchema();
+    await ensureSchema();
     try {
       const valCopy = { ...values };
       

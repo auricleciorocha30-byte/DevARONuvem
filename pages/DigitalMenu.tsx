@@ -96,6 +96,23 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const [appliedCoupon, setAppliedCoupon] = useState<{code: string, discount: number} | null>(null);
 
   useEffect(() => {
+    if (checkoutStep === 'success') {
+      const timer = setTimeout(() => {
+        setIsCartOpen(false);
+        setCheckoutStep('cart');
+        // Clear params from URL if they exist
+        if (paymentStatus || paymentOrderId) {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('status');
+          url.searchParams.delete('order_id');
+          window.history.replaceState({}, '', url.toString());
+        }
+      }, 60000);
+      return () => clearTimeout(timer);
+    }
+  }, [checkoutStep, paymentStatus, paymentOrderId]);
+
+  useEffect(() => {
     if (paymentStatus && paymentOrderId) {
       // Update order in database based on payment status
       const updatePaymentStatus = async () => {
@@ -890,7 +907,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
         
         if ((payment === 'ONLINE' || combinedPayment === 'ONLINE') && settings.onlinePaymentProvider === 'mercado_pago') {
           try {
-            const redirectStoreUrl = `${window.location.origin}${window.location.pathname}#/cardapio?loja=${settings.slug || storeSlug}`;
+            const redirectStoreUrl = `${window.location.origin}${window.location.pathname}#/cardapio?loja=${settings.slug || storeSlug}${urlModo ? '&modo=' + urlModo : ''}`;
             const response = await fetch('/api/mercado-pago/create-preference', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -916,7 +933,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
 
         if ((payment === 'ONLINE' || combinedPayment === 'ONLINE') && settings.onlinePaymentProvider === 'pagbank') {
           try {
-            const redirectStoreUrl = `${window.location.origin}${window.location.pathname}#/cardapio?loja=${settings.slug || storeSlug}`;
+            const redirectStoreUrl = `${window.location.origin}${window.location.pathname}#/cardapio?loja=${settings.slug || storeSlug}${urlModo ? '&modo=' + urlModo : ''}`;
             const response = await fetch('/api/v1/process-payment', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
