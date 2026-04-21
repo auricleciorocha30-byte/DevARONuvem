@@ -323,14 +323,16 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         // Update stock
         const stockUpdates = new Map<string, number>();
         for (const newItem of order.items) {
-            if (newItem.isFractional && newItem.fractionProducts) {
-                for (const fp of newItem.fractionProducts) {
-                    const current = stockUpdates.get(fp.productId) || 0;
-                    stockUpdates.set(fp.productId, current - (Number(newItem.quantity || 0) / Number(newItem.fractions || 1)));
+            const targetProductId = newItem.originalProductId || newItem.productId;
+            const current = stockUpdates.get(targetProductId) || 0;
+            stockUpdates.set(targetProductId, current - Number(newItem.quantity || 0));
+            
+            // Deduct complements stock
+            if (newItem.complements && newItem.complements.length > 0) {
+                for (const cp of newItem.complements) {
+                    const cpCurrent = stockUpdates.get(cp.itemId) || 0;
+                    stockUpdates.set(cp.itemId, cpCurrent - (Number(cp.quantity || 0) * Number(newItem.quantity || 0)));
                 }
-            } else {
-                const current = stockUpdates.get(newItem.productId) || 0;
-                stockUpdates.set(newItem.productId, current - Number(newItem.quantity || 0));
             }
         }
 
@@ -462,7 +464,8 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                 
                 items.forEach((item: any) => {
                     // Stock Check Logic
-                    const product = products.find(p => p.id === item.productId);
+                    const targetId = item.originalProductId || item.productId;
+                    const product = products.find(p => p.id === targetId);
                     const existingItem = targetCart.find(tc => tc.productId === item.productId && tc.isByWeight === item.isByWeight);
                     const currentQty = existingItem ? existingItem.quantity : 0;
                     
@@ -1142,7 +1145,8 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         }
 
         if (delta > 0) {
-            const product = products.find(p => p.id === productId);
+            const targetId = item.originalProductId || item.productId;
+            const product = products.find(p => p.id === targetId);
             if (product && product.stock != null && newQty > product.stock) {
                 alert(`Estoque insuficiente! Disponível: ${product.stock} ${product.isByWeight ? 'KG' : 'un'}`);
                 return item;
@@ -1441,20 +1445,29 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         const stockUpdates = new Map<string, number>();
         for (const oldItem of originalCart) {
             const targetProductId = oldItem.originalProductId || oldItem.productId;
-            if (oldItem.isFractional && oldItem.fractionProducts) {
-                for (const fp of oldItem.fractionProducts) {
-                    const current = stockUpdates.get(fp.productId) || 0;
-                    stockUpdates.set(fp.productId, current + (Number(oldItem.originalQuantity || oldItem.quantity || 0) / Number(oldItem.fractions || 1)));
+            const current = stockUpdates.get(targetProductId) || 0;
+            stockUpdates.set(targetProductId, current + Number(oldItem.originalQuantity || oldItem.quantity || 0));
+            
+            // Restore complements stock
+            if (oldItem.complements && oldItem.complements.length > 0) {
+                for (const cp of oldItem.complements) {
+                    const cpCurrent = stockUpdates.get(cp.itemId) || 0;
+                    stockUpdates.set(cp.itemId, cpCurrent + (Number(cp.quantity || 0) * Number(oldItem.originalQuantity || oldItem.quantity || 0)));
                 }
-            } else {
-                const current = stockUpdates.get(targetProductId) || 0;
-                stockUpdates.set(targetProductId, current + Number(oldItem.originalQuantity || oldItem.quantity || 0));
             }
         }
         for (const newItem of cart) {
             const targetProductId = newItem.originalProductId || newItem.productId;
             const current = stockUpdates.get(targetProductId) || 0;
             stockUpdates.set(targetProductId, current - Number(newItem.quantity || 0));
+
+            // Deduct complements stock
+            if (newItem.complements && newItem.complements.length > 0) {
+                for (const cp of newItem.complements) {
+                    const cpCurrent = stockUpdates.get(cp.itemId) || 0;
+                    stockUpdates.set(cp.itemId, cpCurrent - (Number(cp.quantity || 0) * Number(newItem.quantity || 0)));
+                }
+            }
         }
 
         for (const [productId, diff] of stockUpdates.entries()) {
@@ -1697,26 +1710,30 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
       const stockUpdates = new Map<string, number>();
 
       for (const oldItem of originalCart) {
-          if (oldItem.isFractional && oldItem.fractionProducts) {
-              for (const fp of oldItem.fractionProducts) {
-                  const current = stockUpdates.get(fp.productId) || 0;
-                  stockUpdates.set(fp.productId, current + (Number(oldItem.originalQuantity || oldItem.quantity || 0) / Number(oldItem.fractions || 1)));
+          const targetProductId = oldItem.originalProductId || oldItem.productId;
+          const current = stockUpdates.get(targetProductId) || 0;
+          stockUpdates.set(targetProductId, current + Number(oldItem.originalQuantity || oldItem.quantity || 0));
+
+          // Restore complements stock
+          if (oldItem.complements && oldItem.complements.length > 0) {
+              for (const cp of oldItem.complements) {
+                  const cpCurrent = stockUpdates.get(cp.itemId) || 0;
+                  stockUpdates.set(cp.itemId, cpCurrent + (Number(cp.quantity || 0) * Number(oldItem.originalQuantity || oldItem.quantity || 0)));
               }
-          } else {
-              const current = stockUpdates.get(oldItem.productId) || 0;
-              stockUpdates.set(oldItem.productId, current + Number(oldItem.originalQuantity || oldItem.quantity || 0));
           }
       }
 
       for (const newItem of cart) {
-          if (newItem.isFractional && newItem.fractionProducts) {
-              for (const fp of newItem.fractionProducts) {
-                  const current = stockUpdates.get(fp.productId) || 0;
-                  stockUpdates.set(fp.productId, current - (Number(newItem.quantity || 0) / Number(newItem.fractions || 1)));
+          const targetProductId = newItem.originalProductId || newItem.productId;
+          const current = stockUpdates.get(targetProductId) || 0;
+          stockUpdates.set(targetProductId, current - Number(newItem.quantity || 0));
+
+          // Deduct complements stock
+          if (newItem.complements && newItem.complements.length > 0) {
+              for (const cp of newItem.complements) {
+                  const cpCurrent = stockUpdates.get(cp.itemId) || 0;
+                  stockUpdates.set(cp.itemId, cpCurrent - (Number(cp.quantity || 0) * Number(newItem.quantity || 0)));
               }
-          } else {
-              const current = stockUpdates.get(newItem.productId) || 0;
-              stockUpdates.set(newItem.productId, current - Number(newItem.quantity || 0));
           }
       }
 

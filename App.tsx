@@ -568,6 +568,14 @@ function StoreContext() {
                 const targetProductId = item.originalProductId || item.productId;
                 const current = stockRestoration.get(targetProductId) || 0;
                 stockRestoration.set(targetProductId, current + Number(item.quantity || 0));
+
+                // Restore complements stock
+                if (item.complements && item.complements.length > 0) {
+                    for (const cp of item.complements) {
+                        const cpCurrent = stockRestoration.get(cp.itemId) || 0;
+                        stockRestoration.set(cp.itemId, cpCurrent + (Number(cp.quantity || 0) * Number(item.quantity || 0)));
+                    }
+                }
             }
 
             for (const [productId, quantity] of stockRestoration.entries()) {
@@ -650,14 +658,16 @@ function StoreContext() {
 
           const stockDeduction = new Map<string, number>();
           for (const item of order.items) {
-              if (item.isFractional && item.fractionProducts) {
-                  for (const fp of item.fractionProducts) {
-                      const current = stockDeduction.get(fp.productId) || 0;
-                      stockDeduction.set(fp.productId, current + (Number(item.quantity || 0) / (item.fractions || 1)));
+              const targetProductId = item.originalProductId || item.productId;
+              const current = stockDeduction.get(targetProductId) || 0;
+              stockDeduction.set(targetProductId, current + Number(item.quantity || 0));
+
+              // Deduct complements stock if they exist as products
+              if (item.complements && item.complements.length > 0) {
+                  for (const cp of item.complements) {
+                      const cpCurrent = stockDeduction.get(cp.itemId) || 0;
+                      stockDeduction.set(cp.itemId, cpCurrent + (Number(cp.quantity || 0) * Number(item.quantity || 0)));
                   }
-              } else {
-                  const current = stockDeduction.get(item.productId) || 0;
-                  stockDeduction.set(item.productId, current + Number(item.quantity || 0));
               }
           }
 
