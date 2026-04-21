@@ -227,11 +227,12 @@ const SCHEMA_STATEMENTS = [
   )`
 ];
 
-let schemaInitialized = false;
+let schemaInitializedVersion = '';
+const CURRENT_SCHEMA_VERSION = 'v3';
 let initializationPromise: Promise<void> | null = null;
 
 async function ensureSchema() {
-  if (schemaInitialized) return;
+  if (schemaInitializedVersion === CURRENT_SCHEMA_VERSION) return;
   if (initializationPromise) return initializationPromise;
 
   initializationPromise = (async () => {
@@ -299,9 +300,6 @@ async function ensureSchema() {
           if (!productColumns.includes('stock')) {
               try { await client.execute(`ALTER TABLE products ADD COLUMN stock REAL`); } catch (e) { console.warn(e); }
           }
-          if (!productColumns.includes('complements')) {
-              try { await client.execute(`ALTER TABLE products ADD COLUMN complements TEXT`); } catch (e) { console.warn(e); }
-          }
           if (!productColumns.includes('showInMenu')) {
               try { await client.execute(`ALTER TABLE products ADD COLUMN showInMenu INTEGER DEFAULT 1`); } catch (e) { console.warn(e); }
           }
@@ -357,7 +355,7 @@ async function ensureSchema() {
           console.warn("Migration check failed (safe to ignore if columns exist):", e);
       }
 
-      schemaInitialized = true;
+      schemaInitializedVersion = CURRENT_SCHEMA_VERSION;
     } catch (err) {
       console.error("Erro no Turso Schema:", err);
       initializationPromise = null;
@@ -378,6 +376,7 @@ class TursoBridge {
   // Dynamic Connection State
   private static storeDbUrl: string | null = null;
   private static storeDbToken: string | null = null;
+  private static SCHEMA_VERSION = CURRENT_SCHEMA_VERSION;
   private static initializedStores = new Set<string>();
   private static initializationPromises = new Map<string, Promise<void>>();
 
@@ -387,21 +386,19 @@ class TursoBridge {
       console.log("Conectado ao banco da loja:", url);
 
       // Trigger schema check for this new connection
-      // Always trigger check to ensure migrations run even if previously initialized in this session
-      // (in case of page reload or re-connection)
-      if (!TursoBridge.initializationPromises.has(url)) {
+      const initKey = url + TursoBridge.SCHEMA_VERSION;
+      if (!TursoBridge.initializationPromises.has(initKey)) {
           const instance = new TursoBridge();
-          TursoBridge.initializationPromises.set(url, instance.ensureStoreSchema(url, token));
+          TursoBridge.initializationPromises.set(initKey, instance.ensureStoreSchema(url, token));
       }
       
-      // We don't await here to avoid blocking the UI, but we log success/failure
-      TursoBridge.initializationPromises.get(url)?.then(() => {
-          TursoBridge.initializedStores.add(url);
-          TursoBridge.initializationPromises.delete(url);
+      TursoBridge.initializationPromises.get(initKey)?.then(() => {
+          TursoBridge.initializedStores.add(initKey);
+          TursoBridge.initializationPromises.delete(initKey);
           console.log("Schema da loja inicializado com sucesso");
       }).catch(err => {
           console.error("Falha ao inicializar schema da loja:", err);
-          TursoBridge.initializationPromises.delete(url);
+          TursoBridge.initializationPromises.delete(initKey);
       });
   }
 
@@ -465,6 +462,9 @@ class TursoBridge {
             
             if (!productColumns.includes('stock')) {
                 try { await this.executeSqlCustom(url, token, `ALTER TABLE products ADD COLUMN stock REAL`); } catch (e) { console.warn(e); }
+            }
+            if (!productColumns.includes('complements')) {
+                try { await this.executeSqlCustom(url, token, `ALTER TABLE products ADD COLUMN complements TEXT`); } catch (e) { console.warn(e); }
             }
             if (!productColumns.includes('showInMenu')) {
                 try { await this.executeSqlCustom(url, token, `ALTER TABLE products ADD COLUMN showInMenu INTEGER DEFAULT 1`); } catch (e) { console.warn(e); }
@@ -542,17 +542,18 @@ class TursoBridge {
       const targetToken = useStoreDb ? TursoBridge.storeDbToken! : getTursoAuthToken();
 
       // Ensure schema if connecting to a store DB for the first time
-      if (useStoreDb && !TursoBridge.initializedStores.has(targetUrl)) {
-          if (!TursoBridge.initializationPromises.has(targetUrl)) {
-              TursoBridge.initializationPromises.set(targetUrl, this.ensureStoreSchema(targetUrl, targetToken));
+      const initKey = targetUrl + TursoBridge.SCHEMA_VERSION;
+      if (useStoreDb && !TursoBridge.initializedStores.has(initKey)) {
+          if (!TursoBridge.initializationPromises.has(initKey)) {
+              TursoBridge.initializationPromises.set(initKey, this.ensureStoreSchema(targetUrl, targetToken));
           }
           try {
-              await TursoBridge.initializationPromises.get(targetUrl);
-              TursoBridge.initializedStores.add(targetUrl);
+              await TursoBridge.initializationPromises.get(initKey);
+              TursoBridge.initializedStores.add(initKey);
           } catch (e) {
               console.error("Falha na inicialização do schema da loja", e);
           } finally {
-              TursoBridge.initializationPromises.delete(targetUrl);
+              TursoBridge.initializationPromises.delete(initKey);
           }
       }
 
@@ -1074,17 +1075,18 @@ class TursoBridge {
       const targetToken = useStoreDb ? TursoBridge.storeDbToken! : getTursoAuthToken();
 
       // Ensure schema if connecting to a store DB for the first time
-      if (useStoreDb && !TursoBridge.initializedStores.has(targetUrl)) {
-          if (!TursoBridge.initializationPromises.has(targetUrl)) {
-              TursoBridge.initializationPromises.set(targetUrl, this.ensureStoreSchema(targetUrl, targetToken));
+      const initKey = targetUrl + TursoBridge.SCHEMA_VERSION;
+      if (useStoreDb && !TursoBridge.initializedStores.has(initKey)) {
+          if (!TursoBridge.initializationPromises.has(initKey)) {
+              TursoBridge.initializationPromises.set(initKey, this.ensureStoreSchema(targetUrl, targetToken));
           }
           try {
-              await TursoBridge.initializationPromises.get(targetUrl);
-              TursoBridge.initializedStores.add(targetUrl);
+              await TursoBridge.initializationPromises.get(initKey);
+              TursoBridge.initializedStores.add(initKey);
           } catch (e) {
               console.error("Falha na inicialização do schema da loja", e);
           } finally {
-              TursoBridge.initializationPromises.delete(targetUrl);
+              TursoBridge.initializationPromises.delete(initKey);
           }
       }
 
