@@ -37,6 +37,7 @@ import {
   UserRound,
   ArrowLeft,
   Award,
+  Globe,
   Clock,
   QrCode
 } from 'lucide-react';
@@ -836,7 +837,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
           waitstaffName: activeWaitstaff?.name || undefined,
           couponApplied: appliedCoupon?.code || undefined,
           discountAmount: discountAmount || undefined,
-          stockDeducted: false
+          stockDeducted: true
         };
 
         await addOrder(finalOrder); 
@@ -1337,18 +1338,38 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Método de Pagamento</p>
                            <div className="grid grid-cols-3 gap-2">
                               {[
-                                ...(settings.isOnlinePaymentActive ? [] : [
-                                  {id: 'PIX', icon: <DollarSign size={18}/>, label: 'PIX'},
-                                  {id: 'CARTAO', icon: <CreditCard size={18}/>, label: 'Cartão'},
-                                ]),
+                                {id: 'PIX', icon: <DollarSign size={18}/>, label: 'PIX'},
+                                {id: 'CARTAO', icon: <CreditCard size={18}/>, label: 'Cartão'},
                                 {id: 'DINHEIRO', icon: <Banknote size={18}/>, label: 'Dinheiro'},
-                                ...(settings.isOnlinePaymentActive && settings.onlinePaymentProvider ? [{id: 'ONLINE', icon: <CreditCard size={18}/>, label: 'Pagar Online'}] : []),
-                                ...(orderType === 'ENTREGA' ? [{id: 'A_PAGAR', icon: <Wallet size={18}/>, label: 'Pagar na Entrega'}] : []),
-                                ...(settings.isCashbackActive && customerPoints > 0 && customerPoints >= (settings.minCashbackToUse || 0) ? [{id: 'CASHBACK', icon: <Award size={18}/>, label: `Cashback (R$ ${customerPoints.toFixed(2)})`}] : [])
-                              ].map(m => (
+                                {id: 'DEBITO', icon: <CreditCard size={18}/>, label: 'Débito'},
+                                {id: 'ONLINE', icon: <Globe size={18}/>, label: 'Pagar Online'},
+                                {id: 'A_PAGAR', icon: <Wallet size={18}/>, label: 'Na Entrega'},
+                                {id: 'CASHBACK', icon: <Award size={18}/>, label: `Cashback`}
+                              ].filter(m => {
+                                // Online payment only if active
+                                if (m.id === 'ONLINE' && (!settings.isOnlinePaymentActive || !settings.onlinePaymentProvider)) return false;
+                                
+                                // Pagar na entrega only if it's delivery
+                                if (m.id === 'A_PAGAR' && orderType !== 'ENTREGA') return false;
+                                
+                                // Cashback only if active and user has points
+                                if (m.id === 'CASHBACK' && (!settings.isCashbackActive || customerPoints <= 0 || customerPoints < (settings.minCashbackToUse || 0))) return false;
+                                
+                                // Filter based on admin settings
+                                if (settings.digitalMenuPaymentMethods && settings.digitalMenuPaymentMethods.length > 0 && m.id !== 'CASHBACK') {
+                                  return settings.digitalMenuPaymentMethods.includes(m.id as any);
+                                }
+                                
+                                // Default hide DEBITO as it's redundant with CARTAO usually
+                                if (m.id === 'DEBITO') return false;
+                                
+                                return true;
+                              })
+                             .map(m => (
                                 <button key={m.id} onClick={() => setPayment(m.id as any)} className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${payment === m.id ? 'bg-primary border-primary text-white shadow-lg' : 'bg-white border-gray-100 text-gray-400'}`}>
                                    {m.icon}
                                    <span className="text-[10px] font-black uppercase text-center">{m.label}</span>
+                                   {m.id === 'CASHBACK' && <span className="text-[8px] font-bold">R$ {customerPoints.toFixed(2)}</span>}
                                 </button>
                               ))}
                            </div>
@@ -1366,19 +1387,26 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                </div>
                                <div className="grid grid-cols-3 gap-2">
                                   {[
-                                    ...(!settings.isOnlinePaymentActive ? [
-                                      {id: 'PIX', icon: <DollarSign size={18}/>, label: 'PIX'},
-                                      {id: 'CARTAO', icon: <CreditCard size={18}/>, label: 'Cartão'},
-                                    ] : []),
+                                    {id: 'PIX', icon: <DollarSign size={18}/>, label: 'PIX'},
+                                    {id: 'CARTAO', icon: <CreditCard size={18}/>, label: 'Cartão'},
                                     {id: 'DINHEIRO', icon: <Banknote size={18}/>, label: 'Dinheiro'},
-                                    ...(settings.isOnlinePaymentActive && settings.onlinePaymentProvider ? [{id: 'ONLINE', icon: <CreditCard size={18}/>, label: 'Pagar Online'}] : []),
-                                    ...(orderType === 'ENTREGA' ? [{id: 'A_PAGAR', icon: <Wallet size={18}/>, label: 'Pagar na Entrega'}] : []),
-                                  ].map(m => (
-                                    <button key={m.id} onClick={() => setCombinedPayment(m.id as any)} className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${combinedPayment === m.id ? 'bg-primary border-primary text-white shadow-lg' : 'bg-white border-gray-100 text-gray-400'}`}>
-                                       {m.icon}
-                                       <span className="text-[10px] font-black uppercase text-center">{m.label}</span>
-                                    </button>
-                                  ))}
+                                    {id: 'DEBITO', icon: <CreditCard size={18}/>, label: 'Débito'},
+                                    {id: 'ONLINE', icon: <Globe size={18}/>, label: 'Pagar Online'},
+                                    {id: 'A_PAGAR', icon: <Wallet size={18}/>, label: 'Na Entrega'},
+                                  ].filter(m => {
+                                    if (m.id === 'ONLINE' && (!settings.isOnlinePaymentActive || !settings.onlinePaymentProvider)) return false;
+                                    if (m.id === 'A_PAGAR' && orderType !== 'ENTREGA') return false;
+                                    if (settings.digitalMenuPaymentMethods && settings.digitalMenuPaymentMethods.length > 0) {
+                                      return settings.digitalMenuPaymentMethods.includes(m.id as any);
+                                    }
+                                    if (m.id === 'DEBITO') return false;
+                                    return true;
+                                  }).map(m => (
+                                   <button key={m.id} onClick={() => setCombinedPayment(m.id as any)} className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${combinedPayment === m.id ? 'bg-primary border-primary text-white shadow-lg' : 'bg-white border-gray-100 text-gray-400'}`}>
+                                      {m.icon}
+                                      <span className="text-[10px] font-black uppercase text-center">{m.label}</span>
+                                   </button>
+                                 ))}
                                </div>
                            </div>
                         )}

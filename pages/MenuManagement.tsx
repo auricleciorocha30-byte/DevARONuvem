@@ -518,7 +518,19 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{editingProduct?.isByWeight ? 'Preço por KG (R$)' : 'Preço Unitário (R$)'}</label>
-                  <input required type="number" step="0.01" value={editingProduct?.price || ''} onFocus={(e) => e.target.select()} onChange={(e) => setEditingProduct({...editingProduct, price: parseFloat(e.target.value)})} className="w-full p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500" />
+                  <input 
+                    required 
+                    type="number" 
+                    step="0.01" 
+                    min="0"
+                    value={editingProduct?.price ?? ''} 
+                    onFocus={(e) => e.target.select()} 
+                    onChange={(e) => {
+                      const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                      setEditingProduct({...editingProduct, price: isNaN(val) ? 0 : val});
+                    }} 
+                    className="w-full p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500" 
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">

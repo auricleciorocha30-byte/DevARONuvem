@@ -55,6 +55,15 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
   const [productSearch, setProductSearch] = useState('');
   const [isClosingSessions, setIsClosingSessions] = useState(false);
 
+  const allPaymentMethods = [
+    { id: 'PIX', label: 'PIX' },
+    { id: 'CARTAO', label: 'Cartão' },
+    { id: 'DINHEIRO', label: 'Dinheiro' },
+    { id: 'ONLINE', label: 'Pagamento Online' },
+    { id: 'A_PAGAR', label: 'Pagar na Entrega' },
+    { id: 'DEBITO', label: 'Débito' }
+  ];
+
   useEffect(() => {
     setLocalSettings(settings);
   }, [settings]);
@@ -465,6 +474,30 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                     )}
                   </div>
                 )}
+
+                <div className="w-full mt-6 space-y-3 pt-6 border-t border-gray-100">
+                    <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest text-center mb-2">Meios de Pagamento (Menu Digital)</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {allPaymentMethods.map(method => (
+                            <div key={method.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                                <span className="text-xs font-bold text-gray-600">{method.label}</span>
+                                <Switch 
+                                    checked={localSettings.digitalMenuPaymentMethods ? localSettings.digitalMenuPaymentMethods.includes(method.id as any) : true} 
+                                    onChange={(checked) => {
+                                        const current = localSettings.digitalMenuPaymentMethods || ['PIX', 'CARTAO', 'DINHEIRO', 'ONLINE', 'A_PAGAR', 'DEBITO'];
+                                        let next;
+                                        if (checked) {
+                                            next = [...current, method.id];
+                                        } else {
+                                            next = current.filter(m => m !== method.id);
+                                        }
+                                        setLocalSettings({...localSettings, digitalMenuPaymentMethods: next as any});
+                                    }} 
+                                />
+                            </div>
+                        ))}
+                    </div>
+                </div>
             </div>
           </section>
         </div>

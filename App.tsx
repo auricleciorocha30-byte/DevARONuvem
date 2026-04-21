@@ -548,6 +548,7 @@ function StoreContext() {
 
         if (updateError) {
             console.error("Error updating order status:", updateError);
+            alert("Erro ao atualizar o status do pedido no banco de dados.");
             return;
         }
 
@@ -645,14 +646,19 @@ function StoreContext() {
           }
 
           if (!id.startsWith('local_')) {
-              const { error: updateError } = await supabase
+              const { data: updatedOrders, error: updateError } = await supabase
                   .from('orders')
                   .eq('id', id)
                   .update(updatePayload);
 
               if (updateError) {
                   console.error("Error updating order status:", updateError);
+                  alert("Erro ao atualizar o status do pedido.");
                   return;
+              }
+              
+              if (!updatedOrders || updatedOrders.length === 0) {
+                  console.warn("Nenhum pedido foi atualizado. Ele pode ter sido removido ou modificado por outro usuário.");
               }
           }
 
@@ -716,7 +722,11 @@ function StoreContext() {
 
           setOrders(prev => prev.map(o => o.id === id ? { ...o, ...updatePayload } : o));
           if (!id.startsWith('local_')) {
-              await supabase.from('orders').eq('id', id).update(updatePayload);
+              const { error } = await supabase.from('orders').eq('id', id).update(updatePayload);
+              if (error) {
+                  console.error("Erro ao atualizar status:", error);
+                  alert("Erro ao sincronizar atualização de status com o servidor.");
+              }
           }
       }
     } finally {

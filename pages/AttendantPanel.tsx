@@ -79,7 +79,7 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
   const activeOrders = useMemo(() => orders.filter(o => o.status !== 'ENTREGUE' && o.status !== 'CANCELADO'), [orders]);
 
   const newBalcaoEntregaOrders = useMemo(() => {
-    return activeOrders.filter(o => (o.type === 'BALCAO' || o.type === 'ENTREGA') && o.status === 'AGUARDANDO');
+    return activeOrders.filter(o => (o.type === 'BALCAO' || o.type === 'ENTREGA') && (o.status === 'AGUARDANDO' || o.status === 'AGUARDANDO_PAGAMENTO'));
   }, [activeOrders]);
 
   const occupiedTables = useMemo(() => {
@@ -381,7 +381,7 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
             {displayOrders.map(order => (
               <div key={order.id} className={`bg-white rounded-[2.5rem] p-6 shadow-xl flex flex-col border relative group ${((order.type === 'BALCAO' || order.type === 'ENTREGA') && order.status === 'AGUARDANDO') ? 'border-red-400 ring-2 ring-red-100' : 'border-gray-100'}`}>
-                {((order.type === 'BALCAO' || order.type === 'ENTREGA') && order.status === 'AGUARDANDO') && (
+                {((order.type === 'BALCAO' || order.type === 'ENTREGA') && (order.status === 'AGUARDANDO' || order.status === 'AGUARDANDO_PAGAMENTO')) && (
                   <span className="absolute -top-2 -right-2 flex h-5 w-5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-5 w-5 bg-red-500 border-2 border-white"></span>
@@ -457,19 +457,19 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
                       <p className="text-2xl font-brand font-bold text-primary">R$ {order.total.toFixed(2)}</p>
                       {order.serviceFee > 0 && <span className="text-[10px] text-gray-500 font-bold">Inclui R$ {order.serviceFee.toFixed(2)} de comissão</span>}
                     </div>
-                    <span className={`text-[9px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest ${order.status === 'PRONTO' ? 'bg-green-100 text-green-600 animate-pulse' : order.status === 'AGUARDANDO' ? 'bg-yellow-100 text-yellow-600' : 'bg-orange-100 text-orange-600'}`}>
-                        {order.status}
+                    <span className={`text-[9px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest ${order.status === 'PRONTO' ? 'bg-green-100 text-green-600 animate-pulse' : (order.status === 'AGUARDANDO' || order.status === 'AGUARDANDO_PAGAMENTO') ? 'bg-yellow-100 text-yellow-600' : 'bg-orange-100 text-orange-600'}`}>
+                        {order.status.replace('_', ' ')}
                     </span>
                   </div>
                   <div className="flex gap-2">
-                    {order.status === 'AGUARDANDO' && (
+                    {(order.status === 'AGUARDANDO' || order.status === 'AGUARDANDO_PAGAMENTO') && (
                       <div className="flex gap-2 w-full">
                         <button 
                           disabled={isUpdating === order.id}
                           onClick={() => handleGroupStatusUpdate(order.originalIds, 'PREPARANDO')} 
                           className="flex-1 py-3.5 bg-orange-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
                         >
-                          {isUpdating === order.id ? <Loader2 className="animate-spin" size={14} /> : 'MANDAR P/ PRODUÇÃO'}
+                          {isUpdating === order.id ? <Loader2 className="animate-spin" size={14} /> : (order.status === 'AGUARDANDO_PAGAMENTO' ? 'CONFIRMAR E PRODUZIR' : 'MANDAR P/ PRODUÇÃO')}
                         </button>
                         
                         <div className="relative">
