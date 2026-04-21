@@ -266,7 +266,7 @@ async function startServer() {
   });
 
   // Catch-all for API router to log 404s within the API prefix
-  apiRouter.all('*', (req, res) => {
+  apiRouter.all('*all', (req, res) => {
     console.log(`[API 404] No match for: ${req.method} ${req.url}`);
     res.status(404).json({ 
       error: 'Endpoint de API não encontrado.',
@@ -296,7 +296,7 @@ async function startServer() {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     // SPA Fallback
-    app.get('*', (req, res) => {
+    app.get('*all', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
@@ -306,6 +306,6 @@ startServer().catch(err => {
   console.error('SERVER CRASH AT STARTUP:', err);
   // Still listen on port 3000 to avoid "Please wait" hang even if it just shows an error
   const emergencyApp = express();
-  emergencyApp.get('*', (req, res) => res.send('Server failed to start. Check logs.'));
+  emergencyApp.get('*all', (req, res) => res.send('Server failed to start. Check logs.'));
   emergencyApp.listen(3000, '0.0.0.0');
 });
