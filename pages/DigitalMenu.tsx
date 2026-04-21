@@ -18,7 +18,7 @@ import {
   ShoppingBag, 
   Truck, 
   MessageCircle, 
-  Store, 
+  AlertCircle,  Store, 
   Scale,
   AlertTriangle,
   Power,
@@ -214,6 +214,9 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [referencePoint, setReferencePoint] = useState('');
   const [isConsulting, setIsConsulting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const showAlert = (msg: string) => setErrorMsg(msg);
   
   const [deliveryFee, setDeliveryFee] = useState<number | null>(null);
   const [deliveryDistanceKm, setDeliveryDistanceKm] = useState<number | null>(null);
@@ -497,14 +500,14 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
     }
   };
 
-  const handleAddToCart = (product: Product, fractionProducts?: Product[], complementsToAdd?: CartComplementItem[], quantityToAdd: number = 1) => {
+  const handleAddToCart = (product: Product, complementsToAdd?: CartComplementItem[], quantityToAdd: number = 1) => {
     if (!product.isActive) return;
     if (product.stock != null && product.stock <= 0) {
-      alert("Produto sem estoque!");
+      showAlert("Produto sem estoque!");
       return;
     }
 
-    if (product.complements && product.complements.length > 0 && !complementsToAdd && !product.isByWeight && parseInt(String(product.fractions || 0)) <= 1) {
+    if (product.complements && product.complements.length > 0 && !complementsToAdd && !product.isByWeight) {
       setComplementsProduct(product);
       setSelectedComplements([]);
       setComplementsQuantity(1);
@@ -517,22 +520,10 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
       return;
     }
 
-    const numFractions = parseInt(String(product.fractions || 0));
-    console.log('handleAddToCart:', product.name, 'fractions:', product.fractions, 'numFractions:', numFractions);
-    
-    if (numFractions > 1 && (!fractionProducts || fractionProducts.length === 0)) {
-      setFractionalProduct(product);
-      setSelectedFractions(new Array(numFractions).fill(null));
-      return;
-    }
-
     setCart(prev => {
-      const isFractional = numFractions > 1 && fractionProducts && fractionProducts.length > 0;
-      
       let cartItemId = product.id;
       let itemName = product.name;
       let itemPrice = product.price;
-      let mappedFractionProducts = undefined;
 
       if (complementsToAdd && complementsToAdd.length > 0) {
         // Create unique ID by appending sorted complement item IDs
@@ -545,31 +536,11 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
         itemPrice += complementsTotal;
       }
 
-      if (isFractional && fractionProducts) {
-        const sortedFlavors = [...fractionProducts].sort((a, b) => a.id.localeCompare(b.id));
-        cartItemId = `${product.id}_${sortedFlavors.map(f => f.id).join('_')}`;
-        
-        const fractionNames = fractionProducts.map(f => `1/${numFractions} ${f.name}`);
-        itemName = fractionNames.join(', ');
-        
-        // Use the most expensive flavor price as the base for the whole product
-        const maxFractionPrice = Math.max(...fractionProducts.map(f => {
-          return f.fractionPrice != null ? Number(f.fractionPrice) : (Number(f.price) / numFractions);
-        }));
-        itemPrice = maxFractionPrice * numFractions;
-
-        mappedFractionProducts = fractionProducts.map(f => ({
-          productId: f.id,
-          name: f.name,
-          price: f.fractionPrice != null ? Number(f.fractionPrice) : (Number(f.price) / numFractions)
-        }));
-      }
-
       const existing = prev.find(item => item.productId === cartItemId);
       const currentQty = existing ? existing.quantity : 0;
       
       if (product.stock != null && (currentQty + quantityToAdd) > product.stock) {
-        alert(`Estoque insuficiente! Disponível: ${product.stock} un`);
+        showAlert(`Estoque insuficiente! Disponível: ${product.stock} un`);
         return prev;
       }
 
@@ -584,21 +555,18 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
         price: itemPrice, 
         quantity: quantityToAdd, 
         isByWeight: false,
-        isFractional: isFractional,
-        fractions: Number(product.fractions),
+        isFractional: false,
         originalProductId: product.id,
-        fractionProducts: mappedFractionProducts,
         complements: complementsToAdd
       }];
     });
-    setFractionalProduct(null);
   };
 
   const confirmWeightAddition = () => {
     if (!weightProduct || !selectedWeightGrams) return;
     const grams = parseFloat(selectedWeightGrams.replace(',', '.'));
     if (isNaN(grams) || grams <= 0) {
-      alert("Por favor, informe um peso válido em gramas.");
+      showAlert("Por favor, informe um peso válido em gramas.");
       return;
     }
     const quantityKg = grams / 1000;
@@ -609,7 +577,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
       const currentQty = existingIndex > -1 ? prev[existingIndex].quantity : 0;
       
       if (productToAdd.stock != null && (currentQty + quantityKg) > productToAdd.stock) {
-        alert(`Estoque insuficiente! Disponível: ${productToAdd.stock} KG`);
+        showAlert(`Estoque insuficiente! Disponível: ${productToAdd.stock.toFixed(3)} KG`);
         return prev;
       }
 
@@ -644,7 +612,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                 if (delta > 0) {
                     const product = products.find(p => p.id === productId);
                     if (product && product.stock != null && newQty > product.stock) {
-                        alert(`Estoque insuficiente! Disponível: ${product.stock} ${product.isByWeight ? 'KG' : 'un'}`);
+                        showAlert(`Estoque insuficiente! Disponível: ${product.stock} ${product.isByWeight ? 'KG' : 'un'}`);
                         return item;
                     }
                 }
@@ -696,17 +664,17 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
 
   const handleCheckout = async () => {
     if (cart.length === 0) return;
-    if ((orderType === 'MESA' || orderType === 'COMANDA') && !manualTable) { alert(`Informe o número da ${orderType === 'MESA' ? 'mesa' : 'comanda'}.`); return; }
-    if (orderType === 'BALCAO' && !customerName && !isWaitstaff) { alert('Informe o seu nome.'); return; }
-    if (orderType === 'ENTREGA' && (!customerName || !customerPhone || !deliveryAddress)) { alert('Preencha os dados de entrega.'); return; }
+    if ((orderType === 'MESA' || orderType === 'COMANDA') && !manualTable) { showAlert(`Informe o número da ${orderType === 'MESA' ? 'mesa' : 'comanda'}.`); return; }
+    if (orderType === 'BALCAO' && !customerName && !isWaitstaff) { showAlert('Informe o seu nome.'); return; }
+    if (orderType === 'ENTREGA' && (!customerName || !customerPhone || !deliveryAddress)) { showAlert('Preencha os dados de entrega.'); return; }
     
     if (orderType === 'ENTREGA' && settings.isDeliveryFeeActive && !isFeeConfirmed) {
-        alert('Confirme a taxa de entrega antes de finalizar o pedido.');
+        showAlert('Confirme a taxa de entrega antes de finalizar o pedido.');
         return;
     }
 
     if (orderType === 'ENTREGA' && settings.minDeliveryOrderValue && cartTotal < settings.minDeliveryOrderValue) {
-        alert(`O valor mínimo para entrega é R$ ${settings.minDeliveryOrderValue.toFixed(2)}`);
+        showAlert(`O valor mínimo para entrega é R$ ${settings.minDeliveryOrderValue.toFixed(2)}`);
         return;
     }
 
@@ -826,8 +794,9 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
         if (!isWaitstaff) {
             const stockUpdates = new Map<string, number>();
             for (const newItem of cart) {
-                const current = stockUpdates.get(newItem.productId) || 0;
-                stockUpdates.set(newItem.productId, current - Number(newItem.quantity || 0));
+                const targetProductId = newItem.originalProductId || newItem.productId;
+                const current = stockUpdates.get(targetProductId) || 0;
+                stockUpdates.set(targetProductId, current - Number(newItem.quantity || 0));
             }
 
             for (const [productId, diff] of stockUpdates.entries()) {
@@ -1113,8 +1082,8 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                           className={`px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-white font-bold text-[9px] sm:text-[11px] shadow-lg active:scale-95 transition-all flex items-center gap-1.5 shrink-0 ${isWaitstaff ? 'bg-secondary' : 'bg-primary'}`}
                         >
                           <PlusIcon size={12} /> 
-                          <span className="whitespace-nowrap">
-                            {featuredProduct.fractions && Number(featuredProduct.fractions) > 1 ? 'ESCOLHER' : 'ADICIONAR'}
+                          <span className="whitespace-nowrap uppercase">
+                            ADICIONAR
                           </span>
                         </button>
                       )}
@@ -1134,12 +1103,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
           {filteredProducts.map(product => (
             <div 
               key={product.id} 
-              onClick={() => {
-                if (product.fractions && Number(product.fractions) > 1) {
-                  handleAddToCart(product);
-                }
-              }}
-              className={`bg-white rounded-2xl p-2.5 sm:p-3 shadow-sm flex gap-2.5 sm:gap-3 items-center border border-gray-50 transition-all w-full box-border ${!product.isActive ? 'opacity-50 grayscale' : ''} ${product.fractions && Number(product.fractions) > 1 ? 'cursor-pointer hover:bg-gray-50' : ''}`}
+              className={`bg-white rounded-2xl p-2.5 sm:p-3 shadow-sm flex gap-2.5 sm:gap-3 items-center border border-gray-50 transition-all w-full box-border ${!product.isActive ? 'opacity-50 grayscale' : ''}`}
             >
               <div className="relative shrink-0">
                 <img src={product.imageUrl} className="w-16 h-16 sm:w-18 sm:h-18 md:w-20 md:h-20 object-cover rounded-xl" alt={product.name} />
@@ -1160,7 +1124,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                       }} 
                       className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-white flex items-center gap-1 shadow-sm text-[9px] sm:text-[10px] font-bold transition-all active:scale-95 shrink-0 ${isWaitstaff ? 'bg-secondary' : 'bg-primary'}`}
                     >
-                      <PlusIcon size={12} /> <span className="whitespace-nowrap">{product.fractions && Number(product.fractions) > 1 ? 'Escolher' : 'Add'}</span>
+                      <PlusIcon size={12} /> <span className="whitespace-nowrap uppercase">Add</span>
                     </button>
                   )}
                 </div>
@@ -1648,65 +1612,6 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
         </div>
       )}
 
-      {/* MODAL FRACIONADO */}
-      {fractionalProduct && (
-        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-6">
-          <div className="bg-white w-full max-w-md rounded-[3rem] p-8 shadow-2xl animate-scale-up space-y-6 max-h-[90vh] overflow-y-auto">
-             <div className="text-center">
-                <h3 className="text-xl font-bold text-gray-800">Escolha os Sabores</h3>
-                <p className="text-xs text-gray-400 uppercase font-black tracking-widest mt-1">{fractionalProduct.name} ({fractionalProduct.fractions} sabores)</p>
-             </div>
-             
-             <div className="space-y-4">
-              {Array.from({ length: Number(fractionalProduct.fractions) || 1 }).map((_, index) => (
-                <div key={index} className="space-y-2">
-                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Sabor {index + 1}</label>
-                  <select
-                    className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-primary outline-none font-bold text-gray-700"
-                    value={selectedFractions[index]?.id || ''}
-                    onChange={(e) => {
-                      const selectedProduct = products.find(p => p.id === e.target.value);
-                      const newFractions = [...selectedFractions];
-                      newFractions[index] = selectedProduct || null;
-                      setSelectedFractions(newFractions);
-                    }}
-                  >
-                    <option value="">Selecione um sabor...</option>
-                    {products
-                      .filter(p => p.isActive && p.id !== fractionalProduct.id && (!p.fractions || Number(p.fractions) <= 1) && p.category === fractionalProduct.category)
-                      .sort((a, b) => a.name.localeCompare(b.name))
-                      .map(p => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} - R$ {(p.fractionPrice != null ? p.fractionPrice : (p.price / (Number(fractionalProduct.fractions) || 1))).toFixed(2)}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-              ))}
-            </div>
-
-             <div className="flex gap-3 pt-4">
-                <button onClick={() => setFractionalProduct(null)} className="flex-1 py-4 font-bold text-gray-400">Cancelar</button>
-                <button 
-                  onClick={() => {
-                      if (selectedFractions.every(f => f !== null)) {
-                          handleAddToCart(fractionalProduct, selectedFractions as Product[]);
-                          setIsCartOpen(true);
-                          setCheckoutStep('cart');
-                      } else {
-                          alert("Por favor, selecione todos os sabores.");
-                      }
-                  }} 
-                  disabled={!selectedFractions.every(f => f !== null)} 
-                  className="flex-[2] py-4 bg-primary text-white rounded-2xl font-bold shadow-xl disabled:opacity-50"
-                >
-                  Confirmar
-                </button>
-             </div>
-          </div>
-        </div>
-      )}
-
       {/* MODAL DE PESO (KG) */}
       {weightProduct && (
         <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-6">
@@ -1736,6 +1641,19 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
       )}
 
       {/* MODAL DE COMPLEMENTOS */}
+      {errorMsg && (
+        <div className="fixed inset-0 z-[500] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6 animate-fade-in" onClick={() => setErrorMsg(null)}>
+          <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl text-center space-y-4 animate-scale-up max-w-sm w-full border border-orange-100" onClick={e => e.stopPropagation()}>
+            <div className="relative mx-auto w-20 h-20 bg-orange-100 text-orange-600 rounded-3xl flex items-center justify-center">
+              <div className="absolute inset-0 bg-orange-100/50 rounded-3xl animate-ping" />
+              <AlertCircle size={40} className="relative z-10" />
+            </div>
+            <p className="font-bold text-gray-800 text-lg leading-tight">{errorMsg}</p>
+            <button onClick={() => setErrorMsg(null)} className="w-full py-4 bg-primary text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl active:scale-95 transition-all">Entendi</button>
+          </div>
+        </div>
+      )}
+
       {complementsProduct && (
         <ComplementsModal
           product={complementsProduct}
@@ -1792,7 +1710,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
              setSelectedComplements(newComplements);
           }}
           onConfirm={() => {
-             handleAddToCart(complementsProduct, undefined, selectedComplements, complementsQuantity);
+             handleAddToCart(complementsProduct, selectedComplements, complementsQuantity);
              setComplementsProduct(null);
              setIsCartOpen(true);
              setCheckoutStep('cart');

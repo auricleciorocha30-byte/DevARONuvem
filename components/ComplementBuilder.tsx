@@ -111,6 +111,7 @@ export const ComplementBuilder: React.FC<Props> = ({ complements, onChange }) =>
                       type="text"
                       inputMode="numeric"
                       value={category.minQuantity === 0 && !category.isRequired ? '' : category.minQuantity} 
+                      onFocus={(e) => e.target.select()}
                       onChange={e => {
                         const val = e.target.value === '' ? 0 : parseInt(e.target.value);
                         if (!isNaN(val)) handleUpdateCategory(category.id, { minQuantity: val });
@@ -124,6 +125,7 @@ export const ComplementBuilder: React.FC<Props> = ({ complements, onChange }) =>
                       type="text"
                       inputMode="numeric"
                       value={category.maxQuantity || ''} 
+                      onFocus={(e) => e.target.select()}
                       onChange={e => {
                         const val = e.target.value === '' ? 0 : parseInt(e.target.value);
                         if (!isNaN(val)) handleUpdateCategory(category.id, { maxQuantity: val });
@@ -169,6 +171,7 @@ export const ComplementBuilder: React.FC<Props> = ({ complements, onChange }) =>
                          type="text" 
                          inputMode="decimal"
                          value={item.price === 0 ? '' : item.price} 
+                         onFocus={(e) => e.target.select()}
                          onChange={e => {
                            const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
                            if (!isNaN(val)) handleUpdateItem(category.id, item.id, { price: val });

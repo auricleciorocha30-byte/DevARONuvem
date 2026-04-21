@@ -353,6 +353,7 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                       inputMode="decimal"
                       placeholder="0.00" 
                       value={localSettings.minDeliveryOrderValue === 0 ? '' : (localSettings.minDeliveryOrderValue || '')} 
+                      onFocus={(e) => e.target.select()}
                       onChange={(e) => {
                         const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
                         if (!isNaN(val)) setLocalSettings({...localSettings, minDeliveryOrderValue: val});
@@ -414,6 +415,7 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                                   type="text" 
                                   inputMode="numeric"
                                   value={rule.upToKm === 0 ? '' : rule.upToKm} 
+                                  onFocus={(e) => e.target.select()}
                                   onChange={(e) => {
                                     const val = e.target.value === '' ? 0 : parseInt(e.target.value);
                                     if (!isNaN(val)) {
@@ -431,6 +433,7 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                                   type="text" 
                                   inputMode="decimal"
                                   value={rule.fee === 0 ? '' : rule.fee} 
+                                  onFocus={(e) => e.target.select()}
                                   onChange={(e) => {
                                     const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
                                     if (!isNaN(val)) {

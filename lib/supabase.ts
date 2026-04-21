@@ -780,6 +780,9 @@ class TursoBridge {
         if (this.tableName === 'store_profiles' && typeof processedRow.settings === 'string') {
           try { processedRow.settings = JSON.parse(processedRow.settings); } catch (e) {}
         }
+        if (this.tableName === 'products' && typeof processedRow.complements === 'string') {
+          try { processedRow.complements = JSON.parse(processedRow.complements); } catch (e) {}
+        }
         if (this.tableName === 'orders' && typeof processedRow.items === 'string') {
           try { processedRow.items = JSON.parse(processedRow.items); } catch (e) {}
         }

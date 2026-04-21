@@ -1062,7 +1062,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
       return;
     }
 
-    if (product.complements && product.complements.length > 0 && !product.isByWeight && Number(product.fractions || 0) <= 1) {
+    if (product.complements && product.complements.length > 0 && !product.isByWeight) {
       setComplementsProduct(product);
       setSelectedComplements([]);
       setComplementsQuantity(1);
@@ -1072,24 +1072,16 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
     if (product.isByWeight) {
       setWeightModal({ isOpen: true, product });
       setWeightInput('');
-    } else if (product.fractions && Number(product.fractions) > 1) {
-      const numFractions = Number(product.fractions);
-      setFractionalModal({ isOpen: true, product });
-      setSelectedFractions(new Array(numFractions).fill(null));
     } else {
       addToCart(product, 1);
     }
   };
 
-  const addToCart = (product: Product, quantity: number, fractionProducts?: Product[], complementsToAdd?: CartComplementItem[]) => {
+  const addToCart = (product: Product, quantity: number, complementsToAdd?: CartComplementItem[]) => {
     setCart(prev => {
-      const numFractions = Number(product.fractions || 1);
-      const isFractional = numFractions > 1 && fractionProducts && fractionProducts.length > 0;
-      
       let cartItemId = product.id;
       let itemName = product.name;
       let itemPrice = product.price;
-      let mappedFractionProducts = undefined;
 
       if (complementsToAdd && complementsToAdd.length > 0) {
         // Create unique ID by appending sorted complement item IDs
@@ -1100,28 +1092,6 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         // Add complement prices to base item price
         const complementsTotal = complementsToAdd.reduce((sum, c) => sum + (c.price * c.quantity), 0);
         itemPrice += complementsTotal;
-      }
-
-      if (isFractional && fractionProducts) {
-        // Create a unique ID based on the selected flavors, sorted so order doesn't matter
-        const sortedFlavors = [...fractionProducts].sort((a, b) => a.id.localeCompare(b.id));
-        cartItemId = `${product.id}_${sortedFlavors.map(f => f.id).join('_')}`;
-        
-        // Name is "1/N Flavor A, 1/N Flavor B"
-        const fractionNames = fractionProducts.map(f => `1/${numFractions} ${f.name}`);
-        itemName = fractionNames.join(', ');
-        
-        // Price is the max of fractionPrices
-        const maxFractionPrice = Math.max(...fractionProducts.map(f => {
-          return f.fractionPrice != null ? Number(f.fractionPrice) : (Number(f.price) / numFractions);
-        }));
-        itemPrice = maxFractionPrice * numFractions;
-
-        mappedFractionProducts = fractionProducts.map(f => ({
-          productId: f.id,
-          name: f.name,
-          price: f.fractionPrice != null ? Number(f.fractionPrice) : (Number(f.price) / numFractions)
-        }));
       }
 
       const existing = prev.find(item => item.productId === cartItemId);
@@ -1147,15 +1117,12 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         quantity: quantity,
         description: product.description,
         isByWeight: product.isByWeight,
-        isFractional: isFractional,
-        fractions: product.fractions,
+        isFractional: false,
         originalProductId: product.id,
-        fractionProducts: mappedFractionProducts,
         complements: complementsToAdd
       }];
     });
     setWeightModal({ isOpen: false, product: null });
-    setFractionalModal({ isOpen: false, product: null });
   };
 
   const updateQuantity = (productId: string, delta: number) => {
@@ -1473,26 +1440,21 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         // Update stock based on the difference between cart and originalCart
         const stockUpdates = new Map<string, number>();
         for (const oldItem of originalCart) {
+            const targetProductId = oldItem.originalProductId || oldItem.productId;
             if (oldItem.isFractional && oldItem.fractionProducts) {
                 for (const fp of oldItem.fractionProducts) {
                     const current = stockUpdates.get(fp.productId) || 0;
                     stockUpdates.set(fp.productId, current + (Number(oldItem.originalQuantity || oldItem.quantity || 0) / Number(oldItem.fractions || 1)));
                 }
             } else {
-                const current = stockUpdates.get(oldItem.productId) || 0;
-                stockUpdates.set(oldItem.productId, current + Number(oldItem.originalQuantity || oldItem.quantity || 0));
+                const current = stockUpdates.get(targetProductId) || 0;
+                stockUpdates.set(targetProductId, current + Number(oldItem.originalQuantity || oldItem.quantity || 0));
             }
         }
         for (const newItem of cart) {
-            if (newItem.isFractional && newItem.fractionProducts) {
-                for (const fp of newItem.fractionProducts) {
-                    const current = stockUpdates.get(fp.productId) || 0;
-                    stockUpdates.set(fp.productId, current - (Number(newItem.quantity || 0) / Number(newItem.fractions || 1)));
-                }
-            } else {
-                const current = stockUpdates.get(newItem.productId) || 0;
-                stockUpdates.set(newItem.productId, current - Number(newItem.quantity || 0));
-            }
+            const targetProductId = newItem.originalProductId || newItem.productId;
+            const current = stockUpdates.get(targetProductId) || 0;
+            stockUpdates.set(targetProductId, current - Number(newItem.quantity || 0));
         }
 
         for (const [productId, diff] of stockUpdates.entries()) {
@@ -2812,61 +2774,6 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         </div>
       </div>
 
-      {/* Fractional Modal */}
-      {fractionalModal.isOpen && fractionalModal.product && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-bold mb-4">Escolha os Sabores</h3>
-            <p className="text-sm text-gray-500 mb-4">{fractionalModal.product.name} ({fractionalModal.product.fractions} sabores)</p>
-            
-            <div className="space-y-4 mb-6">
-              {Array.from({ length: Number(fractionalModal.product.fractions) || 1 }).map((_, index) => (
-                <div key={index} className="space-y-2">
-                  <label className="block text-sm font-bold text-gray-700">Sabor {index + 1}</label>
-                  <select
-                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                    value={selectedFractions[index]?.id || ''}
-                    onChange={(e) => {
-                      const selectedProduct = products.find(p => p.id === e.target.value);
-                      const newFractions = [...selectedFractions];
-                      newFractions[index] = selectedProduct || null;
-                      setSelectedFractions(newFractions);
-                    }}
-                  >
-                    <option value="">Selecione um sabor...</option>
-                    {products
-                      .filter(p => p.isActive && p.id !== fractionalModal.product?.id && (!p.fractions || Number(p.fractions) <= 1) && p.category === fractionalModal.product?.category)
-                      .sort((a, b) => a.name.localeCompare(b.name))
-                      .map(p => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} - R$ {(p.fractionPrice != null ? Number(p.fractionPrice) : (Number(p.price) / (Number(fractionalModal.product?.fractions) || 1))).toFixed(2)}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex gap-3">
-                <button onClick={() => setFractionalModal({ isOpen: false, product: null })} className="flex-1 py-3 bg-gray-100 rounded-xl font-bold text-gray-600">Cancelar</button>
-                <button 
-                    onClick={() => {
-                        if (selectedFractions.every(f => f !== null)) {
-                            addToCart(fractionalModal.product!, 1, selectedFractions as Product[]);
-                        } else {
-                            alert("Por favor, selecione todos os sabores.");
-                        }
-                    }}
-                    className={`flex-1 py-3 rounded-xl font-bold text-white ${selectedFractions.every(f => f !== null) ? 'bg-blue-600' : 'bg-gray-400 cursor-not-allowed'}`}
-                    disabled={!selectedFractions.every(f => f !== null)}
-                >
-                    Confirmar
-                </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Weight Modal */}
       {weightModal.isOpen && weightModal.product && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
@@ -2961,7 +2868,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
              setSelectedComplements(newComplements);
           }}
           onConfirm={() => {
-             addToCart(complementsProduct, complementsQuantity, undefined, selectedComplements);
+             addToCart(complementsProduct, complementsQuantity, selectedComplements);
              setComplementsProduct(null);
           }}
         />

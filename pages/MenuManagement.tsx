@@ -161,9 +161,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
             isByWeight: !!editingProduct.isByWeight,
             barcode: editingProduct.barcode || undefined,
             stock: (editingProduct.stock != null && !isNaN(Number(editingProduct.stock))) ? Number(editingProduct.stock) : null,
-            fractions: (editingProduct.fractions != null && !isNaN(Number(editingProduct.fractions))) ? Number(editingProduct.fractions) : null,
             units: (editingProduct.units != null && !isNaN(Number(editingProduct.units))) ? Number(editingProduct.units) : null,
-            fractionPrice: (editingProduct.fractionPrice != null && !isNaN(Number(editingProduct.fractionPrice))) ? Number(editingProduct.fractionPrice) : null,
             ncm: editingProduct.ncm || undefined,
             cfop: editingProduct.cfop || undefined,
             icms_situacao_tributaria: editingProduct.icms_situacao_tributaria || undefined,
@@ -520,46 +518,13 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{editingProduct?.isByWeight ? 'Preço por KG (R$)' : 'Preço Unitário (R$)'}</label>
-                  <input required type="number" step="0.01" value={editingProduct?.price || ''} onChange={(e) => setEditingProduct({...editingProduct, price: parseFloat(e.target.value)})} className="w-full p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500" />
+                  <input required type="number" step="0.01" value={editingProduct?.price || ''} onFocus={(e) => e.target.select()} onChange={(e) => setEditingProduct({...editingProduct, price: parseFloat(e.target.value)})} className="w-full p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
                     {editingProduct?.isByWeight ? 'Estoque Atual (KG)' : 'Estoque Atual (Unid)'}
                   </label>
-                  <input type="number" step={editingProduct?.isByWeight ? "0.001" : "1"} value={editingProduct?.stock ?? ''} onChange={(e) => setEditingProduct({...editingProduct, stock: e.target.value === '' ? undefined : parseFloat(e.target.value)})} className="w-full p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500" placeholder="Opcional" />
-                </div>
-              </div>
-
-              <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>
-                  </div>
-                  <h4 className="font-bold text-sm text-gray-700">Venda Fracionada (Opcional)</h4>
-                </div>
-                <p className="text-xs text-gray-500 mb-4">
-                  Útil para pizzas meio a meio ou combos. Deixe em branco se não for fracionado.
-                </p>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Qtd. de Frações</label>
-                    <input type="number" min="1" step="1" value={editingProduct?.fractions ?? ''} onChange={(e) => setEditingProduct({...editingProduct, fractions: e.target.value === '' ? undefined : parseInt(e.target.value)})} className="w-full p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500" placeholder="Ex: 2" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Qtd. de Unidades</label>
-                    <input type="number" min="1" step="1" value={editingProduct?.units ?? ''} onChange={(e) => setEditingProduct({...editingProduct, units: e.target.value === '' ? undefined : parseInt(e.target.value)})} className="w-full p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500" placeholder="Ex: 1" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Valor por Fração (R$)</label>
-                    <input type="number" step="0.01" value={editingProduct?.fractionPrice ?? ''} onChange={(e) => setEditingProduct({...editingProduct, fractionPrice: e.target.value === '' ? undefined : parseFloat(e.target.value)})} className="w-full p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500" placeholder="Ex: 15.00" />
-                  </div>
-                  <div className="flex items-end">
-                    <div className="w-full p-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-500">
-                      Preço Total: R$ {((editingProduct?.fractions || 0) * (editingProduct?.fractionPrice || 0)).toFixed(2)}
-                    </div>
-                  </div>
+                  <input type="number" step={editingProduct?.isByWeight ? "0.001" : "1"} value={editingProduct?.stock ?? ''} onFocus={(e) => e.target.select()} onChange={(e) => setEditingProduct({...editingProduct, stock: e.target.value === '' ? undefined : parseFloat(e.target.value)})} className="w-full p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500" placeholder="Opcional" />
                 </div>
               </div>
 
