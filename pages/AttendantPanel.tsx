@@ -76,7 +76,13 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
   };
   const canCancel = useMemo(() => isGerente || settings.canWaitstaffCancelItems, [isGerente, settings.canWaitstaffCancelItems]);
 
-  const activeOrders = useMemo(() => orders.filter(o => o.status !== 'ENTREGUE' && o.status !== 'CANCELADO'), [orders]);
+  const activeOrders = useMemo(() => {
+    return orders.filter(o => {
+        if (o.status === 'ENTREGUE' || o.status === 'CANCELADO') return false;
+        if (settings.hideUnpaidOnlineOrders && o.status === 'AGUARDANDO_PAGAMENTO') return false;
+        return true;
+    });
+  }, [orders, settings.hideUnpaidOnlineOrders]);
 
   const newBalcaoEntregaOrders = useMemo(() => {
     return activeOrders.filter(o => (o.type === 'BALCAO' || o.type === 'ENTREGA') && (o.status === 'AGUARDANDO' || o.status === 'AGUARDANDO_PAGAMENTO' || o.status === 'PAGO'));

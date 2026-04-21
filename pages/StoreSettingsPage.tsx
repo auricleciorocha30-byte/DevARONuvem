@@ -476,6 +476,21 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                 )}
 
                 <div className="w-full mt-6 space-y-3 pt-6 border-t border-gray-100">
+                    <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest text-center mb-2">Comportamento (Menu Digital)</p>
+                    
+                    <div className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-2xl">
+                      <div>
+                        <h4 className="font-bold text-gray-800 text-sm">Ocultar Pedidos Não Pagos</h4>
+                        <span className="text-[10px] text-gray-400">Pedidos com pagamento online só aparecem no painel após confirmados.</span>
+                      </div>
+                      <Switch 
+                        checked={localSettings.hideUnpaidOnlineOrders === true} 
+                        onChange={(checked) => setLocalSettings({...localSettings, hideUnpaidOnlineOrders: checked})} 
+                      />
+                    </div>
+                </div>
+
+                <div className="w-full mt-6 space-y-3 pt-6 border-t border-gray-100">
                     <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest text-center mb-2">Meios de Pagamento (Menu Digital)</p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {allPaymentMethods.map(method => (
