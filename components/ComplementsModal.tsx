@@ -26,7 +26,16 @@ export const ComplementsModal: React.FC<Props> = ({
   const isValid = useMemo(() => {
     return complements.every(cat => {
       const catCount = selectedComplements.filter(sc => sc.categoryId === cat.id).reduce((sum, sc) => sum + sc.quantity, 0);
-      if (cat.isRequired && catCount < cat.minQuantity) return false;
+      
+      let min = cat.minQuantity || 0;
+      if (cat.isRequired && min === 0) {
+          // Se a categoria é obrigatória mas o lojista deixou min=0, 
+          // assumimos que o cliente precisa cumprir a quantidade máxima (ex: "Escolha 2" -> precisa escolher 2)
+          // ou pelo menos 1.
+          min = cat.maxQuantity || 1;
+      }
+
+      if (cat.isRequired && catCount < min) return false;
       return true;
     });
   }, [complements, selectedComplements]);

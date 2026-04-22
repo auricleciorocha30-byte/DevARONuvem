@@ -1764,10 +1764,15 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
           const firstId = loadedCommandIds[0];
           
           // Check if original order already had a customer to prevent double cashback
-          // Only mark as true if the order was already finalized/delivered
+          // Only mark as true if the order already received cashback.
+          // DigitalMenu applies cashback at creation for ENTREGA and BALCAO.
           const { data: origOrder } = await supabase.from('orders').eq('id', firstId).maybeSingle();
-          if (origOrder && origOrder.customerId && (origOrder.status === 'ENTREGUE' || origOrder.status === 'CLOSED')) {
-              originalOrderHadCustomer = true;
+          if (origOrder && origOrder.customerId) {
+              if (origOrder.type !== 'MESA' && origOrder.type !== 'COMANDA') {
+                  originalOrderHadCustomer = true;
+              } else if (origOrder.status === 'ENTREGUE' || origOrder.status === 'CLOSED') {
+                  originalOrderHadCustomer = true;
+              }
           }
           
           // Prevent resetting status backwards if the order was already PRONTO or further
