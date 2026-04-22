@@ -138,7 +138,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
             unidade_comercial: item.isByWeight ? 'KG' : 'UN',
             valor_unitario: item.price,
             valor_total: item.price * item.quantity,
-            ncm: product?.ncm || '21069090', 
+            ncm: (product?.ncm || '21069090').replace(/\D/g, ''), 
             cfop: product?.cfop || (group.type === 'ENTREGA' ? '5102' : '5102'),
             icms_origem: 0,
             icms_situacao_tributaria: product?.icms_situacao_tributaria || '102'
