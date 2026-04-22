@@ -182,7 +182,12 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
         }
       } else {
         console.error("Erro Focus NFe:", result);
-        alert(`Erro ao emitir NFC-e: ${result.mensagem || JSON.stringify(result)}`);
+        let errorMessage = result.mensagem || JSON.stringify(result);
+        if (result.erros && Array.isArray(result.erros)) {
+            const detalhamento = result.erros.map((e: any) => `- ${e.codigo}: ${e.mensagem}`).join('\n');
+            errorMessage = `${result.mensagem || 'Erros de validação:'}\n\n${detalhamento}`;
+        }
+        alert(`Erro ao emitir NFC-e:\n${errorMessage}`);
       }
     } catch (error) {
       console.error("Erro ao emitir NFC-e:", error);

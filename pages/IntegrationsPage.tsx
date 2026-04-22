@@ -167,18 +167,18 @@ export default function IntegrationsPage({ settings, onSave }: Props) {
               </div>
 
               <div>
-                <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">Certificado Digital (Base64)</label>
+                <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">Certificado Digital (Base64) - Opcional</label>
                 <div className="relative">
                   <Upload className="absolute left-4 top-4 text-gray-300" size={18} />
                   <textarea
                     value={formData.focusNfeCertificate}
                     onChange={(e) => setFormData({ ...formData, focusNfeCertificate: e.target.value })}
                     className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 transition-all font-mono text-xs h-32 resize-none"
-                    placeholder="Cole aqui o conteúdo do certificado A1 em Base64"
+                    placeholder="Cole aqui apenas se não configurou no painel da Focus"
                   />
                 </div>
-                <p className="text-[10px] text-gray-400 mt-2 ml-1 italic">
-                  * O certificado deve ser o arquivo .pfx convertido para Base64.
+                <p className="text-[10px] text-gray-400 mt-2 ml-1 italic leading-relaxed">
+                  * Se você já fez o upload do Certificado A1 diretamente na plataforma da Focus NFe, pode deixar este campo vazio! O sistema usará o certificado instalado lá automaticamente através do Token.
                 </p>
               </div>
             </div>

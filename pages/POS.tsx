@@ -118,6 +118,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
   const [pointPaymentId, setPointPaymentId] = useState<string | null>(null);
   const [pointStatus, setPointStatus] = useState<string | null>(null);
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
+  const [isEmittingNfce, setIsEmittingNfce] = useState(false);
   const [loadedCommandIds, setLoadedCommandIds] = useState<string[]>(() => {
     const saved = localStorage.getItem(`pos-loadedCommandIds-${storeId}`);
     return saved ? JSON.parse(saved) : [];
@@ -169,6 +170,95 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
   const [showScanner, setShowScanner] = useState(false);
   const [deliveryFee, setDeliveryFee] = useState<number>(0);
   const [isCalculatingFee, setIsCalculatingFee] = useState(false);
+
+  const handleEmitNfcePOS = async (order: Order) => {
+    if (!settings.focusNfeToken) {
+      alert("Token da Focus NFe não configurado nas Integrações.");
+      return;
+    }
+    if (!settings.cnpj) {
+      alert("CNPJ da loja não configurado nas Configurações.");
+      return;
+    }
+
+    setIsEmittingNfce(true);
+    const reference = `order_${order.id}_${Date.now()}`;
+    try {
+      let items = [];
+      if (typeof order.items === 'string') {
+        items = JSON.parse(order.items);
+      } else if (Array.isArray(order.items)) {
+        items = order.items;
+      }
+
+      const nfceData = {
+        cnpj_emitente: settings.cnpj.replace(/\D/g, ''),
+        data_emissao: new Date().toISOString(),
+        indicador_inscricao_estadual_destinatario: 9,
+        modalidade_frete: 9,
+        local_destino: 1,
+        presenca_comprador: order.type === 'ENTREGA' ? 4 : 1,
+        items: items.map((item: any, index: number) => {
+          const product = products.find(p => p.id === item.productId);
+          return {
+            numero_item: index + 1,
+            codigo_produto: item.productId,
+            descricao: item.name,
+            quantidade: item.quantity,
+            unidade_comercial: item.isByWeight ? 'KG' : 'UN',
+            valor_unitario: item.price,
+            valor_total: item.price * item.quantity,
+            ncm: product?.ncm || '21069090',
+            cfop: product?.cfop || (order.type === 'ENTREGA' ? '5102' : '5102'),
+            icms_origem: 0,
+            icms_situacao_tributaria: product?.icms_situacao_tributaria || '102'
+          };
+        }),
+        formas_pagamento: [
+          {
+            forma_pagamento: order.paymentMethod === 'DINHEIRO' ? '01' : 
+                            order.paymentMethod === 'CARTAO' ? '03' : 
+                            order.paymentMethod === 'DEBITO' ? '04' : 
+                            order.paymentMethod === 'PIX' ? '17' : '99',
+            valor_pagamento: order.total
+          }
+        ]
+      };
+
+      const response = await fetch('/api/focus-nfe/emit-nfce', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: settings.focusNfeToken,
+          environment: settings.focusNfeEnvironment,
+          nfceData,
+          reference: reference
+        })
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        alert("NFC-e emitida com sucesso!");
+        if (result.caminho_xml_nota_fiscal) {
+           window.open(`https://${settings.focusNfeEnvironment === 'production' ? 'api' : 'homologacao'}.focusnfe.com.br${result.caminho_xml_nota_fiscal}`, '_blank');
+        }
+      } else {
+        console.error("Erro Focus NFe:", result);
+        let errorMessage = result.mensagem || JSON.stringify(result);
+        if (result.erros && Array.isArray(result.erros)) {
+            const detalhamento = result.erros.map((e: any) => `- ${e.codigo}: ${e.mensagem}`).join('\n');
+            errorMessage = `${result.mensagem || 'Erros de validação:'}\n\n${detalhamento}`;
+        }
+        alert(`Erro ao emitir NFC-e:\n${errorMessage}`);
+      }
+    } catch (error) {
+      console.error("Erro ao emitir NFC-e:", error);
+      alert("Erro de conexão ao emitir NFC-e.");
+    } finally {
+      setIsEmittingNfce(false);
+    }
+  };
 
   const calculateDeliveryFee = async () => {
     if (!settings.address) {
@@ -2430,15 +2520,27 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
              )}
              <InstallPrompt />
              {lastOrder && (
-               <button onClick={() => printReceipt(lastOrder)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-xl border border-blue-100 shrink-0" 
-                style={{ 
-                    color: settings.primaryColor ? '#ffffff' : undefined,
-                    borderColor: settings.primaryColor ? 'rgba(255,255,255,0.2)' : undefined,
-                    backgroundColor: settings.primaryColor ? 'rgba(255,255,255,0.1)' : undefined
-                }}
-                title="Reimprimir Último Cupom">
-                  <Printer size={18} />
-               </button>
+               <div className="flex gap-2 shrink-0">
+                 <button onClick={() => printReceipt(lastOrder)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-xl border border-blue-100" 
+                  style={{ 
+                      color: settings.primaryColor ? '#ffffff' : undefined,
+                      borderColor: settings.primaryColor ? 'rgba(255,255,255,0.2)' : undefined,
+                      backgroundColor: settings.primaryColor ? 'rgba(255,255,255,0.1)' : undefined
+                  }}
+                  title="Reimprimir Último Cupom">
+                    <Printer size={18} />
+                 </button>
+                 {settings.focusNfeToken && (
+                   <button 
+                    onClick={() => handleEmitNfcePOS(lastOrder)} 
+                    disabled={isEmittingNfce}
+                    className="p-2 text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl border border-indigo-700 flex items-center gap-2" 
+                    title="Emitir NFC-e do Último Pedido">
+                      {isEmittingNfce ? <Loader2 size={18} className="animate-spin" /> : <Tag size={18} />}
+                      <span className="text-xs font-bold hidden md:inline">Emitir NF</span>
+                   </button>
+                 )}
+               </div>
              )}
              <button onClick={onLogout} className="hidden md:flex p-2 text-red-500 hover:bg-red-50 rounded-xl border border-red-100 shrink-0" 
                 style={{ 
