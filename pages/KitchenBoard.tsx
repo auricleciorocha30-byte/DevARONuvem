@@ -43,8 +43,8 @@ const KitchenBoard: React.FC<Props> = ({ orders, updateStatus }) => {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-900 text-white p-6 flex flex-col gap-6 font-sans overflow-hidden">
-      <header className="flex justify-between items-center border-b border-white/10 pb-4">
+    <div className="bg-zinc-900 text-white p-6 flex flex-col gap-6 font-sans h-screen max-h-screen overflow-hidden">
+      <header className="shrink-0 flex justify-between items-center border-b border-white/10 pb-4">
         <div className="flex items-center gap-4">
           <div className="p-3 bg-secondary rounded-2xl text-white shadow-lg">
             <ChefHat size={32} />
@@ -62,7 +62,7 @@ const KitchenBoard: React.FC<Props> = ({ orders, updateStatus }) => {
         </div>
       </header>
 
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-hidden">
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-hidden min-h-0">
         {/* COLUNA SALÃO */}
         <section className="flex flex-col bg-zinc-800/40 rounded-[2.5rem] border border-white/5 overflow-hidden">
           <div className="p-6 flex items-center justify-between border-b border-white/5 bg-blue-500/10">

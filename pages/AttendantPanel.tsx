@@ -378,7 +378,7 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
             </div>
           )}
         </>) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in max-h-[calc(100vh-200px)] overflow-y-auto pr-2 pb-10 custom-scrollbar">
             {displayOrders.map(order => (
               <div key={order.id} className={`bg-white rounded-[2.5rem] p-6 shadow-xl flex flex-col border relative group ${((order.type === 'BALCAO' || order.type === 'ENTREGA') && (order.status === 'AGUARDANDO' || order.status === 'PAGO')) ? 'border-red-400 ring-2 ring-red-100' : 'border-gray-100'}`}>
                 {((order.type === 'BALCAO' || order.type === 'ENTREGA') && (order.status === 'AGUARDANDO' || order.status === 'AGUARDANDO_PAGAMENTO' || order.status === 'PAGO')) && (

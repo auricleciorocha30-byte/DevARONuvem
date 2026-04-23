@@ -313,12 +313,12 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
       `}</style>
 
       <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-          {['TODOS', 'MESA', 'BALCAO', 'ENTREGA', 'FINALIZADOS'].map(f => (
+          {['TODOS', 'MESA', 'COMANDA', 'BALCAO', 'ENTREGA', 'FINALIZADOS'].map(f => (
             <button key={f} onClick={() => setFilterType(f as any)} className={`px-6 py-2.5 rounded-2xl font-bold text-sm border transition-all ${filterType === f ? 'bg-primary text-white border-primary shadow-md' : 'bg-white text-gray-400 border-gray-100'}`}>{f}</button>
           ))}
       </div>
 
-      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 ${filterType === 'FINALIZADOS' ? 'max-h-[calc(100vh-200px)] overflow-y-auto pr-2 pb-10 custom-scrollbar' : ''}`}>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-h-[calc(100vh-200px)] overflow-y-auto pr-2 pb-10 custom-scrollbar">
         {displayGroups.map(group => (
           <div key={group.id} className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 flex flex-col hover:shadow-xl transition-all relative overflow-hidden group">
             <div className="absolute top-0 right-0 p-2 bg-gray-50 rounded-bl-2xl">

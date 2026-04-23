@@ -39,7 +39,8 @@ import {
   Award,
   Globe,
   Clock,
-  QrCode
+  QrCode,
+  CheckCircle2
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Product, StoreSettings, Order, OrderItem, OrderType, PaymentMethod, Waitstaff, CartComplementItem, ComplementCategory } from '../types';
@@ -202,7 +203,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
 
   const [manualTable, setManualTable] = useState(effectiveTable || '');
   const [payment, setPayment] = useState<PaymentMethod | 'CASHBACK' | ''>('');
-  const [combinedPayment, setCombinedPayment] = useState<PaymentMethod>('PIX');
+  const [combinedPayment, setCombinedPayment] = useState<PaymentMethod | ''>('');
   const [changeFor, setChangeFor] = useState<string>('');
   const [notes, setNotes] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -216,9 +217,11 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const [referencePoint, setReferencePoint] = useState('');
   const [isConsulting, setIsConsulting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
 
   const showAlert = (msg: string) => setErrorMsg(msg);
+  const showSuccessAlert = (msg: string) => setSuccessMsg(msg);
   
   const [deliveryFee, setDeliveryFee] = useState<number | null>(null);
   const [deliveryDistanceKm, setDeliveryDistanceKm] = useState<number | null>(null);
@@ -244,15 +247,15 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
               setReferencePoint(customer.referencePoint || '');
               setCustomerId(customer.id);
               setCustomerPoints(customer.points || 0);
-              alert('Cadastro encontrado! Dados preenchidos.');
+              showSuccessAlert('Cadastro encontrado! Dados preenchidos.');
           } else {
-              alert('Nenhum cadastro encontrado para este telefone.');
+              showAlert('Nenhum cadastro encontrado para este telefone.');
               setCustomerId(null);
               setCustomerPoints(0);
           }
       } catch (err) {
           console.error("Erro ao consultar cliente:", err);
-          alert('Erro ao consultar cadastro.');
+          showAlert('Erro ao consultar cadastro.');
       } finally {
           setIsConsulting(false);
       }
@@ -671,9 +674,15 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
     if (orderType === 'ENTREGA' && (!customerName || !customerPhone || !deliveryAddress)) { showAlert('Preencha os dados de entrega.'); return; }
     
     // Check for payment method selection (except for waitstaff or table/command orders)
-    if (!isWaitstaff && orderType !== 'MESA' && orderType !== 'COMANDA' && !payment) {
-        showAlert('Selecione uma forma de pagamento.');
-        return;
+    if (!isWaitstaff && orderType !== 'MESA' && orderType !== 'COMANDA') {
+        if (!payment) {
+            showAlert('Selecione uma forma de pagamento.');
+            return;
+        }
+        if (payment === 'CASHBACK' && customerPoints < finalTotal && !combinedPayment) {
+            showAlert('Selecione uma forma de pagamento para completar o valor.');
+            return;
+        }
     }
 
     if (orderType === 'ENTREGA' && settings.isDeliveryFeeActive && !isFeeConfirmed) {
@@ -857,8 +866,8 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
         setReferencePoint('');
         setNotes('');
         setChangeFor('');
-        setPayment('PIX');
-        setCombinedPayment('PIX');
+        setPayment('');
+        setCombinedPayment('');
         if (!effectiveTable) setManualTable('');
         
         if ((payment === 'PIX' || combinedPayment === 'PIX') && settings.onlinePaymentProvider === 'mercado_pago' && settings.onlinePaymentAccessToken) {
@@ -1073,7 +1082,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
           <section className="animate-fade-in w-full">
              <div className="flex overflow-x-auto gap-4 pb-4 snap-x snap-mandatory custom-scrollbar-hide">
                {featuredProducts.map((featuredProduct) => (
-                 <div key={featuredProduct.id} className="min-w-[85%] snap-center shrink-0 bg-white rounded-[1.5rem] sm:rounded-[2rem] p-3 sm:p-4 shadow-xl border border-orange-100 flex flex-row gap-3 sm:gap-4 relative overflow-hidden group">
+                 <div key={featuredProduct.id} className="w-[85vw] max-w-[340px] sm:max-w-[400px] snap-center shrink-0 bg-white rounded-[1.5rem] sm:rounded-[2rem] p-3 sm:p-4 shadow-xl border border-orange-100 flex flex-row gap-3 sm:gap-4 relative overflow-hidden group">
                     <div className="absolute top-0 right-0 p-1.5 sm:p-2 bg-orange-500 text-white rounded-bl-2xl z-20 shadow-sm"><Flame size={12} className="animate-pulse" /></div>
                     <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shrink-0 shadow-sm border border-gray-100 relative">
                         <img 
@@ -1084,10 +1093,10 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                         />
                     </div>
                     <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
-                       <div>
+                       <div className="min-w-0">
                           <div className="flex items-center gap-1 mb-1"><span className="bg-orange-100 text-orange-600 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">Destaque</span></div>
                           <h3 className="text-xs sm:text-sm font-bold text-primary truncate leading-tight">{featuredProduct.name}</h3>
-                          <p className="text-[9px] sm:text-[10px] text-gray-500 line-clamp-2 mt-1 leading-relaxed">{featuredProduct.description}</p>
+                          <p className="text-[9px] sm:text-[10px] text-gray-500 line-clamp-2 mt-1 leading-tight whitespace-normal">{featuredProduct.description}</p>
                        </div>
                        <div className="flex items-end justify-between gap-1 mt-1">
                           <span className="text-sm sm:text-lg font-black text-secondary whitespace-nowrap">
@@ -1706,6 +1715,19 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
             </div>
             <p className="font-bold text-gray-800 text-lg leading-tight">{errorMsg}</p>
             <button onClick={() => setErrorMsg(null)} className="w-full py-4 bg-primary text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl active:scale-95 transition-all">Entendi</button>
+          </div>
+        </div>
+      )}
+      
+      {successMsg && (
+        <div className="fixed inset-0 z-[500] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6 animate-fade-in" onClick={() => setSuccessMsg(null)}>
+          <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl text-center space-y-4 animate-scale-up max-w-sm w-full border border-green-100" onClick={e => e.stopPropagation()}>
+            <div className="relative mx-auto w-20 h-20 bg-green-100 text-green-600 rounded-3xl flex items-center justify-center">
+              <div className="absolute inset-0 bg-green-100/50 rounded-3xl animate-ping" />
+              <CheckCircle2 size={40} className="relative z-10" />
+            </div>
+            <p className="font-bold text-gray-800 text-lg leading-tight">{successMsg}</p>
+            <button onClick={() => setSuccessMsg(null)} className="w-full py-4 bg-green-500 hover:bg-green-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl active:scale-95 transition-all">Legal!</button>
           </div>
         </div>
       )}

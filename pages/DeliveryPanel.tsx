@@ -10,7 +10,8 @@ import {
   LogOut,
   RefreshCw,
   UserCheck,
-  MessageCircle
+  MessageCircle,
+  AlertCircle
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Order, Waitstaff, StoreSettings } from '../types';
@@ -32,6 +33,7 @@ export default function DeliveryPanel({ storeId, user, settings, storeSlug, onLo
   const [couriers, setCouriers] = useState<Waitstaff[]>([]);
   const [showBulkFinalizeModal, setShowBulkFinalizeModal] = useState(false);
   const [bulkDeliveries, setBulkDeliveries] = useState<Order[]>([]);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (user.role === 'GERENTE') {
@@ -180,7 +182,7 @@ export default function DeliveryPanel({ storeId, user, settings, storeSlug, onLo
       .single();
       
     if (currentOrder && currentOrder.deliveryDriverId && currentOrder.deliveryDriverId !== '' && currentOrder.deliveryDriverId !== 'null' && currentOrder.deliveryDriverId !== 'undefined') {
-      alert("Ops! Esta entrega já foi aceita por outro entregador.");
+      setErrorMsg("Ops! Esta entrega já foi aceita por outro entregador.");
       fetchDeliveries();
       return;
     }
@@ -627,6 +629,19 @@ export default function DeliveryPanel({ storeId, user, settings, storeSlug, onLo
                     </button>
                 </div>
             </div>
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="fixed inset-0 z-[500] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6 animate-fade-in" onClick={() => setErrorMsg(null)}>
+          <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl text-center space-y-4 animate-scale-up max-w-sm w-full border border-orange-100" onClick={e => e.stopPropagation()}>
+            <div className="relative mx-auto w-20 h-20 bg-orange-100 text-orange-600 rounded-3xl flex items-center justify-center">
+              <div className="absolute inset-0 bg-orange-100/50 rounded-3xl animate-ping" />
+              <AlertCircle size={40} className="relative z-10" />
+            </div>
+            <p className="font-bold text-gray-800 text-lg leading-tight">{errorMsg}</p>
+            <button onClick={() => setErrorMsg(null)} className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl active:scale-95 transition-all">Entendi</button>
+          </div>
         </div>
       )}
     </div>
