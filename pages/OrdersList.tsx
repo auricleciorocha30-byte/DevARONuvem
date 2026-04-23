@@ -429,17 +429,17 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                    </div>
                 </div>
                 <div className="text-right">
-                  {group.discountAmount && group.discountAmount > 0 && (
+                  {group.discountAmount ? (
                     <p className="text-[10px] font-bold text-green-600 leading-none mb-1">Desconto: -R$ {group.discountAmount.toFixed(2)}</p>
-                  )}
-                  {group.serviceFee && group.serviceFee > 0 && (
+                  ) : null}
+                  {group.serviceFee ? (
                     <p className="text-[10px] font-bold text-gray-500 leading-none mb-1">Comissão: R$ {group.serviceFee.toFixed(2)}</p>
-                  )}
+                  ) : null}
                   <p className="text-2xl font-brand font-bold text-primary">R$ {group.total.toFixed(2)}</p>
                 </div>
               </div>
 
-              {group.changeFor && group.changeFor > 0 && (
+              {group.changeFor ? (
                 <div className="flex items-center justify-between p-3 bg-blue-50 rounded-xl border border-blue-100">
                     <div className="flex items-center gap-2">
                         <Banknote size={16} className="text-blue-500" />
@@ -447,7 +447,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                     </div>
                     <span className="text-sm font-black text-blue-800">R$ {(group.changeFor - group.total).toFixed(2)}</span>
                 </div>
-              )}
+              ) : null}
 
               <div className="flex flex-wrap gap-2">
                  {['AGUARDANDO', 'PAGO', 'NOVO', 'AGUARDANDO_PAGAMENTO', 'PENDENTE'].includes(group.status || 'NOVO') && (
@@ -591,13 +591,13 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
 
               <div style={{ borderTop: '1px solid #000', padding: '3mm 0', textAlign: 'right' }}>
                   <p style={{ fontSize: '9pt' }}>SUBTOTAL: R$ {(printOrder.total + (printOrder.discountAmount || 0) - (printOrder.deliveryFee || 0) - (printOrder.serviceFee || 0)).toFixed(2)}</p>
-                  {printOrder.discountAmount && (
+                  {printOrder.discountAmount ? (
                     <p style={{ fontSize: '9pt', color: '#000' }}>DESCONTO ({printOrder.couponApplied || 'CUPOM'}): -R$ {printOrder.discountAmount.toFixed(2)}</p>
-                  )}
-                  {printOrder.serviceFee && printOrder.serviceFee > 0 ? (
+                  ) : null}
+                  {printOrder.serviceFee ? (
                     <p style={{ fontSize: '9pt', color: '#000' }}>COMISSÃO: R$ {printOrder.serviceFee.toFixed(2)}</p>
                   ) : null}
-                  {printOrder.deliveryFee && printOrder.deliveryFee > 0 ? (
+                  {printOrder.deliveryFee ? (
                     <p style={{ fontSize: '9pt', color: '#000' }}>TAXA DE ENTREGA: R$ {printOrder.deliveryFee.toFixed(2)}</p>
                   ) : null}
                   <p style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: '1mm' }}>TOTAL: R$ {printOrder.total.toFixed(2)}</p>
@@ -622,17 +622,17 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                       return <p style={{ fontSize: '8pt', marginTop: '1mm' }}>PAGAMENTO: {printOrder.paymentMethod || 'A DEFINIR'}</p>;
                   })()}
                   
-                  {printOrder.changeFor && (
+                  {printOrder.changeFor ? (
                     <div style={{ marginTop: '2mm' }}>
                         <p style={{ fontSize: '9pt' }}>PAGO EM DINHEIRO: R$ {printOrder.changeFor.toFixed(2)}</p>
                         <p style={{ fontSize: '10pt', fontWeight: 'bold' }}>TROCO: R$ {(printOrder.changeFor - printOrder.total).toFixed(2)}</p>
                     </div>
-                  )}
+                  ) : null}
               </div>
               
               <div style={{ borderTop: '1px dashed #000', marginTop: '4mm', paddingTop: '4mm', textAlign: 'center' }}>
                   <p style={{ fontSize: '8pt' }}>AGRADECEMOS A PREFERÊNCIA!</p>
-                  <p style={{ fontSize: '6pt' }}>SISTEMA G & C CONVENIÊNCIA</p>
+                  <p style={{ fontSize: '6pt' }}>SISTEMA DevARO</p>
               </div>
           </div>
       )}

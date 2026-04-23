@@ -2265,6 +2265,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         </div>
         ` : ''}
         <p style="text-align: center; margin: 0; font-weight: 900; color: black !important;">OBRIGADO PELA PREFERENCIA!</p>
+        <p style="text-align: center; margin: 0; font-weight: 900; font-size: 8px; color: black !important; margin-top: 5px;">SISTEMA DevARO</p>
         <br /><br />
       </div>
     `;
