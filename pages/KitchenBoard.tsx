@@ -163,6 +163,17 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onReady, elapsed }) => {
             <div className="flex-1">
                 <p className="text-zinc-800 font-bold text-lg leading-tight">{item.name}</p>
                 {item.description && <p className="text-xs text-zinc-500 italic mt-0.5">{item.description}</p>}
+                
+                {item.complements && item.complements.length > 0 && (
+                  <div className="mt-1.5 space-y-0.5">
+                    {item.complements.map((comp: any, idx: number) => (
+                       <p key={idx} className="text-xs text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded-md inline-block mr-2">
+                           + {comp.quantity}x {comp.name}
+                       </p>
+                    ))}
+                  </div>
+                )}
+
                 {item.isByWeight && (
                   <div className="flex items-center gap-1 mt-1 text-blue-500">
                     <Scale size={10} />

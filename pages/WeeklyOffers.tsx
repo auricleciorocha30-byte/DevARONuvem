@@ -79,7 +79,7 @@ const WeeklyOffers: React.FC<Props> = ({ products, saveProduct }) => {
                   <div>
                     <p className="font-bold text-gray-900 truncate">{product.name}</p>
                     <p className="text-xs text-gray-500">{product.category}</p>
-                    <p className="text-sm font-bold text-orange-600 mt-1">R$ {product.price.toFixed(2)}</p>
+                    {product.price > 0 && <p className="text-sm font-bold text-orange-600 mt-1">R$ {product.price.toFixed(2)}</p>}
                   </div>
                   <div className="flex gap-2">
                     <button 
@@ -134,7 +134,7 @@ const WeeklyOffers: React.FC<Props> = ({ products, saveProduct }) => {
                   <div className="flex-1 overflow-hidden">
                     <p className="font-bold text-sm text-gray-800 truncate">{p.name}</p>
                     <p className="text-xs text-gray-500">{p.category}</p>
-                    <p className="text-sm font-bold text-orange-600">R$ {p.price.toFixed(2)}</p>
+                    {p.price > 0 && <p className="text-sm font-bold text-orange-600">R$ {p.price.toFixed(2)}</p>}
                   </div>
                   <div className="text-orange-400 opacity-0 group-hover:opacity-100 transition-opacity">
                     <CheckCircle2 size={24} />

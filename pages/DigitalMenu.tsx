@@ -216,6 +216,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const [referencePoint, setReferencePoint] = useState('');
   const [isConsulting, setIsConsulting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [expandedImage, setExpandedImage] = useState<string | null>(null);
 
   const showAlert = (msg: string) => setErrorMsg(msg);
   
@@ -393,9 +394,9 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
 
   const categories = useMemo(() => ['Todos', ...externalCategories], [externalCategories]);
   
-  const featuredProduct = useMemo(() => {
+  const featuredProducts = useMemo(() => {
     const today = new Date().getDay();
-    return products.find(p => p.featuredDay === today && p.isActive && p.showInMenu !== false);
+    return products.filter(p => p.featuredDay === today && p.isActive && p.showInMenu !== false);
   }, [products]);
 
   const filteredProducts = useMemo(() => {
@@ -1068,34 +1069,43 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
           <input type="text" placeholder="O que deseja comer hoje?" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-11 pr-4 py-3 bg-white rounded-2xl outline-none shadow-sm border border-gray-100 focus:ring-2 focus:ring-secondary/20 transition-all text-sm" />
         </div>
 
-        {!searchTerm && featuredProduct && activeCategory === 'Todos' && (
+        {!searchTerm && featuredProducts.length > 0 && activeCategory === 'Todos' && (
           <section className="animate-fade-in w-full">
-             <div className="bg-white rounded-[1.5rem] sm:rounded-[2rem] p-3 sm:p-4 shadow-xl border border-orange-100 flex flex-row gap-3 sm:gap-4 relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-1.5 sm:p-2 bg-orange-500 text-white rounded-bl-2xl z-20 shadow-sm"><Flame size={12} className="animate-pulse" /></div>
-                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shrink-0 shadow-sm border border-gray-100">
-                    <img src={featuredProduct.imageUrl} className="w-full h-full object-cover transition-transform group-hover:scale-110 duration-700" alt={featuredProduct.name} />
-                </div>
-                <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
-                   <div>
-                      <div className="flex items-center gap-1 mb-1"><span className="bg-orange-100 text-orange-600 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">Destaque</span></div>
-                      <h3 className="text-xs sm:text-sm font-bold text-primary truncate leading-tight">{featuredProduct.name}</h3>
-                      <p className="text-[9px] sm:text-[10px] text-gray-500 line-clamp-2 mt-1 leading-relaxed">{featuredProduct.description}</p>
-                   </div>
-                   <div className="flex items-end justify-between gap-1 mt-1">
-                      <span className="text-sm sm:text-lg font-black text-secondary whitespace-nowrap">R$ {featuredProduct.price.toFixed(2)}{featuredProduct.isByWeight ? '/kg' : ''}</span>
-                      {!isStoreClosed && (
-                        <button 
-                          onClick={() => handleAddToCart(featuredProduct)} 
-                          className={`px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-white font-bold text-[9px] sm:text-[11px] shadow-lg active:scale-95 transition-all flex items-center gap-1.5 shrink-0 ${isWaitstaff ? 'bg-secondary' : 'bg-primary'}`}
-                        >
-                          <PlusIcon size={12} /> 
-                          <span className="whitespace-nowrap uppercase">
-                            ADICIONAR
+             <div className="flex overflow-x-auto gap-4 pb-4 snap-x snap-mandatory custom-scrollbar-hide">
+               {featuredProducts.map((featuredProduct) => (
+                 <div key={featuredProduct.id} className="min-w-[85%] snap-center shrink-0 bg-white rounded-[1.5rem] sm:rounded-[2rem] p-3 sm:p-4 shadow-xl border border-orange-100 flex flex-row gap-3 sm:gap-4 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-1.5 sm:p-2 bg-orange-500 text-white rounded-bl-2xl z-20 shadow-sm"><Flame size={12} className="animate-pulse" /></div>
+                    <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shrink-0 shadow-sm border border-gray-100 relative">
+                        <img 
+                          src={featuredProduct.imageUrl} 
+                          className="w-full h-full object-cover transition-transform group-hover:scale-110 duration-700 cursor-pointer" 
+                          alt={featuredProduct.name} 
+                          onClick={(e) => { e.stopPropagation(); setExpandedImage(featuredProduct.imageUrl!); }}
+                        />
+                    </div>
+                    <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
+                       <div>
+                          <div className="flex items-center gap-1 mb-1"><span className="bg-orange-100 text-orange-600 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">Destaque</span></div>
+                          <h3 className="text-xs sm:text-sm font-bold text-primary truncate leading-tight">{featuredProduct.name}</h3>
+                          <p className="text-[9px] sm:text-[10px] text-gray-500 line-clamp-2 mt-1 leading-relaxed">{featuredProduct.description}</p>
+                       </div>
+                       <div className="flex items-end justify-between gap-1 mt-1">
+                          <span className="text-sm sm:text-lg font-black text-secondary whitespace-nowrap">
+                            {featuredProduct.price > 0 ? `R$ ${featuredProduct.price.toFixed(2)}${featuredProduct.isByWeight ? '/kg' : ''}` : ''}
                           </span>
-                        </button>
-                      )}
-                   </div>
-                </div>
+                          {!isStoreClosed && (
+                            <button 
+                              onClick={() => handleAddToCart(featuredProduct)} 
+                              className={`px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-white font-bold text-[9px] sm:text-[11px] shadow-lg active:scale-95 transition-all flex items-center gap-1.5 shrink-0 ${isWaitstaff ? 'bg-secondary' : 'bg-primary'}`}
+                            >
+                              <PlusIcon size={12} /> 
+                              <span className="whitespace-nowrap uppercase">ADICIONAR</span>
+                            </button>
+                          )}
+                       </div>
+                    </div>
+                 </div>
+               ))}
              </div>
           </section>
         )}
@@ -1113,13 +1123,18 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
               className={`bg-white rounded-2xl p-2.5 sm:p-3 shadow-sm flex gap-2.5 sm:gap-3 items-center border border-gray-50 transition-all w-full box-border ${!product.isActive ? 'opacity-50 grayscale' : ''}`}
             >
               <div className="relative shrink-0">
-                <img src={product.imageUrl} className="w-16 h-16 sm:w-18 sm:h-18 md:w-20 md:h-20 object-cover rounded-xl" alt={product.name} />
+                <img 
+                  src={product.imageUrl} 
+                  className="w-16 h-16 sm:w-18 sm:h-18 md:w-20 md:h-20 object-cover rounded-xl cursor-pointer" 
+                  alt={product.name} 
+                  onClick={(e) => { e.stopPropagation(); setExpandedImage(product.imageUrl!); }}
+                />
                 {product.isByWeight && <div className="absolute -top-1 -right-1 bg-blue-600 text-white p-1 rounded-lg border border-white shadow-sm"><Scale size={10} /></div>}
               </div>
               <div className="flex-1 min-w-0 flex flex-col justify-between h-full py-0.5">
                 <div className="min-w-0">
-                  <h3 className="font-bold text-[11px] sm:text-[12px] md:text-sm truncate leading-tight text-zinc-900">{product.name}</h3>
-                  <p className="text-[9px] sm:text-[10px] text-gray-400 line-clamp-1 mt-0.5">{product.description}</p>
+                  <h3 className="font-bold text-[11px] sm:text-[12px] md:text-sm leading-tight text-zinc-900">{product.name}</h3>
+                  <p className="text-[9px] sm:text-[10px] text-gray-500 mt-0.5 whitespace-pre-wrap line-clamp-3">{product.description}</p>
                 </div>
                 <div className="flex items-center justify-between mt-2 gap-1.5">
                   {product.price > 0 && <span className="font-bold text-secondary text-[10px] sm:text-xs md:text-sm whitespace-nowrap">R$ {product.price.toFixed(2)}{product.isByWeight ? '/kg' : ''}</span>}
@@ -1757,6 +1772,23 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
              setCheckoutStep('cart');
           }}
         />
+      )}
+
+      {expandedImage && (
+        <div 
+          className="fixed inset-0 z-[300] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+          onClick={() => setExpandedImage(null)}
+        >
+           <div className="relative max-w-2xl w-full max-h-[90vh] flex items-center justify-center">
+              <button 
+                onClick={(e) => { e.stopPropagation(); setExpandedImage(null); }} 
+                className="absolute -top-10 text-white hover:text-gray-300 right-0 p-2 bg-black/50 rounded-full"
+              >
+                  <X size={24} />
+              </button>
+              <img src={expandedImage} className="w-full h-auto max-h-[85vh] object-contain rounded-2xl shadow-2xl animate-scale-up" alt="Produto" />
+           </div>
+        </div>
       )}
       
       <style>{`

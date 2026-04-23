@@ -2216,6 +2216,11 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
             <span style="flex: 1;">${item.quantity}x ${item.name}</span>
             <span style="margin-left: 5px;">${formatCurrency(item.price * item.quantity)}</span>
           </div>
+          ${item.complements && item.complements.length > 0 ? item.complements.map((comp: any) => `
+            <div style="margin: 0; padding-left: 10px; color: black !important; font-size: 13px;">
+              + ${comp.quantity}x ${comp.name}
+            </div>
+          `).join('') : ''}
         `).join('')}
         <div style="border-top: 2px dashed black; margin: 5px 0;"></div>
         ${order.serviceFee && order.serviceFee > 0 ? `

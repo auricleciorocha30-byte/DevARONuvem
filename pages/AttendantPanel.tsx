@@ -442,11 +442,22 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
                   </div>
 
                   {order.items.map((it, i) => (
-                    <div key={i} className="flex justify-between text-xs font-bold text-zinc-600">
-                      <span className="truncate pr-2">
-                        <span className="bg-zinc-100 px-1.5 py-0.5 rounded mr-1.5">{it.isByWeight ? it.quantity.toFixed(3) : it.quantity}x</span> {it.name}
-                      </span>
-                      <span className="shrink-0 text-zinc-400">R$ {(it.price * it.quantity).toFixed(2)}</span>
+                    <div key={i} className="mb-2">
+                        <div className="flex justify-between text-xs font-bold text-zinc-600">
+                          <span className="truncate pr-2">
+                            <span className="bg-zinc-100 px-1.5 py-0.5 rounded mr-1.5">{it.isByWeight ? it.quantity.toFixed(3) : it.quantity}x</span> {it.name}
+                          </span>
+                          <span className="shrink-0 text-zinc-400">R$ {(it.price * it.quantity).toFixed(2)}</span>
+                        </div>
+                        {it.complements && it.complements.length > 0 && (
+                          <div className="mt-0.5 ml-8">
+                            {it.complements.map((comp: any, idx: number) => (
+                              <p key={idx} className="text-[10px] text-zinc-400 font-medium leading-none mb-0.5">
+                                + {comp.quantity}x {comp.name}
+                              </p>
+                            ))}
+                          </div>
+                        )}
                     </div>
                   ))}
                 </div>
@@ -657,12 +668,23 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <tbody>
                   {printOrder.items.map((it: any, i: number) => (
-                    <tr key={i}>
-                      <td style={{ fontSize: '9pt', padding: '1.5mm 0' }}>
-                        {it.isByWeight ? `${it.quantity.toFixed(3)}kg` : `${it.quantity}x`} {it.name.toUpperCase()}
-                      </td>
-                      <td style={{ textAlign: 'right', fontSize: '9pt' }}>{(it.price * it.quantity).toFixed(2)}</td>
-                    </tr>
+                    <React.Fragment key={i}>
+                        <tr>
+                        <td style={{ fontSize: '9pt', padding: '1.5mm 0' }}>
+                            {it.isByWeight ? `${it.quantity.toFixed(3)}kg` : `${it.quantity}x`} {it.name.toUpperCase()}
+                        </td>
+                        <td style={{ textAlign: 'right', fontSize: '9pt' }}>{(it.price * it.quantity).toFixed(2)}</td>
+                        </tr>
+                        {it.complements && it.complements.length > 0 && (
+                            <tr>
+                                <td colSpan={2} style={{ fontSize: '8pt', paddingBottom: '1mm' }}>
+                                    {it.complements.map((comp: any, idx: number) => (
+                                        <div key={idx} style={{ paddingLeft: '2mm' }}>+ {comp.quantity}x {comp.name.toUpperCase()}</div>
+                                    ))}
+                                </td>
+                            </tr>
+                        )}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>
@@ -677,26 +699,22 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
 
           <div style={{ borderTop: '1px solid #000', padding: '3mm 0', textAlign: 'right' }}>
               <p style={{ fontSize: '9pt' }}>SUBTOTAL: R$ {(printOrder.subtotal || (printOrder.total - (printOrder.serviceFee || 0) + (printOrder.discountAmount || 0))).toFixed(2)}</p>
-              {printOrder.discountAmount && printOrder.discountAmount > 0 && (
-                <p style={{ fontSize: '9pt', color: '#000' }}>DESCONTO: -R$ {printOrder.discountAmount.toFixed(2)}</p>
-              )}
-              {printOrder.serviceFee && printOrder.serviceFee > 0 && (
-                <p style={{ fontSize: '9pt', color: '#000' }}>COMISSÃO: R$ {printOrder.serviceFee.toFixed(2)}</p>
-              )}
+              {printOrder.discountAmount ? <p style={{ fontSize: '9pt', color: '#000' }}>DESCONTO: -R$ {printOrder.discountAmount.toFixed(2)}</p> : null}
+              {printOrder.serviceFee ? <p style={{ fontSize: '9pt', color: '#000' }}>COMISSÃO: R$ {printOrder.serviceFee.toFixed(2)}</p> : null}
               <p style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: '1mm' }}>TOTAL: R$ {printOrder.total.toFixed(2)}</p>
               <p style={{ fontSize: '8pt', marginTop: '1mm' }}>PAGAMENTO: {printOrder.paymentMethod || (printOrder.isConferencia ? 'A CONFERIR' : 'A DEFINIR')}</p>
               
-              {printOrder.changeFor && printOrder.changeFor > 0 && (
+              {printOrder.changeFor && printOrder.changeFor > 0 ? (
                 <div style={{ marginTop: '2mm' }}>
                     <p style={{ fontSize: '9pt' }}>PAGO EM DINHEIRO: R$ {printOrder.changeFor.toFixed(2)}</p>
                     <p style={{ fontSize: '10pt', fontWeight: 'bold' }}>TROCO: R$ {(printOrder.changeFor - printOrder.total).toFixed(2)}</p>
                 </div>
-              )}
+              ) : null}
           </div>
           
           <div style={{ borderTop: '1px dashed #000', marginTop: '4mm', paddingTop: '4mm', textAlign: 'center' }}>
               <p style={{ fontSize: '8pt' }}>OBRIGADO PELA PREFERÊNCIA!</p>
-              <p style={{ fontSize: '6pt' }}>SISTEMA G & C CONVENIÊNCIA</p>
+              <p style={{ fontSize: '6pt' }}>SISTEMA DevARO</p>
               {printOrder.isConferencia && <p style={{ fontSize: '7pt', fontWeight: 'bold', marginTop: '2mm' }}>ESTE DOCUMENTO NÃO É UM CUPOM FISCAL</p>}
           </div>
         </div>

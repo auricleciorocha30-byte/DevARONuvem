@@ -153,7 +153,7 @@ const TVBoard: React.FC<Props> = ({ orders, settings, products }) => {
                   <div>
                     <h3 className="text-3xl font-brand font-bold text-yellow-400 mb-2 leading-none">{todayOffer.name}</h3>
                     <p className="text-gray-400 text-xs line-clamp-2 mb-4">{todayOffer.description}</p>
-                    <p className="text-5xl font-bold text-white">R$ {todayOffer.price.toFixed(2)}</p>
+                    {todayOffer.price > 0 && <p className="text-5xl font-bold text-white">R$ {todayOffer.price.toFixed(2)}</p>}
                   </div>
                 </div>
               ) : (
