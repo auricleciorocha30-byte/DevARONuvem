@@ -284,8 +284,8 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
           </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        <div className="lg:col-span-8 space-y-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 print:block">
+        <div className="lg:col-span-8 space-y-8 print:block print:w-full">
             {/* CARDS DE ATALHO (SUMIR NA IMPRESSÃO) */}
             <section className="space-y-3 no-print">
                 <h2 className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Painéis Operacionais</h2>
@@ -344,9 +344,9 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
                 <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
                     <ShoppingBag className="text-secondary" /> Detalhamento de Produtos
                 </h2>
-                <div className="overflow-x-auto max-h-[400px] overflow-y-auto custom-scrollbar">
-                    <table className="w-full text-left border-collapse relative">
-                        <thead className="sticky top-0 z-10 bg-white">
+                <div className="overflow-x-auto max-h-[400px] overflow-y-auto custom-scrollbar print:h-auto print:max-h-none print:overflow-visible">
+                    <table className="w-full text-left border-collapse relative print:static">
+                        <thead className="sticky top-0 z-10 bg-white print:static">
                             <tr className="border-b border-gray-100">
                                 <th className="pb-4 pt-2 text-[10px] font-black uppercase tracking-widest text-gray-400 bg-white">Produto</th>
                                 <th className="pb-4 pt-2 text-[10px] font-black uppercase tracking-widest text-gray-400 bg-white">Categoria</th>
@@ -387,8 +387,9 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
                   .print-commissions-only .no-print-commissions { display: none !important; }
                   body { background: white !important; margin: 0 !important; padding: 20px !important; }
                   .bg-white { border: none !important; box-shadow: none !important; padding: 0 !important; }
-                  section { border: none !important; box-shadow: none !important; padding: 0 !important; margin-bottom: 20px !important; page-break-inside: avoid; }
-                  table { width: 100% !important; border-collapse: collapse !important; }
+                  section { border: none !important; box-shadow: none !important; padding: 0 !important; margin-bottom: 20px !important; }
+                  table { width: 100% !important; border-collapse: collapse !important; page-break-inside: auto; }
+                  tr { page-break-inside: avoid; page-break-after: auto; }
                   th, td { border-bottom: 1px solid #eee !important; padding: 8px !important; }
                   .max-h-\[400px\] { max-height: none !important; overflow: visible !important; }
                   .overflow-y-auto { overflow: visible !important; }
@@ -417,8 +418,8 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
                     )}
                 </div>
                 <p className="text-xs text-gray-500 mb-4 no-print">Baseado em todos os pedidos lançados pelo atendente no período selecionado.</p>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                <div className="overflow-x-auto print:overflow-visible">
+                    <table className="w-full text-left border-collapse print:static">
                         <thead>
                             <tr className="border-b border-gray-100">
                                 <th className="pb-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Atendente</th>
