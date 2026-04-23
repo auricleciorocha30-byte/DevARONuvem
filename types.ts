@@ -173,6 +173,7 @@ export interface StoreSettings {
   isKitchenActive?: boolean;
   isTvPanelActive?: boolean;
   isCashbackActive?: boolean;
+  businessHours?: string;
   cashbackPercentage?: number;
   minCashbackToUse?: number;
   storeName: string;

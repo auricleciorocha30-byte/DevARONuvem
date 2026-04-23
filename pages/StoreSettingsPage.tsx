@@ -34,7 +34,8 @@ import {
   Tv,
   Printer,
   Settings,
-  Tag
+  Tag,
+  Clock
 } from 'lucide-react';
 
 interface Props {
@@ -268,6 +269,13 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                 <div className="relative">
                   <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
                   <input type="text" placeholder="Ex: 5511999999999" value={localSettings.whatsapp || ''} onChange={(e) => setLocalSettings({...localSettings, whatsapp: e.target.value})} className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none" />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase ml-2">Horário de Funcionamento</label>
+                <div className="relative">
+                  <Clock className="absolute left-4 top-4 text-gray-300" size={18} />
+                  <textarea placeholder="Ex: Seg a Sex: 08:00 às 18:00&#10;Sáb: 08:00 às 12:00" value={localSettings.businessHours || ''} onChange={(e) => setLocalSettings({...localSettings, businessHours: e.target.value})} className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none resize-none min-h-[100px]" />
                 </div>
               </div>
             </div>

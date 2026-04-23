@@ -202,7 +202,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
           const product = products.find(p => p.id === item.productId);
           return {
             numero_item: index + 1,
-            codigo_produto: item.productId,
+            codigo_produto: String(item.productId).substring(0, 60),
             descricao: item.name,
             quantidade_comercial: item.quantity,
             quantidade_tributavel: item.quantity,

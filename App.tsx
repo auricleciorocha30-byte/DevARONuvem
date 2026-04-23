@@ -544,7 +544,8 @@ function StoreContext() {
             .from('orders')
             .eq('id', id)
             .neq('status', 'CANCELADO')
-            .update({ status: 'CANCELADO' });
+            .update({ status: 'CANCELADO' })
+            .select();
 
         if (updateError) {
             console.error("Error updating order status:", updateError);

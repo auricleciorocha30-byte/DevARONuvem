@@ -670,7 +670,8 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const handleCheckout = async () => {
     if (cart.length === 0) return;
     if ((orderType === 'MESA' || orderType === 'COMANDA') && !manualTable) { showAlert(`Informe o número da ${orderType === 'MESA' ? 'mesa' : 'comanda'}.`); return; }
-    if (orderType === 'BALCAO' && !customerName && !isWaitstaff) { showAlert('Informe o seu nome.'); return; }
+    if (orderType === 'BALCAO' && (!customerName || !customerPhone) && !isWaitstaff) { showAlert('Informe o seu nome e telefone.'); return; }
+    if (orderType === 'MESA' && !customerPhone && !isWaitstaff) { showAlert('Informe o seu telefone.'); return; }
     if (orderType === 'ENTREGA' && (!customerName || !customerPhone || !deliveryAddress)) { showAlert('Preencha os dados de entrega.'); return; }
     
     // Check for payment method selection (except for waitstaff or table/command orders)
@@ -807,25 +808,29 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
             }
         }
 
-        // Update stock only if not waitstaff
-        if (!isWaitstaff) {
-            const stockUpdates = new Map<string, number>();
-            for (const newItem of cart) {
-                const targetProductId = newItem.originalProductId || newItem.productId;
-                const current = stockUpdates.get(targetProductId) || 0;
-                stockUpdates.set(targetProductId, current - Number(newItem.quantity || 0));
-            }
+        // Update stock for all orders (customers and waitstaff)
+        const stockUpdates = new Map<string, number>();
+        for (const newItem of cart) {
+            const targetProductId = newItem.originalProductId || newItem.productId;
+            const current = stockUpdates.get(targetProductId) || 0;
+            stockUpdates.set(targetProductId, current - Number(newItem.quantity || 0));
+        }
 
-            for (const [productId, diff] of stockUpdates.entries()) {
-                if (diff !== 0) {
-                    const product = products.find(p => p.id === productId);
-                    if (product && product.stock != null) {
-                        const newStock = product.stock + diff;
-                        const updates: any = { stock: newStock };
-                        if (newStock <= 0) updates.isactive = false;
-                        else updates.isactive = true;
-                        await supabase.from('products').eq('id', product.id).update(updates);
-                    }
+        for (const [productId, diff] of stockUpdates.entries()) {
+            if (diff !== 0) {
+                // Fetch the latest stock from the database
+                const { data: latestProduct } = await supabase
+                    .from('products')
+                    .select('stock')
+                    .eq('id', productId)
+                    .maybeSingle();
+
+                if (latestProduct && latestProduct.stock != null) {
+                    const newStock = latestProduct.stock + diff;
+                    const updates: any = { stock: newStock };
+                    if (newStock <= 0) updates.isactive = false;
+                    else updates.isactive = true;
+                    await supabase.from('products').eq('id', productId).update(updates);
                 }
             }
         }
@@ -1284,7 +1289,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
 
                         <div className="space-y-2">
                               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">
-                                Telefone (WhatsApp) {orderType !== 'ENTREGA' ? '(Opcional)' : ''}
+                                Telefone (WhatsApp) {(orderType !== 'ENTREGA' && orderType !== 'BALCAO' && orderType !== 'MESA') || isWaitstaff ? '(Opcional)' : ''}
                               </label>
                               <div className="flex gap-2">
                                 <div className="relative flex-1">
@@ -1581,6 +1586,15 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">WhatsApp</p>
                        <p className="text-sm font-bold text-gray-700 leading-snug">{settings.whatsapp}</p>
                        <a href={`https://wa.me/${settings.whatsapp.replace(/\D/g, '')}`} target="_blank" className="text-[10px] font-black text-green-600 flex items-center gap-1 mt-1 uppercase">INICIAR CONVERSA <MessageCircle size={10} /></a>
+                    </div>
+                 </div>
+               )}
+               {settings.businessHours && (
+                 <div className="flex items-start gap-4 p-2 border-t border-gray-100 pt-4">
+                    <div className="p-3 bg-gray-50 rounded-2xl text-primary border border-gray-100"><Clock size={20} /></div>
+                    <div className="min-w-0">
+                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Horário de Funcionamento</p>
+                       <p className="text-sm font-bold text-gray-700 leading-snug whitespace-pre-line">{settings.businessHours}</p>
                     </div>
                  </div>
                )}
