@@ -152,7 +152,72 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
     }
     localStorage.setItem(`pos-loadedServiceFee-${storeId}`, loadedServiceFee.toString());
   }, [cart, originalCart, orderType, commandNumber, deliveryDetails, loadedCommandIds, loadedWaitstaffName, loadedServiceFee, storeId]);
-  const [isLookingUpCommand, setIsLookingUpCommand] = useState(false);
+  const [isProductsLoading, setIsProductsLoading] = useState(true);
+
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Avoid shortcuts if an input is focused (unless it's ESC to blur/clear)
+      const isInput = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+      
+      if (e.key === 'Escape') {
+        if (isCheckoutOpen) setIsCheckoutOpen(false);
+        if (showDeliveryModal) setShowDeliveryModal(false);
+        if (weightModal.isOpen) setWeightModal({ isOpen: false, product: null });
+        if (complementsProduct) setComplementsProduct(null);
+        setSearch('');
+        return;
+      }
+
+      if (isInput && e.key !== 'F2' && e.key !== 'F4') return;
+
+      switch (e.key) {
+        case 'F2':
+          e.preventDefault();
+          const searchInput = document.querySelector('input[placeholder="Buscar produto..."]') as HTMLInputElement;
+          if (searchInput) searchInput.focus();
+          break;
+        case 'F4':
+          e.preventDefault();
+          if (cart.length > 0) setIsCheckoutOpen(true);
+          break;
+        case 'F6':
+          e.preventDefault();
+          lookupOrdersList('COMANDA');
+          break;
+        case 'F7':
+          e.preventDefault();
+          lookupOrdersList('MESA');
+          break;
+        case 'F8':
+          e.preventDefault();
+          lookupOrdersList('ENTREGA');
+          break;
+        case 'F9':
+          e.preventDefault();
+          lookupOrdersList('BALCAO');
+          break;
+        case 'F10':
+          e.preventDefault();
+          if (cart.length > 0) handleSaveToCommand();
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [cart, isCheckoutOpen, showDeliveryModal, weightModal.isOpen, complementsProduct]);
+
+  const ProductSkeleton = () => (
+    <div className="bg-white p-2 rounded-xl shadow-sm border border-gray-100 flex flex-col h-full animate-pulse">
+      <div className="aspect-square rounded-lg bg-gray-200 mb-2" />
+      <div className="h-4 bg-gray-200 rounded w-3/4 mb-1" />
+      <div className="mt-auto flex justify-between items-end">
+        <div className="h-6 bg-gray-200 rounded w-1/2" />
+        <div className="w-8 h-8 rounded-full bg-gray-200" />
+      </div>
+    </div>
+  );
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState('');
@@ -1109,6 +1174,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
   };
 
   const fetchProducts = async () => {
+    setIsProductsLoading(true);
     try {
       const { data, error } = await supabase
         .from('products')
@@ -1126,6 +1192,8 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
       if (cached) {
         try { setProducts(JSON.parse(cached)); } catch (err) {}
       }
+    } finally {
+      setIsProductsLoading(false);
     }
   };
 
@@ -2469,128 +2537,141 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
       {/* Left Side - Products */}
       <div className="flex-1 flex flex-col min-w-0 h-[55dvh] lg:h-full">
         <header 
-          className="p-3 md:p-4 shadow-sm flex flex-col md:flex-row justify-between items-center z-10 gap-3 transition-colors"
+          className="p-3 md:p-4 shadow-sm flex flex-col z-10 gap-3 transition-colors"
           style={{ backgroundColor: settings.primaryColor || '#ffffff' }}
         >
-          <div className="flex justify-between w-full md:w-auto items-center gap-3">
-            {settings.logoUrl && (
-              <img src={settings.logoUrl} alt="Logo" className="h-10 w-10 md:h-12 md:w-12 object-contain rounded-full bg-white/10 p-1" />
-            )}
-            <div>
-              <h1 className="text-lg md:text-xl font-bold" style={{ color: settings.primaryColor ? '#ffffff' : '#1f2937' }}>
-                PDV - {settings.storeName}
-              </h1>
-              <p className="text-[10px] md:text-xs" style={{ color: settings.primaryColor ? 'rgba(255,255,255,0.8)' : '#6b7280' }}>
-                Operador: {user.name}
-              </p>
+          <div className="flex flex-col md:flex-row justify-between items-center gap-3">
+            <div className="flex justify-between w-full md:w-auto items-center gap-3">
+              {settings.logoUrl && (
+                <img src={settings.logoUrl} alt="Logo" className="h-10 w-10 md:h-12 md:w-12 object-contain rounded-full bg-white/10 p-1" />
+              )}
+              <div>
+                <h1 className="text-lg md:text-xl font-bold" style={{ color: settings.primaryColor ? '#ffffff' : '#1f2937' }}>
+                  PDV - {settings.storeName}
+                </h1>
+                <p className="text-[10px] md:text-xs" style={{ color: settings.primaryColor ? 'rgba(255,255,255,0.8)' : '#6b7280' }}>
+                  Operador: {user.name}
+                </p>
+              </div>
+              <button onClick={onLogout} className="md:hidden p-2 hover:bg-white/10 rounded-full" style={{ color: settings.primaryColor ? '#ffffff' : '#ef4444' }}>
+                  <LogOut size={20} />
+              </button>
             </div>
-            <button onClick={onLogout} className="md:hidden p-2 hover:bg-white/10 rounded-full" style={{ color: settings.primaryColor ? '#ffffff' : '#ef4444' }}>
-                <LogOut size={20} />
-            </button>
-          </div>
-          <div className="flex gap-1 md:gap-2 w-full md:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0">
-             <button onClick={connectScale} className={`p-2 rounded-xl flex items-center gap-2 px-3 md:px-4 border shrink-0 ${isScaleConnected ? 'text-blue-600 border-blue-100 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'}`} 
-                style={{ 
-                    color: !isScaleConnected ? (settings.primaryColor ? 'rgba(255,255,255,0.7)' : '#9ca3af') : undefined,
-                    borderColor: settings.primaryColor ? 'rgba(255,255,255,0.2)' : undefined,
-                    backgroundColor: settings.primaryColor && !isScaleConnected ? 'rgba(255,255,255,0.1)' : undefined
-                }}
-                title={isScaleConnected ? "Balança Conectada" : "Conectar Balança"}>
-                <div className="relative">
-                    <Package size={18} />
-                    {isScaleConnected && <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-pulse" />}
-                </div>
-                <span className="text-xs font-bold">{scaleWeight ? `${scaleWeight.toFixed(3)}kg` : 'Balança'}</span>
-             </button>
-             <button onClick={() => setIsBleedModalOpen(true)} className="p-2 text-orange-600 hover:bg-orange-50 rounded-xl flex items-center gap-2 px-3 md:px-4 border border-orange-100 shrink-0" 
-                style={{ 
-                    color: settings.primaryColor ? '#ffffff' : undefined,
-                    borderColor: settings.primaryColor ? 'rgba(255,255,255,0.2)' : undefined,
-                    backgroundColor: settings.primaryColor ? 'rgba(255,255,255,0.1)' : undefined
-                }}
-                title="Sangria">
-                <Minus size={18} />
-                <span className="text-xs font-bold">Sangria</span>
-             </button>
-             <button onClick={handleCloseRegister} className="p-2 text-green-600 hover:bg-green-50 rounded-xl flex items-center gap-2 px-3 md:px-4 border border-green-100 shrink-0" 
-                style={{ 
-                    color: settings.primaryColor ? '#ffffff' : undefined,
-                    borderColor: settings.primaryColor ? 'rgba(255,255,255,0.2)' : undefined,
-                    backgroundColor: settings.primaryColor ? 'rgba(255,255,255,0.1)' : undefined
-                }}
-                title="Fechar Caixa">
-                <DollarSign size={18} />
-                <span className="text-xs font-bold">Fechar Caixa</span>
-             </button>
-             <button onClick={() => {
-                 // Cache desativado
-                 window.location.reload();
-             }} className="p-2 text-gray-500 hover:bg-gray-100 rounded-xl border border-gray-100 shrink-0" 
-                style={{ 
-                    color: settings.primaryColor ? '#ffffff' : undefined,
-                    borderColor: settings.primaryColor ? 'rgba(255,255,255,0.2)' : undefined,
-                    backgroundColor: settings.primaryColor ? 'rgba(255,255,255,0.1)' : undefined
-                }}
-                title="Atualizar Cardápio">
-                <RefreshCw size={18} />
-             </button>
-             <button 
-                onClick={() => setIsContingencyMode(!isContingencyMode)} 
-                className={`p-2 rounded-xl flex items-center gap-2 px-3 md:px-4 border shrink-0 ${isContingencyMode ? 'text-orange-600 border-orange-100 bg-orange-50' : 'border-gray-200 hover:bg-gray-50'}`} 
-                style={{ 
-                    color: !isContingencyMode ? (settings.primaryColor ? 'rgba(255,255,255,0.7)' : '#9ca3af') : undefined,
-                    borderColor: settings.primaryColor ? 'rgba(255,255,255,0.2)' : undefined,
-                    backgroundColor: settings.primaryColor && !isContingencyMode ? 'rgba(255,255,255,0.1)' : undefined
-                }}
-                title={isContingencyMode ? "Modo Contingência Ativo" : "Ativar Modo Contingência"}
-             >
-                {isContingencyMode ? <WifiOff size={18} /> : <Wifi size={18} />}
-                <span className="text-xs font-bold hidden md:inline">{isContingencyMode ? 'Contingência' : 'Online'}</span>
-             </button>
-             {contingencyOrders.length > 0 && (
-                <button 
-                  onClick={syncContingencyOrders} 
-                  disabled={isProcessing}
-                  className="p-2 text-white bg-orange-500 hover:bg-orange-600 rounded-xl flex items-center gap-2 px-3 md:px-4 border border-orange-600 shrink-0 shadow-lg animate-pulse" 
-                  title="Sincronizar Pedidos"
-                >
-                  {isProcessing ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
-                  <span className="text-xs font-bold hidden md:inline">Sincronizar ({contingencyOrders.length})</span>
-                </button>
-             )}
-             <InstallPrompt />
-             {lastOrder && (
-               <div className="flex gap-2 shrink-0">
-                 <button onClick={() => printReceipt(lastOrder)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-xl border border-blue-100" 
+            <div className="flex gap-1 md:gap-2 w-full md:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0">
+               <button onClick={connectScale} className={`p-2 rounded-xl flex items-center gap-2 px-3 md:px-4 border shrink-0 ${isScaleConnected ? 'text-blue-600 border-blue-100 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'}`} 
+                  style={{ 
+                      color: !isScaleConnected ? (settings.primaryColor ? 'rgba(255,255,255,0.7)' : '#9ca3af') : undefined,
+                      borderColor: settings.primaryColor ? 'rgba(255,255,255,0.2)' : undefined,
+                      backgroundColor: settings.primaryColor && !isScaleConnected ? 'rgba(255,255,255,0.1)' : undefined
+                  }}
+                  title={isScaleConnected ? "Balança Conectada" : "Conectar Balança"}>
+                  <div className="relative">
+                      <Package size={18} />
+                      {isScaleConnected && <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-pulse" />}
+                  </div>
+                  <span className="text-xs font-bold">{scaleWeight ? `${scaleWeight.toFixed(3)}kg` : 'Balança'}</span>
+               </button>
+               <button onClick={() => setIsBleedModalOpen(true)} className="p-2 text-orange-600 hover:bg-orange-50 rounded-xl flex items-center gap-2 px-3 md:px-4 border border-orange-100 shrink-0" 
                   style={{ 
                       color: settings.primaryColor ? '#ffffff' : undefined,
                       borderColor: settings.primaryColor ? 'rgba(255,255,255,0.2)' : undefined,
                       backgroundColor: settings.primaryColor ? 'rgba(255,255,255,0.1)' : undefined
                   }}
-                  title="Reimprimir Último Cupom">
-                    <Printer size={18} />
-                 </button>
-                 {settings.focusNfeToken && (
-                   <button 
-                    onClick={() => handleEmitNfcePOS(lastOrder)} 
-                    disabled={isEmittingNfce}
-                    className="p-2 text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl border border-indigo-700 flex items-center gap-2" 
-                    title="Emitir NFC-e do Último Pedido">
-                      {isEmittingNfce ? <Loader2 size={18} className="animate-spin" /> : <Tag size={18} />}
-                      <span className="text-xs font-bold hidden md:inline">Emitir NF</span>
+                  title="Sangria">
+                  <Minus size={18} />
+                  <span className="text-xs font-bold">Sangria</span>
+               </button>
+               <button onClick={handleCloseRegister} className="p-2 text-green-600 hover:bg-green-50 rounded-xl flex items-center gap-2 px-3 md:px-4 border border-green-100 shrink-0" 
+                  style={{ 
+                      color: settings.primaryColor ? '#ffffff' : undefined,
+                      borderColor: settings.primaryColor ? 'rgba(255,255,255,0.2)' : undefined,
+                      backgroundColor: settings.primaryColor ? 'rgba(255,255,255,0.1)' : undefined
+                  }}
+                  title="Fechar Caixa">
+                  <DollarSign size={18} />
+                  <span className="text-xs font-bold">Fechar Caixa</span>
+               </button>
+               <button onClick={() => {
+                   window.location.reload();
+               }} className="p-2 text-gray-500 hover:bg-gray-100 rounded-xl border border-gray-100 shrink-0" 
+                  style={{ 
+                      color: settings.primaryColor ? '#ffffff' : undefined,
+                      borderColor: settings.primaryColor ? 'rgba(255,255,255,0.2)' : undefined,
+                      backgroundColor: settings.primaryColor ? 'rgba(255,255,255,0.1)' : undefined
+                  }}
+                  title="Atualizar Cardápio">
+                  <RefreshCw size={18} />
+               </button>
+               <button 
+                  onClick={() => setIsContingencyMode(!isContingencyMode)} 
+                  className={`p-2 rounded-xl flex items-center gap-2 px-3 md:px-4 border shrink-0 ${isContingencyMode ? 'text-orange-600 border-orange-100 bg-orange-50' : 'border-gray-200 hover:bg-gray-50'}`} 
+                  style={{ 
+                      color: !isContingencyMode ? (settings.primaryColor ? 'rgba(255,255,255,0.7)' : '#9ca3af') : undefined,
+                      borderColor: settings.primaryColor ? 'rgba(255,255,255,0.2)' : undefined,
+                      backgroundColor: settings.primaryColor && !isContingencyMode ? 'rgba(255,255,255,0.1)' : undefined
+                  }}
+                  title={isContingencyMode ? "Modo Contingência Ativo" : "Ativar Modo Contingência"}
+               >
+                  {isContingencyMode ? <WifiOff size={18} /> : <Wifi size={18} />}
+                  <span className="text-xs font-bold hidden md:inline">{isContingencyMode ? 'Contingência' : 'Online'}</span>
+               </button>
+               {contingencyOrders.length > 0 && (
+                  <button 
+                    onClick={syncContingencyOrders} 
+                    disabled={isProcessing}
+                    className="p-2 text-white bg-orange-500 hover:bg-orange-600 rounded-xl flex items-center gap-2 px-3 md:px-4 border border-orange-600 shrink-0 shadow-lg animate-pulse" 
+                    title="Sincronizar Pedidos"
+                  >
+                    {isProcessing ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
+                    <span className="text-xs font-bold hidden md:inline">Sincronizar ({contingencyOrders.length})</span>
+                  </button>
+               )}
+               <InstallPrompt />
+               {lastOrder && (
+                 <div className="flex gap-2 shrink-0">
+                   <button onClick={() => printReceipt(lastOrder)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-xl border border-blue-100" 
+                    style={{ 
+                        color: settings.primaryColor ? '#ffffff' : undefined,
+                        borderColor: settings.primaryColor ? 'rgba(255,255,255,0.2)' : undefined,
+                        backgroundColor: settings.primaryColor ? 'rgba(255,255,255,0.1)' : undefined
+                    }}
+                    title="Reimprimir Último Cupom">
+                      <Printer size={18} />
                    </button>
-                 )}
-               </div>
-             )}
-             <button onClick={onLogout} className="hidden md:flex p-2 text-red-500 hover:bg-red-50 rounded-xl border border-red-100 shrink-0" 
-                style={{ 
-                    color: settings.primaryColor ? '#ffffff' : undefined,
-                    borderColor: settings.primaryColor ? 'rgba(255,255,255,0.2)' : undefined,
-                    backgroundColor: settings.primaryColor ? 'rgba(255,255,255,0.1)' : undefined
-                }}
-                title="Sair">
-                <LogOut size={18} />
-             </button>
+                   {settings.focusNfeToken && (
+                     <button 
+                      onClick={() => handleEmitNfcePOS(lastOrder)} 
+                      disabled={isEmittingNfce}
+                      className="p-2 text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl border border-indigo-700 flex items-center gap-2" 
+                      title="Emitir NFC-e do Último Pedido">
+                        {isEmittingNfce ? <Loader2 size={18} className="animate-spin" /> : <Tag size={18} />}
+                        <span className="text-xs font-bold hidden md:inline">Emitir NF</span>
+                     </button>
+                   )}
+                 </div>
+               )}
+               <button onClick={onLogout} className="hidden md:flex p-2 text-red-500 hover:bg-red-50 rounded-xl border border-red-100 shrink-0" 
+                  style={{ 
+                      color: settings.primaryColor ? '#ffffff' : undefined,
+                      borderColor: settings.primaryColor ? 'rgba(255,255,255,0.2)' : undefined,
+                      backgroundColor: settings.primaryColor ? 'rgba(255,255,255,0.1)' : undefined
+                  }}
+                  title="Sair">
+                  <LogOut size={18} />
+               </button>
+            </div>
+          </div>
+          
+          {/* Shortcuts Info - Desktop Only */}
+          <div className="hidden lg:flex items-center gap-3 text-[10px] font-bold uppercase tracking-wider overflow-x-auto no-scrollbar" style={{ color: settings.primaryColor ? 'rgba(255,255,255,0.6)' : '#9ca3af' }}>
+            <div className="flex items-center gap-1 shrink-0"><kbd className="bg-black/10 px-1.5 py-0.5 rounded border border-white/10 shrink-0">F2</kbd> Buscar</div>
+            <div className="flex items-center gap-1 shrink-0"><kbd className="bg-black/10 px-1.5 py-0.5 rounded border border-white/10 shrink-0">F4</kbd> Checkout</div>
+            <div className="flex items-center gap-1 shrink-0"><kbd className="bg-black/10 px-1.5 py-0.5 rounded border border-white/10 shrink-0">F6</kbd> Comanda</div>
+            <div className="flex items-center gap-1 shrink-0"><kbd className="bg-black/10 px-1.5 py-0.5 rounded border border-white/10 shrink-0">F7</kbd> Mesa</div>
+            <div className="flex items-center gap-1 shrink-0"><kbd className="bg-black/10 px-1.5 py-0.5 rounded border border-white/10 shrink-0">F8</kbd> Entrega</div>
+            <div className="flex items-center gap-1 shrink-0"><kbd className="bg-black/10 px-1.5 py-0.5 rounded border border-white/10 shrink-0">F9</kbd> Balcão</div>
+            <div className="flex items-center gap-1 shrink-0"><kbd className="bg-black/10 px-1.5 py-0.5 rounded border border-white/10 shrink-0">F10</kbd> Lançar</div>
+            <div className="flex items-center gap-1 shrink-0"><kbd className="bg-black/10 px-1.5 py-0.5 rounded border border-white/10 shrink-0">ESC</kbd> Limpar</div>
           </div>
         </header>
         
@@ -2689,47 +2770,61 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
             </div>
           )}
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-4">
-            {filteredProducts.map(product => (
-              <button
-                key={product.id}
-                onClick={() => handleProductClick(product)}
-                className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all text-left flex flex-col h-full group"
-              >
-                <div className="aspect-square rounded-lg overflow-hidden mb-3 bg-gray-100 relative">
-                  {product.imageUrl ? (
-                    <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-300">
-                      <Package size={32} />
-                    </div>
-                  )}
-                  {product.stock != null && (
-                    <div className={`absolute top-2 right-2 px-2 py-1 rounded-md text-[10px] font-bold shadow-sm ${product.stock > 0 ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
-                      {product.stock > 0 ? `${product.stock} un` : 'Sem Estoque'}
-                    </div>
-                  )}
-                  {product.isByWeight && (
-                    <div className="absolute bottom-2 left-2 px-2 py-1 rounded-md text-[10px] font-bold shadow-sm bg-blue-500 text-white">
-                      KG
-                    </div>
-                  )}
-                </div>
-                <h3 className="font-bold text-gray-800 text-sm line-clamp-2 mb-1 group-hover:text-blue-600" style={{ color: settings.primaryColor ? undefined : undefined }}>{product.name}</h3>
-                <div className="mt-auto flex justify-between items-end">
-                  <span className="font-black text-lg text-gray-900">{formatCurrency(product.price)}</span>
-                  <div 
-                    className="w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                    style={{ 
-                        backgroundColor: settings.primaryColor ? `${settings.primaryColor}20` : '#eff6ff',
-                        color: settings.primaryColor || '#2563eb'
-                    }}
-                  >
-                    <Plus size={16} />
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2 md:gap-3">
+            {isProductsLoading ? (
+              Array.from({ length: 15 }).map((_, i) => <ProductSkeleton key={i} />)
+            ) : filteredProducts.length === 0 ? (
+              <div className="col-span-full py-12 text-center text-gray-400">
+                <Package size={48} className="mx-auto mb-2 opacity-20" />
+                <p>Nenhum produto encontrado</p>
+              </div>
+            ) : (
+              filteredProducts.map(product => (
+                <button
+                  key={product.id}
+                  onClick={() => handleProductClick(product)}
+                  className="bg-white p-2 md:p-3 rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-200 transition-all text-left flex flex-col h-full group relative overflow-hidden"
+                >
+                  <div className="aspect-square rounded-lg overflow-hidden mb-2 bg-gray-50 relative shrink-0">
+                    {product.imageUrl ? (
+                      <img 
+                        src={product.imageUrl} 
+                        alt={product.name} 
+                        className="w-full h-full object-cover transition-transform group-hover:scale-110" 
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-200">
+                        <Package size={24} />
+                      </div>
+                    )}
+                    {product.stock != null && (
+                      <div className={`absolute top-1 right-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold shadow-sm z-10 ${product.stock > 0 ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
+                        {product.stock > 0 ? `${product.stock} un` : 'Esgotado'}
+                      </div>
+                    )}
+                    {product.isByWeight && (
+                      <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold shadow-sm bg-blue-500 text-white z-10 uppercase">
+                        Peso
+                      </div>
+                    )}
                   </div>
-                </div>
-              </button>
-            ))}
+                  <h3 className="font-bold text-gray-800 text-[11px] md:text-xs line-clamp-2 leading-tight mb-1 group-hover:text-blue-600 transition-colors">
+                    {product.name}
+                  </h3>
+                  <div className="mt-auto pt-1 flex justify-between items-center">
+                    <span className="font-extrabold text-sm md:text-base text-gray-900 leading-none">
+                      {formatCurrency(product.price)}
+                    </span>
+                    <div 
+                      className="w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center bg-gray-50 text-gray-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-all scale-90 group-hover:scale-100"
+                    >
+                      <Plus size={16} />
+                    </div>
+                  </div>
+                </button>
+              ))
+            )}
           </div>
         </div>
       </div>
