@@ -154,6 +154,25 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
   }, [cart, originalCart, orderType, commandNumber, deliveryDetails, loadedCommandIds, loadedWaitstaffName, loadedServiceFee, storeId]);
   const [isProductsLoading, setIsProductsLoading] = useState(true);
   const [isLookingUpCommand, setIsLookingUpCommand] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(10);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setVisibleCount(10); // Reset count when products or search change
+  }, [products, search, selectedCategory]);
+
+  useEffect(() => {
+    if (!loadMoreRef.current) return;
+    
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        setVisibleCount(prev => prev + 10);
+      }
+    }, { threshold: 0.1 });
+
+    observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [filteredProducts, loadMoreRef.current]);
 
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
@@ -2679,27 +2698,27 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         
         {/* ... (rest of the component) */}
 
-        <div className="p-2 md:p-4 bg-white border-b flex gap-2 md:gap-4 overflow-x-auto no-scrollbar shrink-0">
-          {categories.map(cat => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-3 md:px-4 py-1.5 md:py-2 rounded-full text-xs md:text-sm font-bold whitespace-nowrap transition-colors ${
-                selectedCategory === cat 
-                  ? 'text-white' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-              style={{
-                backgroundColor: selectedCategory === cat ? (settings.primaryColor || '#2563eb') : undefined
-              }}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
+        <div className="bg-white border-b shadow-sm shrink-0 z-10 sticky top-0">
+          <div className="p-2 md:p-3 flex gap-2 md:gap-4 overflow-x-auto no-scrollbar">
+            {categories.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-3 md:px-4 py-1.5 md:py-2 rounded-full text-xs md:text-sm font-bold whitespace-nowrap transition-colors ${
+                  selectedCategory === cat 
+                    ? 'text-white' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+                style={{
+                  backgroundColor: selectedCategory === cat ? (settings.primaryColor || '#2563eb') : undefined
+                }}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
 
-        <div className="p-2 md:p-4 flex-1 overflow-y-auto bg-gray-50">
-          <div className="mb-3 md:mb-6 relative flex gap-2">
+          <div className="px-2 md:px-4 pb-2 md:pb-3 flex gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
               <input
@@ -2759,7 +2778,9 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
               />
             </label>
           </div>
+        </div>
 
+        <div className="p-2 md:p-4 flex-1 overflow-y-auto bg-gray-50 flex flex-col">
           {showScanner && (
             <div className="mb-4 bg-black rounded-xl overflow-hidden relative">
               <div id="pos-reader" className="w-full"></div>
@@ -2781,7 +2802,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                 <p>Nenhum produto encontrado</p>
               </div>
             ) : (
-              filteredProducts.map(product => (
+              filteredProducts.slice(0, visibleCount).map(product => (
                 <button
                   key={product.id}
                   onClick={() => handleProductClick(product)}
@@ -2828,6 +2849,13 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
               ))
             )}
           </div>
+          
+          {/* Scroll Sentinel */}
+          {!isProductsLoading && filteredProducts.length > visibleCount && (
+            <div ref={loadMoreRef} className="py-8 flex justify-center">
+              <Loader2 className="animate-spin text-gray-300" size={32} />
+            </div>
+          )}
         </div>
       </div>
 
