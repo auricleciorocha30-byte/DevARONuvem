@@ -1375,8 +1375,8 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                         )}
 
                         <div className="space-y-4 pt-4 border-t border-gray-100">
-                           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Método de Pagamento</p>
-                           <div className="grid grid-cols-3 gap-2">
+                           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4 text-center">Método de Pagamento</p>
+                           <div className="flex flex-wrap justify-center gap-2">
                               {[
                                 {id: 'PIX', icon: <DollarSign size={18}/>, label: 'PIX'},
                                 {id: 'CARTAO', icon: <CreditCard size={18}/>, label: 'Cartão'},
@@ -1406,9 +1406,9 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                 return true;
                               })
                              .map(m => (
-                                <button key={m.id} onClick={() => setPayment(m.id as any)} className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${payment === m.id ? 'bg-primary border-primary text-white shadow-lg' : 'bg-white border-gray-100 text-gray-400'}`}>
+                                <button key={m.id} onClick={() => setPayment(m.id as any)} className={`flex flex-col items-center justify-center w-[100px] h-[80px] gap-2 p-2 rounded-2xl border transition-all ${payment === m.id ? 'bg-primary border-primary text-white shadow-lg' : 'bg-white border-gray-100 text-gray-400'}`}>
                                    {m.icon}
-                                   <span className="text-[10px] font-black uppercase text-center">{m.label}</span>
+                                   <span className="text-[10px] font-black uppercase text-center leading-tight">{m.label}</span>
                                    {m.id === 'CASHBACK' && <span className="text-[8px] font-bold">R$ {customerPoints.toFixed(2)}</span>}
                                 </button>
                               ))}
@@ -1425,7 +1425,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                    Selecione como deseja completar o pagamento
                                  </p>
                                </div>
-                               <div className="grid grid-cols-3 gap-2">
+                               <div className="flex flex-wrap justify-center gap-2">
                                   {[
                                     {id: 'PIX', icon: <DollarSign size={18}/>, label: 'PIX'},
                                     {id: 'CARTAO', icon: <CreditCard size={18}/>, label: 'Cartão'},
@@ -1442,9 +1442,9 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                     if (m.id === 'DEBITO') return false;
                                     return true;
                                   }).map(m => (
-                                   <button key={m.id} onClick={() => setCombinedPayment(m.id as any)} className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${combinedPayment === m.id ? 'bg-primary border-primary text-white shadow-lg' : 'bg-white border-gray-100 text-gray-400'}`}>
+                                   <button key={m.id} onClick={() => setCombinedPayment(m.id as any)} className={`flex flex-col items-center justify-center w-[100px] h-[80px] gap-2 p-2 rounded-2xl border transition-all ${combinedPayment === m.id ? 'bg-primary border-primary text-white shadow-lg' : 'bg-white border-gray-100 text-gray-400'}`}>
                                       {m.icon}
-                                      <span className="text-[10px] font-black uppercase text-center">{m.label}</span>
+                                      <span className="text-[10px] font-black uppercase text-center leading-tight">{m.label}</span>
                                    </button>
                                  ))}
                                </div>

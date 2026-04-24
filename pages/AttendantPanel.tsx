@@ -326,14 +326,14 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
 
         {activeTab === 'MAPA' ? (
           <>
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-8 gap-3 animate-fade-in">
+          <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-10 gap-2 animate-fade-in">
             {tables.map(num => {
               const occ = occupiedTables.get(num);
               return (
                 <button 
                   key={num} 
                   onClick={() => handleResourceClick(num, 'MESA')} 
-                  className={`relative rounded-2xl p-3 md:p-4 text-left border flex flex-col justify-between transition-all active:scale-95 shadow-sm overflow-hidden h-[90px] md:h-[100px] ${
+                  className={`relative rounded-2xl p-2.5 text-left border flex flex-col justify-between transition-all active:scale-95 shadow-sm overflow-hidden h-[80px] md:h-[90px] ${
                     occ?.status === 'PRONTO' 
                       ? 'bg-green-500 border-green-400 shadow-green-500/20' 
                       : occ 
@@ -342,12 +342,12 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
                   }`}
                 >
                   <div className="flex justify-between items-start w-full">
-                    <span className={`text-2xl md:text-3xl font-black block leading-none tracking-tight ${occ ? 'text-white' : 'text-white/40'}`}>{num}</span>
-                    <Hash size={14} className={occ ? "text-white/60" : "text-white/20"} />
+                    <span className={`text-xl md:text-2xl font-black block leading-none tracking-tight ${occ ? 'text-white' : 'text-white/40'}`}>{num}</span>
+                    <Hash size={12} className={occ ? "text-white/60" : "text-white/20"} />
                   </div>
                   {occ && (
-                    <div className="mt-auto w-full pt-2">
-                       <span className="inline-block bg-black/20 text-white text-[10px] md:text-xs px-2 py-0.5 rounded-md font-bold tracking-wide w-full truncate">
+                    <div className="mt-auto w-full pt-1">
+                       <span className="inline-block bg-black/20 text-white text-[9px] md:text-[10px] px-1.5 py-0.5 rounded-md font-bold tracking-wide w-full truncate text-center">
                            R$ {occ.total.toFixed(2)}
                        </span>
                     </div>
@@ -360,23 +360,23 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
           {activeCommands.size > 0 && (
             <div className="mt-8 pt-6 border-t border-white/10">
               <h3 className="text-white/50 font-bold uppercase tracking-widest text-xs mb-4 flex items-center gap-2"><Tag size={14}/> Comandas Ativas</h3>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-8 gap-3 animate-fade-in">
+              <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-10 gap-2 animate-fade-in">
                 {Array.from(activeCommands.entries()).map(([num, occ]) => (
                   <button 
                     key={`cmd-${num}`} 
                     onClick={() => handleResourceClick(num, 'COMANDA')} 
-                    className={`relative rounded-2xl p-3 md:p-4 text-left border flex flex-col justify-between transition-all active:scale-95 shadow-sm overflow-hidden h-[90px] md:h-[100px] ${
+                    className={`relative rounded-2xl p-2.5 text-left border flex flex-col justify-between transition-all active:scale-95 shadow-sm overflow-hidden h-[80px] md:h-[90px] ${
                       occ.status === 'PRONTO' 
                         ? 'bg-green-500 border-green-400 shadow-green-500/20' 
                         : 'bg-purple-500 border-purple-400 shadow-purple-500/20'
                     }`}
                   >
                     <div className="flex justify-between items-start w-full">
-                      <span className="text-2xl md:text-3xl font-black text-white block leading-none tracking-tight">{num}</span>
-                      <Tag size={14} className="text-white/60" />
+                      <span className="text-xl md:text-2xl font-black text-white block leading-none tracking-tight">{num}</span>
+                      <Tag size={12} className="text-white/60" />
                     </div>
-                    <div className="mt-auto w-full pt-2">
-                       <span className="inline-block bg-black/20 text-white text-[10px] md:text-xs px-2 py-0.5 rounded-md font-bold tracking-wide w-full truncate">
+                    <div className="mt-auto w-full pt-1">
+                       <span className="inline-block bg-black/20 text-white text-[9px] md:text-[10px] px-1.5 py-0.5 rounded-md font-bold tracking-wide w-full truncate text-center">
                            R$ {occ.total.toFixed(2)}
                        </span>
                     </div>

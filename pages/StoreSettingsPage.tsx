@@ -360,10 +360,6 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                 )}
             </div>
           </section>
-        </div>
-
-        {/* Coluna 2: Regras e Vendas */}
-        <div className="space-y-6">
           <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col">
               <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 flex items-center justify-center gap-2">
                   <CreditCard size={18} /> Meios de Pagamento
@@ -498,6 +494,11 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
               </div>
             </section>
           )}
+
+        </div>
+
+        {/* Coluna 2: Regras e Vendas */}
+        <div className="space-y-6">
 
           <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
             <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">

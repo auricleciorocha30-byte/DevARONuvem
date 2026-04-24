@@ -374,9 +374,9 @@ function StoreContext() {
     if (!currentStore) return;
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
     const [ordersRes, productsRes, usersRes] = await Promise.all([
-       supabase.from('orders').select('*').eq('store_id', currentStore.id).gte('createdAt', startOfMonth),
-       supabase.from('products').select('*').eq('store_id', currentStore.id),
-       supabase.from('waitstaff').select('*').eq('store_id', currentStore.id)
+       supabase.from('orders').select('id').eq('store_id', currentStore.id).gte('createdAt', startOfMonth),
+       supabase.from('products').select('id').eq('store_id', currentStore.id),
+       supabase.from('waitstaff').select('id').eq('store_id', currentStore.id)
     ]);
     setEcosystemUsage({
        ordersThisMonth: ordersRes.data?.length || 0,
@@ -515,7 +515,7 @@ function StoreContext() {
       const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
       const { data } = await supabase
         .from('orders')
-        .select('*')
+        .select('id')
         .eq('store_id', currentStore?.id)
         .gte('createdAt', startOfMonth);
         

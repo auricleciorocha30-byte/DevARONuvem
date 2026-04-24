@@ -651,7 +651,10 @@ class TursoBridge {
       }
   }
 
+  private selectCols: string = '*';
+
   select(columns: string = '*') {
+    this.selectCols = columns;
     return this;
   }
 
@@ -760,7 +763,7 @@ class TursoBridge {
 
   private async get() {
     try {
-      let queryStr = `SELECT * FROM ${this.tableName}`;
+      let queryStr = `SELECT ${this.selectCols} FROM ${this.tableName}`;
       if (this.queries.length > 0) {
         queryStr += ` WHERE ${this.queries.join(' AND ')}`;
       }
