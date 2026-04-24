@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { 
   Search, 
   ShoppingCart, 
@@ -1646,13 +1646,16 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         return;
       }
 
-      if (isInput && e.key !== 'F2' && e.key !== 'F4') return;
+      if (isInput && !e.key.startsWith('F')) return;
 
       switch (e.key) {
         case 'F2':
           e.preventDefault();
-          const searchInput = document.querySelector('input[placeholder="Buscar produto..."]') as HTMLInputElement;
-          if (searchInput) searchInput.focus();
+          const searchInput = document.getElementById('pdv-search-input') as HTMLInputElement;
+          if (searchInput) {
+            searchInput.focus();
+            searchInput.select();
+          }
           break;
         case 'F4':
           e.preventDefault();
@@ -2722,6 +2725,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
             <div className="relative flex-1">
               <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
               <input
+                id="pdv-search-input"
                 type="text"
                 placeholder="Buscar produto..."
                 value={search}
