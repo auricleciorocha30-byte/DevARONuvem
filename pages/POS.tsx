@@ -152,6 +152,20 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
     }
     localStorage.setItem(`pos-loadedServiceFee-${storeId}`, loadedServiceFee.toString());
   }, [cart, originalCart, orderType, commandNumber, deliveryDetails, loadedCommandIds, loadedWaitstaffName, loadedServiceFee, storeId]);
+  const categories = useMemo(() => {
+    const cats = Array.from(new Set(products.map(p => p.category)));
+    return ['Todos', ...cats];
+  }, [products]);
+
+  const filteredProducts = useMemo(() => {
+    return products.filter(p => {
+      const matchesSearch = (p.name || '').toLowerCase().includes(search.toLowerCase()) || 
+                            (p.barcode || '').includes(search);
+      const matchesCategory = selectedCategory === 'Todos' || p.category === selectedCategory;
+      return matchesSearch && matchesCategory && p.isActive;
+    });
+  }, [products, search, selectedCategory]);
+
   const [isProductsLoading, setIsProductsLoading] = useState(true);
   const [isLookingUpCommand, setIsLookingUpCommand] = useState(false);
   const [visibleCount, setVisibleCount] = useState(10);
@@ -1173,18 +1187,6 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
       }
     }
   };
-
-  const categories = useMemo(() => {
-    const cats = Array.from(new Set(products.map(p => p.category)));
-    return ['Todos', ...cats];
-  }, [products]);
-
-  const filteredProducts = products.filter(p => {
-    const matchesSearch = (p.name || '').toLowerCase().includes(search.toLowerCase()) || 
-                          (p.barcode || '').includes(search);
-    const matchesCategory = selectedCategory === 'Todos' || p.category === selectedCategory;
-    return matchesSearch && matchesCategory && p.isActive;
-  });
 
   const handleProductClick = (product: Product) => {
     if (product.stock != null && product.stock <= 0) {
