@@ -35,7 +35,8 @@ import {
   Printer,
   Settings,
   Tag,
-  Clock
+  Clock,
+  CreditCard
 } from 'lucide-react';
 
 interface Props {
@@ -341,7 +342,7 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                     <Switch checked={localSettings.isDeliveryActive} onChange={(v) => setLocalSettings({...localSettings, isDeliveryActive: v})} />
                 </div>
                 {localSettings.isDeliveryActive && (
-                  <div className="p-3 bg-gray-50 rounded-xl space-y-1">
+                  <div className="p-3 bg-gray-50 rounded-xl space-y-1 mt-3">
                     <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Pedido Mínimo (R$)</label>
                     <input 
                       type="text" 
@@ -357,139 +358,147 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                     />
                   </div>
                 )}
-
-                {localSettings.isDeliveryActive && (
-                  <div className="mt-4 pt-4 border-t border-gray-200 space-y-4">
-                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-bold text-gray-700">Taxa de Entrega por Distância</span>
-                        <span className="text-[10px] text-gray-400">Calcula a taxa baseada no endereço do cliente.</span>
-                      </div>
-                      <Switch 
-                        checked={localSettings.isDeliveryFeeActive === true} 
-                        onChange={(checked) => setLocalSettings({...localSettings, isDeliveryFeeActive: checked})} 
-                      />
-                    </div>
-
-                    {localSettings.isDeliveryFeeActive && (
-                      <div className="space-y-4 p-4 bg-gray-50 rounded-xl border border-gray-100">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Tolerância Entrega Grátis (KM)</label>
-                          <input 
-                            type="text" 
-                            inputMode="numeric"
-                            placeholder="Ex: 2" 
-                            value={localSettings.freeDeliveryToleranceKm === 0 ? '' : (localSettings.freeDeliveryToleranceKm || '')} 
-                            onChange={(e) => {
-                              const val = e.target.value === '' ? 0 : parseInt(e.target.value);
-                              if (!isNaN(val)) setLocalSettings({...localSettings, freeDeliveryToleranceKm: val});
-                            }} 
-                            className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 outline-none text-sm font-bold" 
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <div className="flex justify-between items-center">
-                            <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Regras de Taxa</label>
-                            <button 
-                              onClick={() => {
-                                const rules = localSettings.deliveryFeeRules || [];
-                                setLocalSettings({...localSettings, deliveryFeeRules: [...rules, { upToKm: 5, fee: 5 }]});
-                              }}
-                              className="text-[10px] bg-blue-100 text-blue-600 px-2 py-1 rounded-md font-bold uppercase"
-                            >
-                              + Adicionar Regra
-                            </button>
-                          </div>
-                          
-                          {(localSettings.deliveryFeeRules || []).map((rule, idx) => (
-                            <div key={idx} className="flex items-center gap-2">
-                              <div className="flex-1">
-                                <span className="text-[10px] text-gray-400 block ml-1">Até (KM)</span>
-                                <input 
-                                  type="text" 
-                                  inputMode="numeric"
-                                  value={rule.upToKm === 0 ? '' : rule.upToKm} 
-                                  onFocus={(e) => e.target.select()}
-                                  onChange={(e) => {
-                                    const val = e.target.value === '' ? 0 : parseInt(e.target.value);
-                                    if (!isNaN(val)) {
-                                      const newRules = [...(localSettings.deliveryFeeRules || [])];
-                                      newRules[idx].upToKm = val;
-                                      setLocalSettings({...localSettings, deliveryFeeRules: newRules});
-                                    }
-                                  }}
-                                  className="w-full px-2 py-1.5 bg-white rounded-lg border border-gray-200 outline-none text-sm font-bold" 
-                                />
-                              </div>
-                              <div className="flex-1">
-                                <span className="text-[10px] text-gray-400 block ml-1">Valor (R$)</span>
-                                <input 
-                                  type="text" 
-                                  inputMode="decimal"
-                                  value={rule.fee === 0 ? '' : rule.fee} 
-                                  onFocus={(e) => e.target.select()}
-                                  onChange={(e) => {
-                                    const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                                    if (!isNaN(val)) {
-                                      const newRules = [...(localSettings.deliveryFeeRules || [])];
-                                      newRules[idx].fee = val;
-                                      setLocalSettings({...localSettings, deliveryFeeRules: newRules});
-                                    }
-                                  }}
-                                  className="w-full px-2 py-1.5 bg-white rounded-lg border border-gray-200 outline-none text-sm font-bold" 
-                                />
-                              </div>
-                              <button 
-                                onClick={() => {
-                                  const newRules = [...(localSettings.deliveryFeeRules || [])];
-                                  newRules.splice(idx, 1);
-                                  setLocalSettings({...localSettings, deliveryFeeRules: newRules});
-                                }}
-                                className="mt-4 p-1.5 text-red-500 hover:bg-red-50 rounded-lg"
-                              >
-                                <AlertTriangle size={16} />
-                              </button>
-                            </div>
-                          ))}
-                          {(!localSettings.deliveryFeeRules || localSettings.deliveryFeeRules.length === 0) && (
-                            <p className="text-xs text-gray-400 text-center py-2">Nenhuma regra definida. A taxa será 0.</p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="w-full mt-6 space-y-3 pt-6 border-t border-gray-100">
-                    <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest text-center mb-2">Meios de Pagamento (Menu Digital)</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {allPaymentMethods.map(method => (
-                            <div key={method.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                                <span className="text-xs font-bold text-gray-600">{method.label}</span>
-                                <Switch 
-                                    checked={localSettings.digitalMenuPaymentMethods ? localSettings.digitalMenuPaymentMethods.includes(method.id as any) : true} 
-                                    onChange={(checked) => {
-                                        const current = localSettings.digitalMenuPaymentMethods || ['PIX', 'CARTAO', 'DINHEIRO', 'ONLINE', 'A_PAGAR', 'DEBITO'];
-                                        let next;
-                                        if (checked) {
-                                            next = [...current, method.id];
-                                        } else {
-                                            next = current.filter(m => m !== method.id);
-                                        }
-                                        setLocalSettings({...localSettings, digitalMenuPaymentMethods: next as any});
-                                    }} 
-                                />
-                            </div>
-                        ))}
-                    </div>
-                </div>
             </div>
           </section>
         </div>
 
         {/* Coluna 2: Regras e Vendas */}
         <div className="space-y-6">
+          <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 flex items-center justify-center gap-2">
+                  <CreditCard size={18} /> Meios de Pagamento
+              </h2>
+              <p className="text-[10px] uppercase text-gray-400 text-center mb-4">No Menu Digital</p>
+              <div className="flex flex-col gap-2">
+                  {allPaymentMethods.map(method => (
+                      <div key={method.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                          <span className="text-xs font-bold text-gray-600">{method.label}</span>
+                          <Switch 
+                              checked={localSettings.digitalMenuPaymentMethods ? localSettings.digitalMenuPaymentMethods.includes(method.id as any) : true} 
+                              onChange={(checked) => {
+                                  const current = localSettings.digitalMenuPaymentMethods || ['PIX', 'CARTAO', 'DINHEIRO', 'ONLINE', 'A_PAGAR', 'DEBITO'];
+                                  let next;
+                                  if (checked) {
+                                      next = [...current, method.id];
+                                  } else {
+                                      next = current.filter(m => m !== method.id);
+                                  }
+                                  setLocalSettings({...localSettings, digitalMenuPaymentMethods: next as any});
+                              }} 
+                          />
+                      </div>
+                  ))}
+              </div>
+          </section>
+
+          {localSettings.isDeliveryActive && (
+            <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
+                  <Truck size={18} /> Taxa de Entrega
+              </h2>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-gray-700">Por Distância</span>
+                    <span className="text-[10px] text-gray-400">Calculada via GPS Mapeado.</span>
+                  </div>
+                  <Switch 
+                    checked={localSettings.isDeliveryFeeActive === true} 
+                    onChange={(checked) => setLocalSettings({...localSettings, isDeliveryFeeActive: checked})} 
+                  />
+                </div>
+
+                {localSettings.isDeliveryFeeActive && (
+                  <div className="space-y-4 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Tolerância Entrega Grátis (KM)</label>
+                      <input 
+                        type="text" 
+                        inputMode="numeric"
+                        placeholder="Ex: 2" 
+                        value={localSettings.freeDeliveryToleranceKm === 0 ? '' : (localSettings.freeDeliveryToleranceKm || '')} 
+                        onChange={(e) => {
+                          const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+                          if (!isNaN(val)) setLocalSettings({...localSettings, freeDeliveryToleranceKm: val});
+                        }} 
+                        className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 outline-none text-sm font-bold" 
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Regras de Taxa</label>
+                        <button 
+                          onClick={() => {
+                            const rules = localSettings.deliveryFeeRules || [];
+                            setLocalSettings({...localSettings, deliveryFeeRules: [...rules, { upToKm: 5, fee: 5 }]});
+                          }}
+                          className="text-[10px] bg-blue-100 text-blue-600 px-2 py-1 rounded-md font-bold uppercase"
+                        >
+                          + Adicionar Regra
+                        </button>
+                      </div>
+                      
+                      {(localSettings.deliveryFeeRules || []).map((rule, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <div className="flex-1">
+                            <span className="text-[10px] text-gray-400 block ml-1">Até (KM)</span>
+                            <input 
+                              type="text" 
+                              inputMode="numeric"
+                              value={rule.upToKm === 0 ? '' : rule.upToKm} 
+                              onFocus={(e) => e.target.select()}
+                              onChange={(e) => {
+                                const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+                                if (!isNaN(val)) {
+                                  const newRules = [...(localSettings.deliveryFeeRules || [])];
+                                  newRules[idx].upToKm = val;
+                                  setLocalSettings({...localSettings, deliveryFeeRules: newRules});
+                                }
+                              }}
+                              className="w-full px-2 py-1.5 bg-white rounded-lg border border-gray-200 outline-none text-sm font-bold" 
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <span className="text-[10px] text-gray-400 block ml-1">Valor (R$)</span>
+                            <input 
+                              type="text" 
+                              inputMode="decimal"
+                              value={rule.fee === 0 ? '' : rule.fee} 
+                              onFocus={(e) => e.target.select()}
+                              onChange={(e) => {
+                                const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                                if (!isNaN(val)) {
+                                  const newRules = [...(localSettings.deliveryFeeRules || [])];
+                                  newRules[idx].fee = val;
+                                  setLocalSettings({...localSettings, deliveryFeeRules: newRules});
+                                }
+                              }}
+                              className="w-full px-2 py-1.5 bg-white rounded-lg border border-gray-200 outline-none text-sm font-bold" 
+                            />
+                          </div>
+                          <button 
+                            onClick={() => {
+                              const newRules = [...(localSettings.deliveryFeeRules || [])];
+                              newRules.splice(idx, 1);
+                              setLocalSettings({...localSettings, deliveryFeeRules: newRules});
+                            }}
+                            className="mt-4 p-1.5 text-red-500 hover:bg-red-50 rounded-lg"
+                          >
+                            <AlertTriangle size={16} />
+                          </button>
+                        </div>
+                      ))}
+                      {(!localSettings.deliveryFeeRules || localSettings.deliveryFeeRules.length === 0) && (
+                        <p className="text-xs text-gray-400 text-center py-2">Nenhuma regra definida. A taxa será 0.</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
           <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
             <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
               <Settings size={16} /> Regras de Negócio

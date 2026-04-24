@@ -326,26 +326,30 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
 
         {activeTab === 'MAPA' ? (
           <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 animate-fade-in">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-8 gap-3 animate-fade-in">
             {tables.map(num => {
               const occ = occupiedTables.get(num);
               return (
                 <button 
                   key={num} 
                   onClick={() => handleResourceClick(num, 'MESA')} 
-                  className={`relative aspect-square rounded-[2rem] p-6 text-center border-2 flex flex-col items-center justify-center transition-all active:scale-95 ${
+                  className={`relative rounded-2xl p-3 md:p-4 text-left border flex flex-col justify-between transition-all active:scale-95 shadow-sm overflow-hidden h-[90px] md:h-[100px] ${
                     occ?.status === 'PRONTO' 
-                      ? 'bg-green-600 border-green-400 shadow-lg shadow-green-900/20' 
+                      ? 'bg-green-500 border-green-400 shadow-green-500/20' 
                       : occ 
-                      ? 'bg-secondary border-secondary/50 shadow-lg shadow-yellow-900/20' 
-                      : 'bg-white/5 border-white/10 hover:border-white/30'
+                      ? 'bg-secondary border-secondary/80 shadow-secondary/20' 
+                      : 'bg-white/5 border-white/10 hover:border-white/20'
                   }`}
                 >
-                  <Hash size={16} className="text-white/60 mb-1" />
-                  <span className="text-5xl font-bold text-white block leading-none">{num}</span>
+                  <div className="flex justify-between items-start w-full">
+                    <span className={`text-2xl md:text-3xl font-black block leading-none tracking-tight ${occ ? 'text-white' : 'text-white/40'}`}>{num}</span>
+                    <Hash size={14} className={occ ? "text-white/60" : "text-white/20"} />
+                  </div>
                   {occ && (
-                    <div className="absolute top-3 right-3 flex flex-col items-end gap-1">
-                      <div className="bg-white/20 text-white text-[9px] px-2 py-0.5 rounded-full font-bold">R$ {occ.total.toFixed(2)}</div>
+                    <div className="mt-auto w-full pt-2">
+                       <span className="inline-block bg-black/20 text-white text-[10px] md:text-xs px-2 py-0.5 rounded-md font-bold tracking-wide w-full truncate">
+                           R$ {occ.total.toFixed(2)}
+                       </span>
                     </div>
                   )}
                 </button>
@@ -356,21 +360,25 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
           {activeCommands.size > 0 && (
             <div className="mt-8 pt-6 border-t border-white/10">
               <h3 className="text-white/50 font-bold uppercase tracking-widest text-xs mb-4 flex items-center gap-2"><Tag size={14}/> Comandas Ativas</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 animate-fade-in">
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-8 gap-3 animate-fade-in">
                 {Array.from(activeCommands.entries()).map(([num, occ]) => (
                   <button 
                     key={`cmd-${num}`} 
                     onClick={() => handleResourceClick(num, 'COMANDA')} 
-                    className={`relative aspect-square rounded-[2rem] p-6 text-center border-2 flex flex-col items-center justify-center transition-all active:scale-95 ${
+                    className={`relative rounded-2xl p-3 md:p-4 text-left border flex flex-col justify-between transition-all active:scale-95 shadow-sm overflow-hidden h-[90px] md:h-[100px] ${
                       occ.status === 'PRONTO' 
-                        ? 'bg-green-600 border-green-400 shadow-lg shadow-green-900/20' 
-                        : 'bg-purple-600 border-purple-400 shadow-lg shadow-purple-900/20'
+                        ? 'bg-green-500 border-green-400 shadow-green-500/20' 
+                        : 'bg-purple-500 border-purple-400 shadow-purple-500/20'
                     }`}
                   >
-                    <Tag size={16} className="text-white/60 mb-1" />
-                    <span className="text-5xl font-bold text-white block leading-none">{num}</span>
-                    <div className="absolute top-3 right-3 flex flex-col items-end gap-1">
-                      <div className="bg-white/20 text-white text-[9px] px-2 py-0.5 rounded-full font-bold">R$ {occ.total.toFixed(2)}</div>
+                    <div className="flex justify-between items-start w-full">
+                      <span className="text-2xl md:text-3xl font-black text-white block leading-none tracking-tight">{num}</span>
+                      <Tag size={14} className="text-white/60" />
+                    </div>
+                    <div className="mt-auto w-full pt-2">
+                       <span className="inline-block bg-black/20 text-white text-[10px] md:text-xs px-2 py-0.5 rounded-md font-bold tracking-wide w-full truncate">
+                           R$ {occ.total.toFixed(2)}
+                       </span>
                     </div>
                   </button>
                 ))}
