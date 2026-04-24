@@ -861,7 +861,10 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
           stockDeducted: true
         };
 
-        await addOrder(finalOrder); 
+        const success = await addOrder(finalOrder); 
+        if (success === false) {
+           return;
+        }
         setGeneratedDisplayId(displayId);
         setCart([]); 
         setAppliedCoupon(null);
@@ -1382,7 +1385,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                 {id: 'CASHBACK', icon: <Award size={18}/>, label: `Cashback`}
                               ].filter(m => {
                                 // Online payment only if active
-                                if (m.id === 'ONLINE' && (!settings.isOnlinePaymentActive || !settings.onlinePaymentProvider)) return false;
+                                if (m.id === 'ONLINE' && (!settings.isOnlinePaymentActive || !settings.onlinePaymentProvider || settings.lockedFeatures?.includes('ONLINE_PAYMENT'))) return false;
                                 
                                 // Pagar na entrega only if it's delivery
                                 if (m.id === 'A_PAGAR' && orderType !== 'ENTREGA') return false;
@@ -1429,7 +1432,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                     {id: 'ONLINE', icon: <Globe size={18}/>, label: 'Pagar Online'},
                                     {id: 'A_PAGAR', icon: <Wallet size={18}/>, label: 'Na Entrega'},
                                   ].filter(m => {
-                                    if (m.id === 'ONLINE' && (!settings.isOnlinePaymentActive || !settings.onlinePaymentProvider)) return false;
+                                    if (m.id === 'ONLINE' && (!settings.isOnlinePaymentActive || !settings.onlinePaymentProvider || settings.lockedFeatures?.includes('ONLINE_PAYMENT'))) return false;
                                     if (m.id === 'A_PAGAR' && orderType !== 'ENTREGA') return false;
                                     if (settings.digitalMenuPaymentMethods && settings.digitalMenuPaymentMethods.length > 0) {
                                       return settings.digitalMenuPaymentMethods.includes(m.id as any);

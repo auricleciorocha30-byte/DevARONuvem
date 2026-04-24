@@ -15,9 +15,12 @@ interface Props {
   setCategories: (c: string[]) => void;
   storeId?: string;
   onCategoryChange?: () => void;
+  settings?: any;
+  ecosystemUsage?: { ordersThisMonth: number, productsCount: number, usersCount: number };
+  refreshEcosystemUsage?: () => void;
 }
 
-const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct, categories, setCategories, storeId, onCategoryChange }) => {
+const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct, categories, setCategories, storeId, onCategoryChange, settings, ecosystemUsage, refreshEcosystemUsage }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showProductModal, setShowProductModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -326,7 +329,13 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                 <ListTree size={18} /> Categorias
             </button>
             <button 
-                onClick={() => { setEditingProduct({ category: categories[0] || '', description: '', featuredDay: -1, isActive: true, showInMenu: true, isByWeight: false, complements: [] }); setProductTab('INFO'); setShowProductModal(true); }}
+                onClick={() => { 
+                  if (ecosystemUsage && settings?.maxProducts && ecosystemUsage.productsCount >= settings.maxProducts) {
+                      alert("Limite máximo de produtos atingido. Entre em contato com seu consultor para fazer um upgrade do seu plano.");
+                      return;
+                  }
+                  setEditingProduct({ category: categories[0] || '', description: '', featuredDay: -1, isActive: true, showInMenu: true, isByWeight: false, complements: [] }); setProductTab('INFO'); setShowProductModal(true); 
+                }}
                 className="px-4 py-3 bg-[#f68c3e] text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-orange-600 transition-colors shadow-md whitespace-nowrap"
             >
                 <Plus size={18} /> Novo Produto

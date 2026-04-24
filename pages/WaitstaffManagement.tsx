@@ -25,9 +25,11 @@ interface Props {
   currentStore: StoreProfile;
   settings: StoreSettings;
   onUpdateSettings: (s: StoreSettings) => void;
+  ecosystemUsage?: { ordersThisMonth: number, productsCount: number, usersCount: number };
+  refreshEcosystemUsage?: () => void;
 }
 
-const WaitstaffManagement: React.FC<Props> = ({ currentStore, settings, onUpdateSettings }) => {
+const WaitstaffManagement: React.FC<Props> = ({ currentStore, settings, onUpdateSettings, ecosystemUsage, refreshEcosystemUsage }) => {
   const [staff, setStaff] = useState<Waitstaff[]>([]);
   const [loading, setLoading] = useState(true);
   const [newName, setNewName] = useState('');
@@ -61,6 +63,12 @@ const WaitstaffManagement: React.FC<Props> = ({ currentStore, settings, onUpdate
   const handleAddStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName || !newPass) return;
+    
+    if (!editingId && ecosystemUsage && settings?.maxUsers && ecosystemUsage.usersCount >= settings.maxUsers) {
+        alert("Limite máximo de usuários atingido. Entre em contato com seu consultor para realizar um upgrade do seu plano.");
+        return;
+    }
+    
     setIsSaving(true);
     try {
       if (editingId) {

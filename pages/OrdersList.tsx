@@ -109,6 +109,10 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
   }, [orders, filterType]);
 
   const handleEmitNfce = async (group: GroupedOrder) => {
+    if (settings?.lockedFeatures?.includes('NFE')) {
+      alert("Módulo bloqueado. Fale com seu consultor para desbloquear a emissão de notas fiscais.");
+      return;
+    }
     if (!settings.focusNfeToken) {
       alert("Token da Focus NFe não configurado nas Integrações.");
       return;

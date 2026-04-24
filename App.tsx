@@ -364,6 +364,31 @@ function StoreContext() {
     })()
   }), []);
 
+  const [ecosystemUsage, setEcosystemUsage] = useState({
+    ordersThisMonth: 0,
+    productsCount: 0,
+    usersCount: 0
+  });
+
+  const loadEcosystemUsage = useCallback(async () => {
+    if (!currentStore) return;
+    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+    const [ordersRes, productsRes, usersRes] = await Promise.all([
+       supabase.from('orders').select('*', { count: 'exact', head: true }).eq('store_id', currentStore.id).gte('createdAt', startOfMonth),
+       supabase.from('products').select('*', { count: 'exact', head: true }).eq('store_id', currentStore.id),
+       supabase.from('waitstaff').select('*', { count: 'exact', head: true }).eq('store_id', currentStore.id)
+    ]);
+    setEcosystemUsage({
+       ordersThisMonth: ordersRes.count || 0,
+       productsCount: productsRes.count || 0,
+       usersCount: (usersRes.count || 0) + 1 // Add 1 for the main store owner account
+    });
+  }, [currentStore]);
+
+  useEffect(() => {
+    loadEcosystemUsage();
+  }, [loadEcosystemUsage]);
+
   const syncOrders = useCallback(async () => {
     if (!currentStore) return;
     if (document.hidden) return; 
@@ -486,6 +511,21 @@ function StoreContext() {
   }, [currentStore, mapOrderFromDb, mapProductFromDb, syncOrders, settings?.syncIntervals, location.pathname]);
 
   const addOrder = async (order: Order) => {
+    if (settings?.maxOrdersPerMonth) {
+      const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+      const { count } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('store_id', currentStore?.id)
+        .gte('createdAt', startOfMonth);
+        
+      if (count && count >= settings.maxOrdersPerMonth) {
+        alert("Seu limite máximo de pedidos para este mês foi atingido. Entre em contato com seu consultor para fazer um upgrade do seu plano.");
+        // We dispatch a custom event to show upgrade modal globally if needed, or returning early handles the block.
+        return false;
+      }
+    }
+
     const dbOrder = {
       id: Number(order.id),
       store_id: currentStore?.id,
@@ -826,7 +866,7 @@ function StoreContext() {
           <Navigate to={loginRedirect} replace />
         )
       } />
-      <Route path="/cardapio/*" element={<DigitalMenu storeId={currentStore?.id} products={products} categories={categories} settings={settings} orders={orders} addOrder={addOrder} tableNumber={activeTable} onLogout={() => setActiveTable(null)} isWaitstaff={!!adminUser} />} />
+      <Route path="/cardapio/*" element={<DigitalMenu storeId={currentStore?.id} products={products} categories={categories} settings={settings} orders={orders} addOrder={addOrder} tableNumber={activeTable} onLogout={() => setActiveTable(null)} isWaitstaff={!!adminUser} ecosystemUsage={ecosystemUsage} refreshEcosystemUsage={loadEcosystemUsage} />} />
       <Route path="/master" element={<SuperAdminPanel />} />
       <Route path="/login" element={<LoginPage onLoginSuccess={handleSetUser} />} />
 
@@ -856,6 +896,8 @@ function StoreContext() {
             onLogout={() => handleSetUser(null)}
             updateStatus={updateOrderStatus}
             isOffline={isOffline}
+            ecosystemUsage={ecosystemUsage}
+            refreshEcosystemUsage={loadEcosystemUsage}
           />
         ) : (
           <Navigate to={loginRedirect} replace />
@@ -888,7 +930,7 @@ function StoreContext() {
         )
       }>
         <Route index element={<AdminDashboard orders={orders} products={products} settings={settings} storeId={currentStore?.id} onLogout={() => handleSetUser(null)} />} />
-        <Route path="cardapio-admin" element={<MenuManagement storeId={currentStore?.id} products={products} saveProduct={async (p) => { 
+        <Route path="cardapio-admin" element={<MenuManagement ecosystemUsage={ecosystemUsage} refreshEcosystemUsage={loadEcosystemUsage} settings={settings} storeId={currentStore?.id} products={products} saveProduct={async (p) => { 
           const payload: any = { ...p, store_id: currentStore?.id };
           if (payload.complements !== undefined) {
              payload.complements = payload.complements ? JSON.stringify(payload.complements) : null;
@@ -922,7 +964,7 @@ function StoreContext() {
           // No cache to clear
         }} />} />
         <Route path="pedidos" element={<OrdersList orders={orders} updateStatus={updateOrderStatus} products={products} addOrder={addOrder} settings={settings} updateOrder={updateOrder} />} />
-        <Route path="equipe" element={<WaitstaffManagement currentStore={currentStore!} settings={settings} onUpdateSettings={handleUpdateSettings} />} />
+        <Route path="equipe" element={<WaitstaffManagement ecosystemUsage={ecosystemUsage} refreshEcosystemUsage={loadEcosystemUsage} currentStore={currentStore!} settings={settings} onUpdateSettings={handleUpdateSettings} />} />
         <Route path="clientes" element={<CustomerManagement storeId={currentStore?.id} />} />
         <Route path="integracoes" element={<IntegrationsPage settings={settings} onSave={handleUpdateSettings} />} />
         <Route path="configuracoes" element={<StoreSettingsPage settings={settings} products={products} onSave={handleUpdateSettings} storeId={currentStore?.id} />} />

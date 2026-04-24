@@ -114,7 +114,15 @@ export default function IntegrationsPage({ settings, onSave }: Props) {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* FOCUS NFE SECTION */}
-        <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 flex flex-col h-full">
+        <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 flex flex-col h-full relative">
+          {settings?.lockedFeatures?.includes('NFE') && (
+            <div className="absolute inset-0 z-10 bg-white/60 backdrop-blur-[2px] rounded-[2.5rem] flex items-center justify-center cursor-not-allowed" onClick={(e) => { e.stopPropagation(); alert("Fale com seu consultor para desbloquear a emissão de notas fiscais."); }}>
+                <div className="bg-white p-4 rounded-2xl shadow-xl flex flex-col items-center gap-2 border border-red-100 pointer-events-none">
+                    <Lock className="text-red-500" size={32} />
+                    <span className="text-xs font-bold text-gray-800">Módulo Bloqueado</span>
+                </div>
+            </div>
+          )}
           <div className="flex items-center gap-4 mb-8">
             <div className="p-4 bg-green-50 text-green-600 rounded-2xl">
               <FileText size={32} />
@@ -198,11 +206,24 @@ export default function IntegrationsPage({ settings, onSave }: Props) {
         </div>
 
         {/* ONLINE PAYMENT SECTION */}
-        <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 flex flex-col h-full">
+        <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 flex flex-col h-full relative">
+          {settings?.lockedFeatures?.includes('ONLINE_PAYMENT') && (
+            <div className="absolute inset-0 z-10 bg-white/60 backdrop-blur-[2px] rounded-[2.5rem] flex items-center justify-center cursor-not-allowed" onClick={(e) => { e.stopPropagation(); alert("Fale com seu consultor para desbloquear o Pagamento Online."); }}>
+                <div className="bg-white p-4 rounded-2xl shadow-xl flex flex-col items-center gap-2 border border-red-100 pointer-events-none">
+                    <Lock className="text-red-500" size={32} />
+                    <span className="text-xs font-bold text-gray-800">Módulo Bloqueado</span>
+                </div>
+            </div>
+          )}
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
-              <div className="p-4 bg-blue-50 text-blue-600 rounded-2xl">
+              <div className="p-4 bg-blue-50 text-blue-600 rounded-2xl relative">
                 <CreditCard size={32} />
+                {settings?.lockedFeatures?.includes('ONLINE_PAYMENT') && (
+                  <div className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1" title="Funcionalidade Bloqueada - Fale com seu consultor">
+                    <Lock size={12} />
+                  </div>
+                )}
               </div>
               <div>
                 <h3 className="text-xl font-bold text-gray-800">Pagamento Online</h3>
@@ -211,8 +232,14 @@ export default function IntegrationsPage({ settings, onSave }: Props) {
             </div>
             
             <button
-              onClick={() => setFormData({ ...formData, isOnlinePaymentActive: !formData.isOnlinePaymentActive })}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${formData.isOnlinePaymentActive ? 'bg-blue-600' : 'bg-gray-200'}`}
+              onClick={() => {
+                if (settings?.lockedFeatures?.includes('ONLINE_PAYMENT')) {
+                    alert("Fale com seu consultor para desbloquear esta funcionalidade.");
+                    return;
+                }
+                setFormData({ ...formData, isOnlinePaymentActive: !formData.isOnlinePaymentActive })
+              }}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${formData.isOnlinePaymentActive ? 'bg-blue-600' : 'bg-gray-200'} ${settings?.lockedFeatures?.includes('ONLINE_PAYMENT') ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.isOnlinePaymentActive ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>

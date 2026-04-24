@@ -223,4 +223,10 @@ export interface StoreSettings {
     tv?: number;
     admin?: number;
   };
+  
+  // Limites do Ecossistema
+  maxOrdersPerMonth?: number;
+  maxProducts?: number;
+  maxUsers?: number;
+  lockedFeatures?: ('ONLINE_PAYMENT' | 'NFE')[];
 }

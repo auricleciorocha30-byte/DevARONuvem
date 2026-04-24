@@ -50,6 +50,12 @@ interface POSProps {
   onLogout: () => void;
   updateStatus: (id: string, status: OrderStatus) => void;
   isOffline?: boolean;
+  ecosystemUsage?: {
+    ordersThisMonth: number;
+    productsCount: number;
+    usersCount: number;
+  };
+  refreshEcosystemUsage?: () => void;
 }
 
 interface Payment {
@@ -57,7 +63,7 @@ interface Payment {
   amount: number;
 }
 
-export default function POS({ storeId, user, settings, onLogout, updateStatus, isOffline }: POSProps) {
+export default function POS({ storeId, user, settings, onLogout, updateStatus, isOffline, ecosystemUsage, refreshEcosystemUsage }: POSProps) {
   const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [couriers, setCouriers] = useState<Waitstaff[]>([]);
@@ -172,6 +178,10 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
   const [isCalculatingFee, setIsCalculatingFee] = useState(false);
 
   const handleEmitNfcePOS = async (order: Order) => {
+    if (settings?.lockedFeatures?.includes('NFE')) {
+      alert("Módulo bloqueado. Fale com seu consultor para desbloquear a emissão de notas fiscais.");
+      return;
+    }
     if (!settings.focusNfeToken) {
       alert("Token da Focus NFe não configurado nas Integrações.");
       return;
@@ -1475,6 +1485,11 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
     const handleSaveToCommand = async () => {
     if (cart.length === 0) return;
     
+    if (loadedCommandIds.length === 0 && ecosystemUsage && settings.maxOrdersPerMonth && ecosystemUsage.ordersThisMonth >= settings.maxOrdersPerMonth) {
+        alert("Seu limite máximo de pedidos para este mês foi atingido. Entre em contato com seu consultor para fazer um upgrade do seu plano.");
+        return;
+    }
+    
     let num = commandNumber;
     let currentType = orderType;
     
@@ -1677,6 +1692,11 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
 
   const handleCheckout = async () => {
     if (cart.length === 0) return;
+    
+    if (loadedCommandIds.length === 0 && ecosystemUsage && settings.maxOrdersPerMonth && ecosystemUsage.ordersThisMonth >= settings.maxOrdersPerMonth) {
+        alert("Seu limite máximo de pedidos para este mês foi atingido. Entre em contato com seu consultor para fazer um upgrade do seu plano.");
+        return;
+    }
     
     const isPayOnDelivery = orderType === 'ENTREGA' && deliveryDetails.payOnDelivery;
     
@@ -2438,6 +2458,12 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
           <div className="fixed top-0 left-0 right-0 z-[100] bg-orange-600 text-white py-2 px-4 flex items-center justify-center gap-2 font-bold shadow-lg animate-slide-down">
               <WifiOff size={20} />
               <span>MODO CONTINGÊNCIA ATIVO - VOCÊ ESTÁ OFFLINE</span>
+          </div>
+      )}
+      {ecosystemUsage && settings.maxOrdersPerMonth && ecosystemUsage.ordersThisMonth >= (settings.maxOrdersPerMonth * 0.8) && ecosystemUsage.ordersThisMonth < settings.maxOrdersPerMonth && (
+          <div className="fixed top-0 left-0 right-0 z-[99] bg-yellow-500 text-black py-2 px-4 flex items-center justify-center gap-2 font-bold shadow-lg animate-slide-down text-xs md:text-sm">
+              <AlertCircle size={20} />
+              <span>Atenção: Você atingiu {Math.floor((ecosystemUsage.ordersThisMonth / settings.maxOrdersPerMonth) * 100)}% do seu limite de pedidos mensal ({ecosystemUsage.ordersThisMonth}/{settings.maxOrdersPerMonth}).</span>
           </div>
       )}
       {/* Left Side - Products */}
