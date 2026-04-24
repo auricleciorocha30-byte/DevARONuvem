@@ -374,14 +374,14 @@ function StoreContext() {
     if (!currentStore) return;
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
     const [ordersRes, productsRes, usersRes] = await Promise.all([
-       supabase.from('orders').select('*', { count: 'exact', head: true }).eq('store_id', currentStore.id).gte('createdAt', startOfMonth),
-       supabase.from('products').select('*', { count: 'exact', head: true }).eq('store_id', currentStore.id),
-       supabase.from('waitstaff').select('*', { count: 'exact', head: true }).eq('store_id', currentStore.id)
+       supabase.from('orders').select('*').eq('store_id', currentStore.id).gte('createdAt', startOfMonth),
+       supabase.from('products').select('*').eq('store_id', currentStore.id),
+       supabase.from('waitstaff').select('*').eq('store_id', currentStore.id)
     ]);
     setEcosystemUsage({
-       ordersThisMonth: ordersRes.count || 0,
-       productsCount: productsRes.count || 0,
-       usersCount: (usersRes.count || 0) + 1 // Add 1 for the main store owner account
+       ordersThisMonth: ordersRes.data?.length || 0,
+       productsCount: productsRes.data?.length || 0,
+       usersCount: (usersRes.data?.length || 0) + 1 // Add 1 for the main store owner account
     });
   }, [currentStore]);
 
@@ -513,13 +513,13 @@ function StoreContext() {
   const addOrder = async (order: Order) => {
     if (settings?.maxOrdersPerMonth) {
       const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
-      const { count } = await supabase
+      const { data } = await supabase
         .from('orders')
-        .select('*', { count: 'exact', head: true })
+        .select('*')
         .eq('store_id', currentStore?.id)
         .gte('createdAt', startOfMonth);
         
-      if (count && count >= settings.maxOrdersPerMonth) {
+      if (data && data.length >= settings.maxOrdersPerMonth) {
         alert("Seu limite máximo de pedidos para este mês foi atingido. Entre em contato com seu consultor para fazer um upgrade do seu plano.");
         // We dispatch a custom event to show upgrade modal globally if needed, or returning early handles the block.
         return false;
@@ -584,8 +584,7 @@ function StoreContext() {
             .from('orders')
             .eq('id', id)
             .neq('status', 'CANCELADO')
-            .update({ status: 'CANCELADO' })
-            .select();
+            .update({ status: 'CANCELADO' });
 
         if (updateError) {
             console.error("Error updating order status:", updateError);

@@ -53,14 +53,16 @@ interface Props {
   categories: string[];
   settings: StoreSettings;
   orders: Order[];
-  addOrder: (order: Order) => Promise<void>;
+  addOrder: (order: Order) => Promise<void | boolean>;
   tableNumber: string | null;
   onLogout: () => void;
   onCloseMenu?: () => void;
   isWaitstaff?: boolean;
+  ecosystemUsage?: { ordersThisMonth: number; productsCount: number; usersCount: number; };
+  refreshEcosystemUsage?: () => Promise<void>;
 }
 
-const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalCategories, settings, addOrder, tableNumber: initialTable, onLogout, onCloseMenu, isWaitstaff: initialIsWaitstaff = false }) => {
+const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalCategories, settings, addOrder, tableNumber: initialTable, onLogout, onCloseMenu, isWaitstaff: initialIsWaitstaff = false, ecosystemUsage, refreshEcosystemUsage }) => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const urlTable = searchParams.get('mesa');

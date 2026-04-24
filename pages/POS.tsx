@@ -153,71 +153,8 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
     localStorage.setItem(`pos-loadedServiceFee-${storeId}`, loadedServiceFee.toString());
   }, [cart, originalCart, orderType, commandNumber, deliveryDetails, loadedCommandIds, loadedWaitstaffName, loadedServiceFee, storeId]);
   const [isProductsLoading, setIsProductsLoading] = useState(true);
+  const [isLookingUpCommand, setIsLookingUpCommand] = useState(false);
 
-  // Keyboard Shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Avoid shortcuts if an input is focused (unless it's ESC to blur/clear)
-      const isInput = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
-      
-      if (e.key === 'Escape') {
-        if (isCheckoutOpen) setIsCheckoutOpen(false);
-        if (showDeliveryModal) setShowDeliveryModal(false);
-        if (weightModal.isOpen) setWeightModal({ isOpen: false, product: null });
-        if (complementsProduct) setComplementsProduct(null);
-        setSearch('');
-        return;
-      }
-
-      if (isInput && e.key !== 'F2' && e.key !== 'F4') return;
-
-      switch (e.key) {
-        case 'F2':
-          e.preventDefault();
-          const searchInput = document.querySelector('input[placeholder="Buscar produto..."]') as HTMLInputElement;
-          if (searchInput) searchInput.focus();
-          break;
-        case 'F4':
-          e.preventDefault();
-          if (cart.length > 0) setIsCheckoutOpen(true);
-          break;
-        case 'F6':
-          e.preventDefault();
-          lookupOrdersList('COMANDA');
-          break;
-        case 'F7':
-          e.preventDefault();
-          lookupOrdersList('MESA');
-          break;
-        case 'F8':
-          e.preventDefault();
-          lookupOrdersList('ENTREGA');
-          break;
-        case 'F9':
-          e.preventDefault();
-          lookupOrdersList('BALCAO');
-          break;
-        case 'F10':
-          e.preventDefault();
-          if (cart.length > 0) handleSaveToCommand();
-          break;
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [cart, isCheckoutOpen, showDeliveryModal, weightModal.isOpen, complementsProduct]);
-
-  const ProductSkeleton = () => (
-    <div className="bg-white p-2 rounded-xl shadow-sm border border-gray-100 flex flex-col h-full animate-pulse">
-      <div className="aspect-square rounded-lg bg-gray-200 mb-2" />
-      <div className="h-4 bg-gray-200 rounded w-3/4 mb-1" />
-      <div className="mt-auto flex justify-between items-end">
-        <div className="h-6 bg-gray-200 rounded w-1/2" />
-        <div className="w-8 h-8 rounded-full bg-gray-200" />
-      </div>
-    </div>
-  );
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState('');
@@ -1674,6 +1611,71 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         setIsProcessing(false);
     }
   };
+
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Avoid shortcuts if an input is focused (unless it's ESC to blur/clear)
+      const isInput = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+      
+      if (e.key === 'Escape') {
+        if (isCheckoutOpen) setIsCheckoutOpen(false);
+        if (showDeliveryModal) setShowDeliveryModal(false);
+        if (weightModal.isOpen) setWeightModal({ isOpen: false, product: null });
+        if (complementsProduct) setComplementsProduct(null);
+        setSearch('');
+        return;
+      }
+
+      if (isInput && e.key !== 'F2' && e.key !== 'F4') return;
+
+      switch (e.key) {
+        case 'F2':
+          e.preventDefault();
+          const searchInput = document.querySelector('input[placeholder="Buscar produto..."]') as HTMLInputElement;
+          if (searchInput) searchInput.focus();
+          break;
+        case 'F4':
+          e.preventDefault();
+          if (cart.length > 0) setIsCheckoutOpen(true);
+          break;
+        case 'F6':
+          e.preventDefault();
+          lookupOrdersList('COMANDA');
+          break;
+        case 'F7':
+          e.preventDefault();
+          lookupOrdersList('MESA');
+          break;
+        case 'F8':
+          e.preventDefault();
+          lookupOrdersList('ENTREGA');
+          break;
+        case 'F9':
+          e.preventDefault();
+          lookupOrdersList('BALCAO');
+          break;
+        case 'F10':
+          e.preventDefault();
+          if (cart.length > 0) handleSaveToCommand();
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [cart, isCheckoutOpen, showDeliveryModal, weightModal.isOpen, complementsProduct, lookupOrdersList, handleSaveToCommand, setSearch, setIsCheckoutOpen, setShowDeliveryModal, setWeightModal, setComplementsProduct]);
+
+  const ProductSkeleton = () => (
+    <div className="bg-white p-2 rounded-xl shadow-sm border border-gray-100 flex flex-col h-full animate-pulse">
+      <div className="aspect-square rounded-lg bg-gray-200 mb-2" />
+      <div className="h-4 bg-gray-200 rounded w-3/4 mb-1" />
+      <div className="mt-auto flex justify-between items-end">
+        <div className="h-6 bg-gray-200 rounded w-1/2" />
+        <div className="w-8 h-8 rounded-full bg-gray-200" />
+      </div>
+    </div>
+  );
 
   const handleCancelOrder = async () => {
     if (loadedCommandIds.length === 0) return;
