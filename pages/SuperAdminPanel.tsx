@@ -146,7 +146,11 @@ export default function SuperAdminPanel() {
         delivery?: number;
         tv?: number;
         admin?: number;
-    }
+    },
+    maxOrdersPerMonth?: number;
+    maxProducts?: number;
+    maxUsers?: number;
+    lockedFeatures?: ('ONLINE_PAYMENT' | 'NFE')[];
   }>({
     name: '',
     slug: '',
@@ -162,7 +166,11 @@ export default function SuperAdminPanel() {
         delivery: 20,
         tv: 20,
         admin: 20
-    }
+    },
+    maxOrdersPerMonth: undefined,
+    maxProducts: undefined,
+    maxUsers: undefined,
+    lockedFeatures: []
   });
 
   // Estados para Gerenciamento de Equipe
@@ -303,7 +311,11 @@ export default function SuperAdminPanel() {
             delivery: 20,
             tv: 20,
             admin: 20
-        }
+        },
+        maxOrdersPerMonth: fullStore.settings?.maxOrdersPerMonth,
+        maxProducts: fullStore.settings?.maxProducts,
+        maxUsers: fullStore.settings?.maxUsers,
+        lockedFeatures: fullStore.settings?.lockedFeatures || []
       });
       setIsManagingContent(true);
       setActiveSubTab('perfil');
@@ -362,7 +374,11 @@ export default function SuperAdminPanel() {
         logoUrl: editProfileData.logoUrl,
         address: editProfileData.address,
         whatsapp: editProfileData.whatsapp,
-        syncIntervals: editProfileData.syncIntervals
+        syncIntervals: editProfileData.syncIntervals,
+        maxOrdersPerMonth: editProfileData.maxOrdersPerMonth,
+        maxProducts: editProfileData.maxProducts,
+        maxUsers: editProfileData.maxUsers,
+        lockedFeatures: editProfileData.lockedFeatures
     };
 
     const { error } = await supabase
@@ -781,6 +797,45 @@ export default function SuperAdminPanel() {
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Auth Token</label>
                             <input type="password" value={editProfileData.dbAuthToken} onChange={e => setEditProfileData({...editProfileData, dbAuthToken: e.target.value})} className="w-full px-6 py-4 bg-slate-50 rounded-2xl outline-none font-mono text-xs border border-transparent focus:border-slate-200" placeholder="ey..." />
+                        </div>
+                    </div>
+
+                    <div className="space-y-4 pt-4 border-t border-slate-100">
+                        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2"><Settings className="text-secondary" /> Limites do Ecossistema</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Máx Pedidos/Mês</label>
+                                <input type="number" value={editProfileData.maxOrdersPerMonth || ''} onChange={e => setEditProfileData({...editProfileData, maxOrdersPerMonth: e.target.value ? Number(e.target.value) : undefined})} className="w-full px-6 py-4 bg-slate-50 rounded-2xl outline-none font-bold border border-transparent focus:border-slate-200" placeholder="Sem limite" />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Máx Produtos</label>
+                                <input type="number" value={editProfileData.maxProducts || ''} onChange={e => setEditProfileData({...editProfileData, maxProducts: e.target.value ? Number(e.target.value) : undefined})} className="w-full px-6 py-4 bg-slate-50 rounded-2xl outline-none font-bold border border-transparent focus:border-slate-200" placeholder="Sem limite" />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Máx Usuários</label>
+                                <input type="number" value={editProfileData.maxUsers || ''} onChange={e => setEditProfileData({...editProfileData, maxUsers: e.target.value ? Number(e.target.value) : undefined})} className="w-full px-6 py-4 bg-slate-50 rounded-2xl outline-none font-bold border border-transparent focus:border-slate-200" placeholder="Sem limite" />
+                            </div>
+                        </div>
+                        <div className="space-y-2 mt-4">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Recursos Bloqueados</label>
+                            <div className="flex gap-4">
+                                <label className="flex items-center gap-2">
+                                    <input type="checkbox" checked={editProfileData.lockedFeatures?.includes('ONLINE_PAYMENT') || false} onChange={e => {
+                                        const current = editProfileData.lockedFeatures || [];
+                                        if (e.target.checked) setEditProfileData({...editProfileData, lockedFeatures: [...current, 'ONLINE_PAYMENT']});
+                                        else setEditProfileData({...editProfileData, lockedFeatures: current.filter(f => f !== 'ONLINE_PAYMENT')});
+                                    }} />
+                                    <span className="text-sm font-bold text-slate-700">Pagamento Online</span>
+                                </label>
+                                <label className="flex items-center gap-2">
+                                    <input type="checkbox" checked={editProfileData.lockedFeatures?.includes('NFE') || false} onChange={e => {
+                                        const current = editProfileData.lockedFeatures || [];
+                                        if (e.target.checked) setEditProfileData({...editProfileData, lockedFeatures: [...current, 'NFE']});
+                                        else setEditProfileData({...editProfileData, lockedFeatures: current.filter(f => f !== 'NFE')});
+                                    }} />
+                                    <span className="text-sm font-bold text-slate-700">Emissão de Notas Fiscais</span>
+                                </label>
+                            </div>
                         </div>
                     </div>
 
