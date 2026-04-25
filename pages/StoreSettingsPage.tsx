@@ -309,20 +309,6 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                     </div>
                     <Switch checked={localSettings.isCommandOrderActive ?? true} onChange={(v) => setLocalSettings({...localSettings, isCommandOrderActive: v})} />
                 </div>
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                    <div className="flex items-center gap-2">
-                        <ChefHat size={16} className="text-blue-500" />
-                        <span className="text-xs font-bold text-gray-600">Módulo Produção</span>
-                    </div>
-                    <Switch checked={localSettings.isKitchenActive ?? true} onChange={(v) => setLocalSettings({...localSettings, isKitchenActive: v})} />
-                </div>
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                    <div className="flex items-center gap-2">
-                        <Tv size={16} className="text-purple-500" />
-                        <span className="text-xs font-bold text-gray-600">Módulo Painel TV</span>
-                    </div>
-                    <Switch checked={localSettings.isTvPanelActive ?? true} onChange={(v) => setLocalSettings({...localSettings, isTvPanelActive: v})} />
-                </div>
             </div>
 
             <div className="w-full mt-6 space-y-3 pt-6 border-t border-gray-100">

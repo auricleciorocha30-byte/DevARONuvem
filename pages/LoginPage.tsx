@@ -260,65 +260,19 @@ export default function LoginPage({ onLoginSuccess }: Props) {
 
           {view === 'hub' ? (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-scale-up">
-                <PortalButton 
-                  icon={Monitor} 
-                  title="PDV" 
-                  description="Frente de Caixa" 
-                  to="/pdv" 
-                  color="bg-blue-500" 
-                  requiresAuth={true}
-                />
-                {(!storeSettings || storeSettings.isTableOrderActive !== false) && (
-                  <PortalButton 
-                    icon={UserRound} 
-                    title="Atendimento" 
-                    description="Mapa de Mesas" 
-                    to="/atendimento" 
-                    color="bg-orange-500" 
-                    requiresAuth={true}
-                  />
-                )}
-                <PortalButton 
-                  icon={Truck} 
-                  title="Entregas" 
-                  description="Painel do Entregador" 
-                  to="/entregas" 
-                  color="bg-green-600" 
-                  requiresAuth={true}
-                />
-                {(!storeSettings || storeSettings.isKitchenActive !== false) && (
-                  <PortalButton 
-                    icon={ChefHat} 
-                    title="Produção" 
-                    description="Painel de Produção" 
-                    to="/cozinha" 
-                    color="bg-blue-600" 
-                    requiresAuth={false}
-                  />
-                )}
-                {(!storeSettings || storeSettings.isTvPanelActive !== false) && (
-                  <PortalButton 
-                    icon={Tv} 
-                    title="Painel TV" 
-                    description="Exibição de Pedidos" 
-                    to="/tv" 
-                    color="bg-purple-600" 
-                    requiresAuth={false}
-                  />
-                )}
+              <div className="flex flex-col gap-4 animate-scale-up">
                 <button 
                   onClick={() => { setIntendedDestination('/'); setView('login'); }}
-                  className="group flex items-center gap-5 p-6 bg-primary rounded-[2rem] border border-primary/10 shadow-lg text-left active:scale-95"
+                  className="group flex items-center gap-5 p-6 md:p-8 bg-primary rounded-[2rem] border border-primary/10 shadow-lg text-left active:scale-95 w-full"
                 >
                   <div className="p-4 rounded-2xl bg-white/10 text-secondary shadow-lg group-hover:scale-110 transition-transform">
-                    <ShieldCheck size={28} />
+                    <ShieldCheck size={32} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-white leading-none mb-1">Gerência</h3>
-                    <p className="text-[10px] text-white/40 font-bold uppercase tracking-wider">Painel Administrativo</p>
+                    <h3 className="font-bold text-white text-xl md:text-2xl leading-none mb-1">Gerência</h3>
+                    <p className="text-xs text-white/40 font-bold uppercase tracking-wider">Painel Administrativo</p>
                   </div>
-                  <ArrowRight size={20} className="text-white/20 group-hover:text-secondary group-hover:translate-x-1 transition-all" />
+                  <ArrowRight size={24} className="text-white/20 group-hover:text-secondary group-hover:translate-x-1 transition-all" />
                 </button>
               </div>
 
