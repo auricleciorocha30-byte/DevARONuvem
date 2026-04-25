@@ -673,7 +673,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
     if (cart.length === 0) return;
     if ((orderType === 'MESA' || orderType === 'COMANDA') && !manualTable) { showAlert(`Informe o número da ${orderType === 'MESA' ? 'mesa' : 'comanda'}.`); return; }
     if (orderType === 'BALCAO' && (!customerName || !customerPhone) && !isWaitstaff) { showAlert('Informe o seu nome e telefone.'); return; }
-    if (orderType === 'MESA' && !customerPhone && !isWaitstaff) { showAlert('Informe o seu telefone.'); return; }
+    if ((orderType === 'MESA' || orderType === 'COMANDA') && !customerPhone && !isWaitstaff) { showAlert('Informe o seu telefone para iniciar/continuar.'); return; }
     if (orderType === 'ENTREGA' && (!customerName || !customerPhone || !deliveryAddress)) { showAlert('Preencha os dados de entrega.'); return; }
     
     // Check for payment method selection (except for waitstaff or table/command orders)
@@ -699,6 +699,36 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
     }
 
     setIsSending(true);
+
+    if ((orderType === 'MESA' || orderType === 'COMANDA') && !isWaitstaff) {
+        const { data: activeOrdersList } = await supabase
+            .from('orders')
+            .select('tableNumber, customerPhone, type')
+            .eq('store_id', storeId)
+            .in('status', ['PENDENTE', 'PREPARANDO', 'PRONTO', 'AGUARDANDO_PAGAMENTO', 'AGUARDANDO', 'ENVIADO_PARA_ENTREGA']);
+        
+        if (activeOrdersList) {
+            const tableOpenOrders = activeOrdersList.filter(o => o.tableNumber === manualTable && o.type === orderType);
+            if (tableOpenOrders.length > 0) {
+                const tablePhone = tableOpenOrders[0].customerPhone;
+                if (tablePhone && tablePhone !== customerPhone.trim()) {
+                    showAlert(`Esta ${orderType === 'MESA' ? 'Mesa' : 'Comanda'} já está sendo utilizada por outro cliente. Fale com um atendente.`);
+                    setIsSending(false);
+                    return;
+                }
+            } else {
+                const phoneOpenOrders = activeOrdersList.filter(o => o.customerPhone === customerPhone.trim());
+                if (phoneOpenOrders.length > 0) {
+                    const otherTable = phoneOpenOrders[0].tableNumber;
+                    const otherType = phoneOpenOrders[0].type === 'MESA' ? 'Mesa' : 'Comanda';
+                    showAlert(`Este telefone já está com a ${otherType} ${otherTable} aberta. Feche a anterior para abrir uma nova.`);
+                    setIsSending(false);
+                    return;
+                }
+            }
+        }
+    }
+
     const orderChangeFor = ((payment === 'DINHEIRO' || (payment === 'CASHBACK' && combinedPayment === 'DINHEIRO')) && changeFor) ? parseFloat(changeFor.replace(',', '.')) : undefined;
     const displayId = Math.floor(1000 + Math.random() * 9000).toString();
 
@@ -1049,76 +1079,76 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   }
 
   return (
-    <div className="min-h-screen w-full overflow-x-hidden bg-orange-50/40 text-primary relative flex flex-col font-sans text-zinc-900">
-      <header className={`sticky top-0 z-30 shadow-md ${isWaitstaff ? 'bg-secondary' : 'bg-primary'} text-white p-3 md:p-4 transition-all w-full`}>
+    <div className="min-h-screen w-full overflow-x-hidden bg-slate-50 text-slate-900 relative flex flex-col font-sans">
+      <header className={`sticky top-0 z-30 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.1)] ${isWaitstaff ? 'bg-secondary' : 'bg-white'} ${isWaitstaff ? 'text-white' : 'text-slate-800'} p-3 md:p-4 transition-all w-full border-b ${isWaitstaff ? 'border-secondary' : 'border-slate-100'}`}>
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
-            <button onClick={handleBack} className="p-2 hover:bg-white/10 rounded-full shrink-0">
+            <button onClick={handleBack} className={`p-2 rounded-full shrink-0 ${isWaitstaff ? 'hover:bg-white/10' : 'hover:bg-slate-100'} transition-colors`}>
               {isWaitstaff ? <ArrowLeft size={22} /> : <ChevronLeft size={22} />}
             </button>
             <div className="flex flex-col min-w-0">
-                <h1 className="font-brand text-sm md:text-base font-bold leading-none truncate">{settings.storeName}</h1>
-                <button onClick={handleResetMode} className="text-[9px] uppercase font-black opacity-70 truncate mt-0.5 text-left hover:opacity-100 underline decoration-dotted underline-offset-2">
+                <h1 className="font-brand text-base md:text-lg font-bold leading-none truncate">{settings.storeName}</h1>
+                <button onClick={handleResetMode} className="text-[10px] uppercase font-black opacity-60 truncate mt-0.5 text-left hover:opacity-100 decoration-dotted underline-offset-2 transition-opacity">
                   {orderType} {(orderType === 'MESA' || orderType === 'COMANDA') && manualTable ? `• ${orderType === 'MESA' ? 'Mesa' : 'Comanda'} ${manualTable}` : ''}
                 </button>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <InstallPrompt />
-            <button onClick={() => setIsTrackingModalOpen(true)} className="p-2.5 bg-white/10 rounded-full shrink-0 active:scale-90 transition-transform"><Search size={20} /></button>
-            <button onClick={() => setIsInfoOpen(true)} className="p-2.5 bg-white/10 rounded-full shrink-0 active:scale-90 transition-transform"><Info size={20} /></button>
-            <button onClick={() => { setIsCartOpen(true); setCheckoutStep('cart'); }} className="relative p-2.5 bg-white/10 rounded-full shrink-0 active:scale-90 transition-transform">
-              <ShoppingCart size={20} />
-              {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-secondary text-[9px] w-5 h-5 flex items-center justify-center rounded-full font-bold border-2 border-primary">{cart.length}</span>}
+            <button onClick={() => setIsTrackingModalOpen(true)} className={`p-2.5 rounded-full shrink-0 active:scale-95 transition-transform ${isWaitstaff ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}><Search size={20} /></button>
+            <button onClick={() => setIsInfoOpen(true)} className={`p-2.5 rounded-full shrink-0 active:scale-95 transition-transform ${isWaitstaff ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}><Info size={20} /></button>
+            <button onClick={() => { setIsCartOpen(true); setCheckoutStep('cart'); }} className={`relative p-2.5 rounded-full shrink-0 active:scale-95 transition-transform ${isWaitstaff ? 'bg-white/10 text-white' : 'bg-primary text-white hover:bg-primary/90 shadow-md'}`}>
+               <ShoppingCart size={20} />
+              {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-secondary text-white text-[9px] w-[18px] h-[18px] flex items-center justify-center rounded-full font-bold shadow-sm">{cart.length}</span>}
             </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-3 sm:px-4 py-4 space-y-5 flex-1 pb-24 text-zinc-900 overflow-x-hidden w-full box-border">
+      <main className="max-w-4xl mx-auto px-4 py-6 flex-1 pb-24 text-slate-800 overflow-x-hidden w-full box-border">
         {isStoreClosed && !isWaitstaff && (
-          <div className="bg-red-50 p-4 rounded-2xl border border-red-100 flex items-center gap-3 animate-pulse">
+          <div className="bg-red-50 p-4 rounded-2xl border border-red-100 flex items-center gap-3 animate-pulse mb-6">
             <AlertTriangle className="text-red-500 shrink-0" size={20} />
             <p className="text-[10px] font-black uppercase text-red-700 tracking-widest">A loja está fechada. Apenas visualização.</p>
           </div>
         )}
 
-        <div className="relative group w-full">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input type="text" placeholder="O que deseja comer hoje?" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-11 pr-4 py-3 bg-white rounded-2xl outline-none shadow-sm border border-gray-100 focus:ring-2 focus:ring-secondary/20 transition-all text-sm" />
+        <div className="relative group w-full mb-8">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <input type="text" placeholder="O que deseja comer hoje?" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-11 pr-4 py-4 bg-white rounded-2xl outline-none shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100 focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all text-sm font-medium" />
         </div>
 
         {!searchTerm && featuredProducts.length > 0 && activeCategory === 'Todos' && (
-          <section className="animate-fade-in w-full">
-             <div className="flex overflow-x-auto gap-4 pb-4 snap-x snap-mandatory custom-scrollbar-hide">
+          <section className="animate-fade-in w-full mb-8 space-y-3">
+             <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest">Destaques</h2>
+             <div className="flex overflow-x-auto gap-4 pb-4 snap-x snap-mandatory custom-scrollbar-hide -mx-4 px-4">
                {featuredProducts.map((featuredProduct) => (
-                 <div key={featuredProduct.id} className="w-[85vw] max-w-[340px] sm:max-w-[400px] snap-center shrink-0 bg-white rounded-[1.5rem] sm:rounded-[2rem] p-3 sm:p-4 shadow-xl border border-orange-100 flex flex-row gap-3 sm:gap-4 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-1.5 sm:p-2 bg-orange-500 text-white rounded-bl-2xl z-20 shadow-sm"><Flame size={12} className="animate-pulse" /></div>
-                    <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shrink-0 shadow-sm border border-gray-100 relative">
+                 <div key={featuredProduct.id} className="w-[85vw] max-w-[320px] sm:max-w-[360px] snap-center shrink-0 bg-white rounded-3xl p-3 sm:p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 flex flex-col gap-3 relative overflow-hidden group">
+                    <div className="absolute top-4 right-4 bg-orange-500 text-white text-[8px] font-black uppercase px-2 py-1 rounded-full z-20 shadow-sm flex items-center gap-1"><Flame size={10} className="animate-pulse" /> Top</div>
+                    <div className="w-full h-40 rounded-2xl overflow-hidden shrink-0 bg-slate-50 relative group-hover:shadow-inner transition-shadow">
                         <img 
                           src={featuredProduct.imageUrl} 
-                          className="w-full h-full object-cover transition-transform group-hover:scale-110 duration-700 cursor-pointer" 
+                          className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-700 cursor-pointer" 
                           alt={featuredProduct.name} 
                           onClick={(e) => { e.stopPropagation(); setExpandedImage(featuredProduct.imageUrl!); }}
                         />
                     </div>
-                    <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
+                    <div className="flex-1 min-w-0 flex flex-col justify-between py-1 px-1">
                        <div className="min-w-0">
-                          <div className="flex items-center gap-1 mb-1"><span className="bg-orange-100 text-orange-600 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">Destaque</span></div>
-                          <h3 className="text-xs sm:text-sm font-bold text-primary truncate leading-tight">{featuredProduct.name}</h3>
-                          <p className="text-[9px] sm:text-[10px] text-gray-500 line-clamp-2 mt-1 leading-tight whitespace-normal">{featuredProduct.description}</p>
+                          <h3 className="text-base sm:text-lg font-bold text-slate-800 leading-tight mb-1">{featuredProduct.name}</h3>
+                          <p className="text-[11px] text-slate-500 line-clamp-2 leading-snug">{featuredProduct.description}</p>
                        </div>
-                       <div className="flex items-end justify-between gap-1 mt-1">
-                          <span className="text-sm sm:text-lg font-black text-secondary whitespace-nowrap">
+                       <div className="flex items-center justify-between gap-2 mt-4">
+                          <span className="text-lg sm:text-xl font-black text-primary">
                             {featuredProduct.price > 0 ? `R$ ${featuredProduct.price.toFixed(2)}${featuredProduct.isByWeight ? '/kg' : ''}` : ''}
                           </span>
                           {!isStoreClosed && (
                             <button 
                               onClick={() => handleAddToCart(featuredProduct)} 
-                              className={`px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-white font-bold text-[9px] sm:text-[11px] shadow-lg active:scale-95 transition-all flex items-center gap-1.5 shrink-0 ${isWaitstaff ? 'bg-secondary' : 'bg-primary'}`}
+                              className={`px-4 py-2.5 rounded-xl text-white font-bold text-xs shadow-md active:scale-95 transition-all flex items-center gap-1.5 shrink-0 hover:opacity-90 ${isWaitstaff ? 'bg-secondary' : 'bg-primary'}`}
                             >
-                              <PlusIcon size={12} /> 
-                              <span className="whitespace-nowrap uppercase">ADICIONAR</span>
+                              <PlusIcon size={14} /> 
+                              <span className="whitespace-nowrap uppercase">Adicionar</span>
                             </button>
                           )}
                        </div>
@@ -1129,43 +1159,45 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
           </section>
         )}
 
-        <div className="flex gap-2 overflow-x-auto no-scrollbar py-1 -mx-3 sm:-mx-4 px-3 sm:px-4 w-full">
-            {categories.map(cat => (
-              <button key={cat} onClick={() => { setActiveCategory(cat); setSearchTerm(''); }} className={`px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl whitespace-nowrap font-bold text-[10px] sm:text-[11px] border transition-all ${activeCategory === cat ? (isWaitstaff ? 'bg-secondary text-white border-secondary shadow-sm' : 'bg-primary text-white border-primary shadow-sm') : 'bg-white text-gray-400 border-gray-100'}`}>{cat}</button>
-            ))}
+        <div className="sticky top-16 md:top-[72px] z-20 bg-slate-50/80 backdrop-blur-md pb-4 pt-2 -mx-4 px-4 border-b border-slate-100 mb-6">
+          <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
+              {categories.map(cat => (
+                <button key={cat} onClick={() => { setActiveCategory(cat); setSearchTerm(''); }} className={`px-5 py-2.5 rounded-xl whitespace-nowrap font-bold text-[11px] transition-all ${activeCategory === cat ? (isWaitstaff ? 'bg-secondary text-white shadow-md' : 'bg-primary text-white shadow-md') : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-100'}`}>{cat}</button>
+              ))}
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
           {filteredProducts.map(product => (
             <div 
               key={product.id} 
-              className={`bg-white rounded-2xl p-2.5 sm:p-3 shadow-sm flex gap-2.5 sm:gap-3 items-center border border-gray-50 transition-all w-full box-border ${!product.isActive ? 'opacity-50 grayscale' : ''}`}
+              className={`bg-white rounded-[1.5rem] p-3 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] flex gap-4 items-center border border-slate-100 transition-all w-full box-border group ${!product.isActive ? 'opacity-50 grayscale' : ''}`}
             >
               <div className="relative shrink-0">
                 <img 
                   src={product.imageUrl} 
-                  className="w-16 h-16 sm:w-18 sm:h-18 md:w-20 md:h-20 object-cover rounded-xl cursor-pointer" 
+                  className="w-24 h-24 sm:w-28 sm:h-28 object-cover rounded-xl cursor-pointer transition-transform group-hover:scale-105" 
                   alt={product.name} 
                   onClick={(e) => { e.stopPropagation(); setExpandedImage(product.imageUrl!); }}
                 />
-                {product.isByWeight && <div className="absolute -top-1 -right-1 bg-blue-600 text-white p-1 rounded-lg border border-white shadow-sm"><Scale size={10} /></div>}
+                {product.isByWeight && <div className="absolute -top-2 -right-2 bg-blue-600 text-white p-1.5 rounded-lg shadow-md border-2 border-white"><Scale size={12} /></div>}
               </div>
-              <div className="flex-1 min-w-0 flex flex-col justify-between h-full py-0.5">
+              <div className="flex-1 min-w-0 flex flex-col justify-between h-full py-1">
                 <div className="min-w-0">
-                  <h3 className="font-bold text-[11px] sm:text-[12px] md:text-sm leading-tight text-zinc-900">{product.name}</h3>
-                  <p className="text-[9px] sm:text-[10px] text-gray-500 mt-0.5 whitespace-pre-wrap line-clamp-3">{product.description}</p>
+                  <h3 className="font-bold text-sm md:text-base leading-tight text-slate-800 mb-1">{product.name}</h3>
+                  <p className="text-[11px] text-slate-500 whitespace-normal line-clamp-2 leading-relaxed">{product.description}</p>
                 </div>
-                <div className="flex items-center justify-between mt-2 gap-1.5">
-                  {product.price > 0 && <span className="font-bold text-secondary text-[10px] sm:text-xs md:text-sm whitespace-nowrap">R$ {product.price.toFixed(2)}{product.isByWeight ? '/kg' : ''}</span>}
+                <div className="flex items-center justify-between mt-3 gap-2">
+                  {product.price > 0 && <span className="font-black text-primary text-sm sm:text-md">R$ {product.price.toFixed(2)}{product.isByWeight ? '/kg' : ''}</span>}
                   {!isStoreClosed && (
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
                         handleAddToCart(product);
                       }} 
-                      className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-white flex items-center gap-1 shadow-sm text-[9px] sm:text-[10px] font-bold transition-all active:scale-95 shrink-0 ${isWaitstaff ? 'bg-secondary' : 'bg-primary'}`}
+                      className={`w-8 h-8 rounded-full text-white flex items-center justify-center shadow-md text-xs font-bold transition-all active:scale-90 hover:-translate-y-0.5 shrink-0 ${isWaitstaff ? 'bg-secondary' : 'bg-primary'}`}
                     >
-                      <PlusIcon size={12} /> <span className="whitespace-nowrap uppercase">Add</span>
+                      <PlusIcon size={16} />
                     </button>
                   )}
                 </div>
