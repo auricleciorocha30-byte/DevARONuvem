@@ -40,7 +40,8 @@ import {
   Globe,
   Clock,
   QrCode,
-  CheckCircle2
+  CheckCircle2,
+  Percent
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Product, StoreSettings, Order, OrderItem, OrderType, PaymentMethod, Waitstaff, CartComplementItem, ComplementCategory } from '../types';
@@ -96,11 +97,19 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const [trackedOrders, setTrackedOrders] = useState<Order[]>([]);
   const [isTrackingLoading, setIsTrackingLoading] = useState(false);
 
-  const getPromotionalPrice = (product: Product) => {
-    if (!settings?.isCouponActive || product.price <= 0) return null;
+  const getPromotionalPrice = (product: Product, customBasePrice?: number) => {
+    const base = customBasePrice !== undefined ? customBasePrice : product.price;
+    if (!settings?.isCouponActive || base <= 0) return null;
     const isApplicable = settings.isCouponForAllProducts || settings.applicableProductIds?.includes(product.id);
     if (!isApplicable || !settings.couponDiscount || settings.couponDiscount <= 0) return null;
-    return product.price * (1 - settings.couponDiscount / 100);
+    return base * (1 - settings.couponDiscount / 100);
+  };
+
+  const getPromotionalDiscountPercentage = (product: Product) => {
+    if (!settings?.isCouponActive) return null;
+    const isApplicable = settings.isCouponForAllProducts || settings.applicableProductIds?.includes(product.id);
+    if (!isApplicable || !settings.couponDiscount || settings.couponDiscount <= 0) return null;
+    return settings.couponDiscount;
   };
 
   useEffect(() => {
@@ -534,8 +543,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
     setCart(prev => {
       let cartItemId = product.id;
       let itemName = product.name;
-      const promoPrice = getPromotionalPrice(product);
-      let itemPrice = promoPrice !== null ? promoPrice : product.price;
+      let rawPrice = product.price;
 
       if (complementsToAdd && complementsToAdd.length > 0) {
         // Create unique ID by appending sorted complement item IDs
@@ -545,8 +553,11 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
         
         // Add complement prices to base item price
         const complementsTotal = complementsToAdd.reduce((sum, c) => sum + (c.price * c.quantity), 0);
-        itemPrice += complementsTotal;
+        rawPrice += complementsTotal;
       }
+
+      const promoPrice = getPromotionalPrice(product, rawPrice);
+      let itemPrice = promoPrice !== null ? promoPrice : rawPrice;
 
       const existing = prev.find(item => item.productId === cartItemId);
       const currentQty = existing ? existing.quantity : 0;
@@ -1129,6 +1140,14 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                  </div>
                                );
                              }
+                             const discountPercentage = getPromotionalDiscountPercentage(featuredProduct);
+                             if (featuredProduct.price <= 0 && discountPercentage) {
+                               return (
+                                 <span className="text-sm font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 flex items-center gap-1">
+                                   <Percent size={12} /> {discountPercentage}% OFF
+                                 </span>
+                               );
+                             }
                              return (
                                <span className="text-lg sm:text-xl font-black text-primary">
                                  {featuredProduct.price > 0 ? `R$ ${featuredProduct.price.toFixed(2)}${featuredProduct.isByWeight ? '/kg' : ''}` : ''}
@@ -1190,6 +1209,14 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                            <span className="text-[10px] text-slate-400 line-through">De R$ {product.price.toFixed(2)}</span>
                            <span className="font-black text-primary text-sm sm:text-md">por R$ {promoPrice.toFixed(2)}{product.isByWeight ? '/kg' : ''}</span>
                          </div>
+                       );
+                     }
+                     const discountPercentage = getPromotionalDiscountPercentage(product);
+                     if (product.price <= 0 && discountPercentage) {
+                       return (
+                         <span className="text-sm font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 flex items-center gap-1">
+                           <Percent size={12} /> {discountPercentage}% OFF
+                         </span>
                        );
                      }
                      return product.price > 0 ? <span className="font-black text-primary text-sm sm:text-md">R$ {product.price.toFixed(2)}{product.isByWeight ? '/kg' : ''}</span> : <span />;
@@ -1772,6 +1799,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
           quantity={complementsQuantity}
           onClose={() => setComplementsProduct(null)}
           onQuantityChange={setComplementsQuantity}
+          getPromotionalPrice={getPromotionalPrice}
           onToggleComplement={(category, item, currentQty, maxCategoryQty) => {
              const catItems = selectedComplements.filter(sc => sc.categoryId === category.id);
              const currentCatCount = catItems.reduce((sum, sc) => sum + sc.quantity, 0);

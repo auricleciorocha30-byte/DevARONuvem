@@ -10,6 +10,7 @@ interface Props {
   onQuantityChange: (q: number) => void;
   onToggleComplement: (category: ComplementCategory, item: any, currentQty: number, maxCategoryQty: number) => void;
   onConfirm: () => void;
+  getPromotionalPrice?: (product: Product, customBasePrice?: number) => number | null;
 }
 
 export const ComplementsModal: React.FC<Props> = ({ 
@@ -19,7 +20,8 @@ export const ComplementsModal: React.FC<Props> = ({
   onClose, 
   onQuantityChange, 
   onToggleComplement, 
-  onConfirm 
+  onConfirm,
+  getPromotionalPrice
 }) => {
   const complements = product.complements || [];
   
@@ -29,9 +31,6 @@ export const ComplementsModal: React.FC<Props> = ({
       
       let min = cat.minQuantity || 0;
       if (cat.isRequired && min === 0) {
-          // Se a categoria é obrigatória mas o lojista deixou min=0, 
-          // assumimos que o cliente precisa cumprir a quantidade máxima (ex: "Escolha 2" -> precisa escolher 2)
-          // ou pelo menos 1.
           min = cat.maxQuantity || 1;
       }
 
@@ -40,10 +39,16 @@ export const ComplementsModal: React.FC<Props> = ({
     });
   }, [complements, selectedComplements]);
 
-  const calculateTotal = useMemo(() => {
+  const rawUnitTotal = useMemo(() => {
     const complementsTotal = selectedComplements.reduce((sum, sc) => sum + (sc.price * sc.quantity), 0);
-    return (product.price + complementsTotal) * quantity;
-  }, [product.price, selectedComplements, quantity]);
+    return product.price + complementsTotal;
+  }, [product.price, selectedComplements]);
+
+  const calculateTotal = useMemo(() => {
+    const promoPrice = getPromotionalPrice ? getPromotionalPrice(product, rawUnitTotal) : null;
+    const finalPrice = promoPrice !== null ? promoPrice : rawUnitTotal;
+    return finalPrice * quantity;
+  }, [rawUnitTotal, quantity, getPromotionalPrice, product]);
 
   return (
     <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-6">

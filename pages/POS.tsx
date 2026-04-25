@@ -33,7 +33,8 @@ import {
   Award,
   MessageCircle,
   Zap,
-  Globe
+  Globe,
+  Percent
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Product, Order, OrderItem, StoreSettings, Waitstaff, PaymentMethod, Customer, OrderStatus, CartComplementItem, ComplementCategory } from '../types';
@@ -1188,12 +1189,20 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
     }
   };
 
-  const getPromotionalPrice = (product: Product) => {
-    if (!settings.isCouponActive || !settings.couponDiscount || settings.couponDiscount <= 0 || product.price <= 0) return null;
+  const getPromotionalPrice = (product: Product, customBasePrice?: number) => {
+    const base = customBasePrice !== undefined ? customBasePrice : product.price;
+    if (!settings.isCouponActive || !settings.couponDiscount || settings.couponDiscount <= 0 || base <= 0) return null;
     const isApplicable = settings.isCouponForAllProducts || settings.applicableProductIds?.includes(product.id);
     if (!isApplicable) return null;
-    const discount = product.price * (settings.couponDiscount / 100);
-    return product.price - discount;
+    const discount = base * (settings.couponDiscount / 100);
+    return base - discount;
+  };
+
+  const getPromotionalDiscountPercentage = (product: Product) => {
+    if (!settings.isCouponActive) return null;
+    const isApplicable = settings.isCouponForAllProducts || settings.applicableProductIds?.includes(product.id);
+    if (!isApplicable || !settings.couponDiscount || settings.couponDiscount <= 0) return null;
+    return settings.couponDiscount;
   };
 
   const handleProductClick = (product: Product) => {
@@ -1221,8 +1230,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
     setCart(prev => {
       let cartItemId = product.id;
       let itemName = product.name;
-      const promoPrice = getPromotionalPrice(product);
-      let itemPrice = promoPrice !== null ? promoPrice : product.price;
+      let rawPrice = product.price;
 
       if (complementsToAdd && complementsToAdd.length > 0) {
         // Create unique ID by appending sorted complement item IDs
@@ -1232,8 +1240,11 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         
         // Add complement prices to base item price
         const complementsTotal = complementsToAdd.reduce((sum, c) => sum + (c.price * c.quantity), 0);
-        itemPrice += complementsTotal;
+        rawPrice += complementsTotal;
       }
+
+      const promoPrice = getPromotionalPrice(product, rawPrice);
+      let itemPrice = promoPrice !== null ? promoPrice : rawPrice;
 
       const existing = prev.find(item => item.productId === cartItemId);
       const currentQty = existing ? existing.quantity : 0;
@@ -2852,7 +2863,21 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                   </h3>
                   <div className="mt-auto pt-1 flex justify-between items-center">
                     <span className="font-extrabold text-sm md:text-base text-gray-900 leading-none">
-                      {formatCurrency(getPromotionalPrice(product) !== null ? getPromotionalPrice(product)! : product.price)}
+                      {(() => {
+                        const promoPrice = getPromotionalPrice(product);
+                        if (promoPrice !== null) {
+                           return formatCurrency(promoPrice);
+                        }
+                        const discountPercentage = getPromotionalDiscountPercentage(product);
+                        if (product.price <= 0 && discountPercentage) {
+                           return (
+                             <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 flex items-center gap-1">
+                               <Percent size={10} /> {discountPercentage}% OFF
+                             </span>
+                           );
+                        }
+                        return formatCurrency(product.price);
+                      })()}
                     </span>
                     <div 
                       className="w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center bg-gray-50 text-gray-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-all scale-90 group-hover:scale-100"
@@ -3121,6 +3146,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
           quantity={complementsQuantity}
           onClose={() => setComplementsProduct(null)}
           onQuantityChange={setComplementsQuantity}
+          getPromotionalPrice={getPromotionalPrice}
           onToggleComplement={(category, item, currentQty, maxCategoryQty) => {
              const catItems = selectedComplements.filter(sc => sc.categoryId === category.id);
              const currentCatCount = catItems.reduce((sum, sc) => sum + sc.quantity, 0);
