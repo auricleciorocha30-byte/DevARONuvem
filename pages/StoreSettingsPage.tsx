@@ -36,7 +36,8 @@ import {
   Settings,
   Tag,
   Clock,
-  CreditCard
+  CreditCard,
+  X 
 } from 'lucide-react';
 
 interface Props {
@@ -558,15 +559,26 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
 
                   {!localSettings.isCouponForAllProducts && (
                       <div className="space-y-4 animate-scale-up">
-                          <div className="relative">
-                              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                              <input 
-                                  type="text" 
-                                  placeholder="Buscar produtos para a promoção..." 
-                                  value={productSearch}
-                                  onChange={(e) => setProductSearch(e.target.value)}
-                                  className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none" 
-                              />
+                          <div className="flex gap-2">
+                              <div className="relative flex-1">
+                                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                  <input 
+                                      type="text" 
+                                      placeholder="Buscar produtos para a promoção..." 
+                                      value={productSearch}
+                                      onChange={(e) => setProductSearch(e.target.value)}
+                                      className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none" 
+                                  />
+                              </div>
+                              {localSettings.applicableProductIds && localSettings.applicableProductIds.length > 0 && (
+                                <button
+                                  onClick={() => setLocalSettings({...localSettings, applicableProductIds: []})}
+                                  className="flex items-center gap-1.5 px-4 bg-red-50 text-red-600 rounded-2xl border border-red-100 hover:bg-red-100 transition-colors font-bold text-xs"
+                                  title="Remover todos selecionados"
+                                >
+                                  <X size={16} /> Limpar
+                                </button>
+                              )}
                           </div>
 
                           <div className="grid grid-cols-1 gap-3 max-h-60 overflow-y-auto custom-scrollbar pr-2">
