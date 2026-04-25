@@ -1124,8 +1124,8 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                              if (promoPrice !== null) {
                                return (
                                  <div className="flex flex-col">
-                                   <span className="text-[10px] text-slate-400 line-through">De {formatCurrency(featuredProduct.price)}</span>
-                                   <span className="text-lg sm:text-xl font-black text-primary">por {formatCurrency(promoPrice)}{featuredProduct.isByWeight ? '/kg' : ''}</span>
+                                   <span className="text-[10px] text-slate-400 line-through">De R$ {featuredProduct.price.toFixed(2)}</span>
+                                   <span className="text-lg sm:text-xl font-black text-primary">por R$ {promoPrice.toFixed(2)}{featuredProduct.isByWeight ? '/kg' : ''}</span>
                                  </div>
                                );
                              }
@@ -1187,8 +1187,8 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                      if (promoPrice !== null) {
                        return (
                          <div className="flex flex-col">
-                           <span className="text-[10px] text-slate-400 line-through">De {formatCurrency(product.price)}</span>
-                           <span className="font-black text-primary text-sm sm:text-md">por {formatCurrency(promoPrice)}{product.isByWeight ? '/kg' : ''}</span>
+                           <span className="text-[10px] text-slate-400 line-through">De R$ {product.price.toFixed(2)}</span>
+                           <span className="font-black text-primary text-sm sm:text-md">por R$ {promoPrice.toFixed(2)}{product.isByWeight ? '/kg' : ''}</span>
                          </div>
                        );
                      }
