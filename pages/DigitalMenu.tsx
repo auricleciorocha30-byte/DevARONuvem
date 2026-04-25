@@ -96,8 +96,12 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const [trackedOrders, setTrackedOrders] = useState<Order[]>([]);
   const [isTrackingLoading, setIsTrackingLoading] = useState(false);
 
-  const [couponCode, setCouponCode] = useState('');
-  const [appliedCoupon, setAppliedCoupon] = useState<{code: string, discount: number} | null>(null);
+  const getPromotionalPrice = (product: Product) => {
+    if (!settings?.isCouponActive) return null;
+    const isApplicable = settings.isCouponForAllProducts || settings.applicableProductIds?.includes(product.id);
+    if (!isApplicable || !settings.couponDiscount || settings.couponDiscount <= 0) return null;
+    return product.price * (1 - settings.couponDiscount / 100);
+  };
 
   useEffect(() => {
     if (checkoutStep === 'success') {
@@ -530,7 +534,8 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
     setCart(prev => {
       let cartItemId = product.id;
       let itemName = product.name;
-      let itemPrice = product.price;
+      const promoPrice = getPromotionalPrice(product);
+      let itemPrice = promoPrice !== null ? promoPrice : product.price;
 
       if (complementsToAdd && complementsToAdd.length > 0) {
         // Create unique ID by appending sorted complement item IDs
@@ -583,6 +588,9 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
       const existingIndex = prev.findIndex(item => item.productId === productToAdd.id);
       const currentQty = existingIndex > -1 ? prev[existingIndex].quantity : 0;
       
+      const promoPrice = getPromotionalPrice(productToAdd);
+      const itemPrice = promoPrice !== null ? promoPrice : productToAdd.price;
+
       if (productToAdd.stock != null && (currentQty + quantityKg) > productToAdd.stock) {
         showAlert(`Estoque insuficiente! Disponível: ${productToAdd.stock.toFixed(3)} KG`);
         return prev;
@@ -600,9 +608,10 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
         productId: productToAdd.id, 
         name: productToAdd.name, 
         description: productToAdd.description,
-        price: productToAdd.price, 
+        price: itemPrice, 
         quantity: quantityKg, 
-        isByWeight: true
+        isByWeight: true,
+        originalProductId: productToAdd.id
       }];
     });
     setWeightProduct(null);
@@ -631,43 +640,14 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
     });
   };
 
-  const { subtotal, discountAmount, cartTotal, isAnyItemEligibleForCoupon } = useMemo(() => {
+  const { subtotal, cartTotal } = useMemo(() => {
     const sub = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-    let disc = 0;
-    const eligibleIds = settings.applicableProductIds || [];
-    const eligibleItems = cart.filter(item => settings.isCouponForAllProducts || eligibleIds.includes(item.productId));
-    const anyEligible = eligibleItems.length > 0;
-
-    if (appliedCoupon) {
-      if (settings.isCouponForAllProducts !== false) {
-        disc = sub * (appliedCoupon.discount / 100);
-      } else {
-        const eligibleSubtotal = cart.reduce((acc, item) => {
-           return eligibleIds.includes(item.productId) ? acc + (item.price * item.quantity) : acc;
-        }, 0);
-        disc = eligibleSubtotal * (appliedCoupon.discount / 100);
-      }
-    }
-    return { subtotal: sub, discountAmount: disc, cartTotal: Math.max(0, sub - disc), isAnyItemEligibleForCoupon: anyEligible };
-  }, [cart, appliedCoupon, settings]);
+    return { subtotal: sub, cartTotal: sub };
+  }, [cart]);
 
   const commissionRate = (isWaitstaff && (activeWaitstaff?.role === 'ATENDENTE' || activeWaitstaff?.role === 'GERENTE') && settings.waitstaffCommissions?.[activeWaitstaff.id]) || 0;
   const serviceFee = (orderType === 'MESA' || orderType === 'COMANDA') ? cartTotal * (commissionRate / 100) : 0;
   const finalTotal = cartTotal + serviceFee + (orderType === 'ENTREGA' && deliveryFee ? deliveryFee : 0);
-
-  const handleApplyCoupon = () => {
-    if (!couponCode.trim()) return;
-    if (settings.isCouponActive && couponCode.toUpperCase() === settings.couponName?.toUpperCase()) {
-      if (settings.isCouponForAllProducts === false && !isAnyItemEligibleForCoupon) {
-          alert("Este cupom não é válido para nenhum dos produtos selecionados.");
-          return;
-      }
-      setAppliedCoupon({ code: settings.couponName!, discount: settings.couponDiscount || 0 });
-      setCouponCode('');
-    } else {
-      alert("Cupom inválido ou expirado.");
-    }
-  };
 
   const handleCheckout = async () => {
     if (cart.length === 0) return;
@@ -888,8 +868,8 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
           referencePoint: orderType === 'ENTREGA' ? referencePoint.trim() : undefined,
           deliveryFee: orderType === 'ENTREGA' && deliveryFee !== null ? deliveryFee : undefined,
           waitstaffName: activeWaitstaff?.name || undefined,
-          couponApplied: appliedCoupon?.code || undefined,
-          discountAmount: discountAmount || undefined,
+          couponApplied: undefined,
+          discountAmount: undefined,
           stockDeducted: true
         };
 
@@ -899,7 +879,6 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
         }
         setGeneratedDisplayId(displayId);
         setCart([]); 
-        setAppliedCoupon(null);
         setCustomerName('');
         setCustomerPhone('');
         setDeliveryAddress('');
@@ -1135,13 +1114,27 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                     </div>
                     <div className="flex-1 min-w-0 flex flex-col justify-between py-1 px-1">
                        <div className="min-w-0">
+                          {settings?.isCashbackActive && <div className="mb-2"><span className="bg-green-100 text-green-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center w-fit gap-1"><DollarSign size={10}/> Cashback Ativo</span></div>}
                           <h3 className="text-base sm:text-lg font-bold text-slate-800 leading-tight mb-1">{featuredProduct.name}</h3>
                           <p className="text-[11px] text-slate-500 line-clamp-2 leading-snug">{featuredProduct.description}</p>
                        </div>
                        <div className="flex items-center justify-between gap-2 mt-4">
-                          <span className="text-lg sm:text-xl font-black text-primary">
-                            {featuredProduct.price > 0 ? `R$ ${featuredProduct.price.toFixed(2)}${featuredProduct.isByWeight ? '/kg' : ''}` : ''}
-                          </span>
+                          {(() => {
+                             const promoPrice = getPromotionalPrice(featuredProduct);
+                             if (promoPrice !== null) {
+                               return (
+                                 <div className="flex flex-col">
+                                   <span className="text-[10px] text-slate-400 line-through">De {formatCurrency(featuredProduct.price)}</span>
+                                   <span className="text-lg sm:text-xl font-black text-primary">por {formatCurrency(promoPrice)}{featuredProduct.isByWeight ? '/kg' : ''}</span>
+                                 </div>
+                               );
+                             }
+                             return (
+                               <span className="text-lg sm:text-xl font-black text-primary">
+                                 {featuredProduct.price > 0 ? `R$ ${featuredProduct.price.toFixed(2)}${featuredProduct.isByWeight ? '/kg' : ''}` : ''}
+                               </span>
+                             );
+                          })()}
                           {!isStoreClosed && (
                             <button 
                               onClick={() => handleAddToCart(featuredProduct)} 
@@ -1184,11 +1177,23 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
               </div>
               <div className="flex-1 min-w-0 flex flex-col justify-between h-full py-1">
                 <div className="min-w-0">
+                  {settings?.isCashbackActive && <div className="mb-1.5"><span className="bg-green-100 text-green-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center w-fit gap-1"><DollarSign size={10}/> Cashback Ativo</span></div>}
                   <h3 className="font-bold text-sm md:text-base leading-tight text-slate-800 mb-1">{product.name}</h3>
                   <p className="text-[11px] text-slate-500 whitespace-normal line-clamp-2 leading-relaxed">{product.description}</p>
                 </div>
                 <div className="flex items-center justify-between mt-3 gap-2">
-                  {product.price > 0 && <span className="font-black text-primary text-sm sm:text-md">R$ {product.price.toFixed(2)}{product.isByWeight ? '/kg' : ''}</span>}
+                  {(() => {
+                     const promoPrice = getPromotionalPrice(product);
+                     if (promoPrice !== null) {
+                       return (
+                         <div className="flex flex-col">
+                           <span className="text-[10px] text-slate-400 line-through">De {formatCurrency(product.price)}</span>
+                           <span className="font-black text-primary text-sm sm:text-md">por {formatCurrency(promoPrice)}{product.isByWeight ? '/kg' : ''}</span>
+                         </div>
+                       );
+                     }
+                     return product.price > 0 ? <span className="font-black text-primary text-sm sm:text-md">R$ {product.price.toFixed(2)}{product.isByWeight ? '/kg' : ''}</span> : <span />;
+                  })()}
                   {!isStoreClosed && (
                     <button 
                       onClick={(e) => {
@@ -1275,28 +1280,6 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                  </div>
                               </div>
                             ))}
-                         </div>
-
-                         {/* CUPOM */}
-                         <div className="pt-6 border-t border-gray-100">
-                             <div className="flex items-center gap-3 mb-3">
-                                <Tag size={18} className="text-orange-500" />
-                                <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Cupom de Desconto</span>
-                             </div>
-                             {appliedCoupon ? (
-                               <div className="flex items-center justify-between p-4 bg-green-50 border border-green-100 rounded-2xl">
-                                  <div className="flex items-center gap-3 text-green-700">
-                                     <CheckCircle size={18} />
-                                     <span className="font-bold text-sm">CUPOM: {appliedCoupon.code} (-{appliedCoupon.discount}%)</span>
-                                  </div>
-                                  <button onClick={() => setAppliedCoupon(null)} className="text-[10px] font-black text-red-400 uppercase">Remover</button>
-                               </div>
-                             ) : (
-                               <div className="flex gap-2">
-                                  <input type="text" placeholder="EX: NATAL10" value={couponCode} onChange={e => setCouponCode(e.target.value.toUpperCase())} className="flex-1 px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl outline-none font-bold" />
-                                  <button onClick={handleApplyCoupon} className="px-6 py-3 bg-primary text-white rounded-xl font-black text-[10px] uppercase">Aplicar</button>
-                               </div>
-                             )}
                          </div>
                        </>
                      )}
@@ -1571,7 +1554,6 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                <div className="p-6 border-t border-gray-100 bg-white shrink-0">
                  <div className="bg-primary p-6 rounded-[2rem] text-white space-y-2 shadow-xl shadow-black/5 mb-4">
                     <div className="flex justify-between text-xs opacity-60"><span>Subtotal</span><span>R$ {subtotal.toFixed(2)}</span></div>
-                    {discountAmount > 0 && <div className="flex justify-between text-xs text-secondary font-bold"><span>Desconto ({appliedCoupon?.code})</span><span>-R$ {discountAmount.toFixed(2)}</span></div>}
                     {serviceFee > 0 && <div className="flex justify-between text-xs text-secondary font-bold"><span>Comissão ({commissionRate > 0 ? `${commissionRate}%` : 'Atendente'})</span><span>R$ {serviceFee.toFixed(2)}</span></div>}
                     {orderType === 'ENTREGA' && deliveryFee !== null && <div className="flex justify-between text-xs text-secondary font-bold"><span>Taxa de Entrega (Itens + Taxa)</span><span>R$ {deliveryFee.toFixed(2)} (R$ {(cartTotal + deliveryFee).toFixed(2)})</span></div>}
                     <div className="flex justify-between items-end pt-2">

@@ -531,7 +531,7 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
           <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                <Ticket size={18} /> Cupom de Desconto
+                <Ticket size={18} /> Preço Promocional
               </h2>
               <Switch checked={localSettings.isCouponActive || false} onChange={(v) => setLocalSettings({...localSettings, isCouponActive: v})} />
             </div>
@@ -539,11 +539,7 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
             <div className={`space-y-6 transition-all ${localSettings.isCouponActive ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
               <div className="grid grid-cols-1 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-2">Nome do Cupom</label>
-                  <input type="text" placeholder="Ex: BEMVINDO10" value={localSettings.couponName || ''} onChange={(e) => setLocalSettings({...localSettings, couponName: e.target.value.toUpperCase()})} className="w-full px-4 py-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none font-bold" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-2">Porcentagem (%)</label>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-2">Desconto (%)</label>
                   <div className="relative">
                     <Percent className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
                     <input type="number" placeholder="10" value={localSettings.couponDiscount || ''} onChange={(e) => setLocalSettings({...localSettings, couponDiscount: Number(e.target.value)})} className="w-full pl-4 pr-12 py-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none font-bold" />
@@ -566,7 +562,7 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                               <input 
                                   type="text" 
-                                  placeholder="Buscar produtos para o cupom..." 
+                                  placeholder="Buscar produtos para a promoção..." 
                                   value={productSearch}
                                   onChange={(e) => setProductSearch(e.target.value)}
                                   className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none" 

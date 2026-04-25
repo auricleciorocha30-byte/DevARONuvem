@@ -1188,6 +1188,14 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
     }
   };
 
+  const getPromotionalPrice = (product: Product) => {
+    if (!settings.isCouponActive || !settings.couponDiscount || settings.couponDiscount <= 0) return null;
+    const isApplicable = settings.isCouponForAllProducts || settings.applicableProductIds?.includes(product.id);
+    if (!isApplicable) return null;
+    const discount = product.price * (settings.couponDiscount / 100);
+    return product.price - discount;
+  };
+
   const handleProductClick = (product: Product) => {
     if (product.stock != null && product.stock <= 0) {
       alert("Produto sem estoque!");
@@ -1213,7 +1221,8 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
     setCart(prev => {
       let cartItemId = product.id;
       let itemName = product.name;
-      let itemPrice = product.price;
+      const promoPrice = getPromotionalPrice(product);
+      let itemPrice = promoPrice !== null ? promoPrice : product.price;
 
       if (complementsToAdd && complementsToAdd.length > 0) {
         // Create unique ID by appending sorted complement item IDs
@@ -2843,7 +2852,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                   </h3>
                   <div className="mt-auto pt-1 flex justify-between items-center">
                     <span className="font-extrabold text-sm md:text-base text-gray-900 leading-none">
-                      {formatCurrency(product.price)}
+                      {formatCurrency(getPromotionalPrice(product) !== null ? getPromotionalPrice(product)! : product.price)}
                     </span>
                     <div 
                       className="w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center bg-gray-50 text-gray-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-all scale-90 group-hover:scale-100"
