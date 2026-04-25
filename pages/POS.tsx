@@ -1189,7 +1189,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
   };
 
   const getPromotionalPrice = (product: Product) => {
-    if (!settings.isCouponActive || !settings.couponDiscount || settings.couponDiscount <= 0) return null;
+    if (!settings.isCouponActive || !settings.couponDiscount || settings.couponDiscount <= 0 || product.price <= 0) return null;
     const isApplicable = settings.isCouponForAllProducts || settings.applicableProductIds?.includes(product.id);
     if (!isApplicable) return null;
     const discount = product.price * (settings.couponDiscount / 100);

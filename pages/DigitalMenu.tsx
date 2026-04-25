@@ -97,7 +97,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const [isTrackingLoading, setIsTrackingLoading] = useState(false);
 
   const getPromotionalPrice = (product: Product) => {
-    if (!settings?.isCouponActive) return null;
+    if (!settings?.isCouponActive || product.price <= 0) return null;
     const isApplicable = settings.isCouponForAllProducts || settings.applicableProductIds?.includes(product.id);
     if (!isApplicable || !settings.couponDiscount || settings.couponDiscount <= 0) return null;
     return product.price * (1 - settings.couponDiscount / 100);
