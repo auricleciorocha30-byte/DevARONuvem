@@ -73,7 +73,7 @@ function StoreContext() {
 
   const [googleUser, setGoogleUser] = useState<User | null>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
-  const [masterEmail, setMasterEmail] = useState(import.meta.env.VITE_MASTER_EMAIL || 'auricleciorocha30@gmail.com');
+  const [masterEmail, setMasterEmail] = useState('auricleciorocha30@gmail.com');
   const [secondaryEmail, setSecondaryEmail] = useState('');
 
   useEffect(() => {
