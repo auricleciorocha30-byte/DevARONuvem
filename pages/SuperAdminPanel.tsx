@@ -82,7 +82,11 @@ export default function SuperAdminPanel() {
     } catch (error: any) {
       console.error("Erro no login:", error);
       if (error.code !== 'auth/popup-closed-by-user') {
-          setLoginError('Falha na autenticação com Google.');
+          // Display more descriptive error for debugging
+          const errorMsg = error.code === 'auth/unauthorized-domain' 
+            ? 'Domínio não autorizado no Firebase. Adicione este domínio nas configurações de autenticação.' 
+            : `Erro: ${error.code || error.message}`;
+          setLoginError(`Falha na autenticação: ${errorMsg}`);
       }
     }
   };
