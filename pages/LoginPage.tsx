@@ -25,9 +25,11 @@ import {
 
 interface Props {
   onLoginSuccess: (user: any) => void;
+  onGoogleLogin?: () => Promise<void>;
+  isGoogleAuthenticated?: boolean;
 }
 
-export default function LoginPage({ onLoginSuccess }: Props) {
+export default function LoginPage({ onLoginSuccess, onGoogleLogin, isGoogleAuthenticated }: Props) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
@@ -342,6 +344,27 @@ export default function LoginPage({ onLoginSuccess }: Props) {
                   Acesso restrito à unidade: {storeSlug || 'Master'}
                 </p>
               </div>
+
+              {onGoogleLogin && !isGoogleAuthenticated && (
+                <div className="space-y-4 mb-8">
+                  <button
+                    type="button"
+                    onClick={onGoogleLogin}
+                    className="w-full flex items-center justify-center gap-3 py-4 bg-white border border-gray-200 rounded-2xl font-bold text-gray-700 shadow-sm hover:bg-gray-50 transition-all active:scale-95 px-6"
+                  >
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/pickers/google.svg" alt="Google" className="w-5 h-5" />
+                    Entrar com Google (Acesso Master)
+                  </button>
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                      <div className="w-full border-t border-gray-100"></div>
+                    </div>
+                    <div className="relative flex justify-center text-[10px] uppercase font-black tracking-widest text-gray-300">
+                      <span className="bg-white px-4">Ou use login de colaborador</span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <form onSubmit={handleLogin} className="space-y-6">
                 <div className="space-y-1">

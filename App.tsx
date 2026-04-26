@@ -46,6 +46,9 @@ import KitchenBoard from './pages/KitchenBoard.tsx';
 import SuperAdminPanel from './pages/SuperAdminPanel.tsx';
 import IntegrationsPage from './pages/IntegrationsPage.tsx';
 
+import { auth, signInWithGoogle } from './lib/firebase.ts';
+import { onAuthStateChanged, User, signOut } from 'firebase/auth';
+
 const SOUNDS = {
   NEW_ORDER: 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3',
   ORDER_READY: 'https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3'
@@ -66,6 +69,32 @@ export default function App() {
 function StoreContext() {
   const [searchParams] = useSearchParams();
   const location = useLocation();
+
+  const [googleUser, setGoogleUser] = useState<User | null>(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setGoogleUser(user);
+      setCheckingAuth(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const MASTER_EMAIL = 'auricleciorocha30@gmail.com';
+  const isMaster = googleUser?.email === MASTER_EMAIL;
+
+  const handleGoogleLogin = async () => {
+    try {
+      await signInWithGoogle();
+    } catch (e) {
+      console.error("Login Error:", e);
+    }
+  };
+
+  const handleGoogleLogout = async () => {
+    await signOut(auth);
+  };
   
   const storeSlug = useMemo(() => {
     const slug = searchParams.get('loja');
@@ -842,6 +871,46 @@ function StoreContext() {
   const lojaParam = storeSlug ? `?loja=${storeSlug}` : '';
   const loginRedirect = `/login${lojaParam}${lojaParam ? '&' : '?'}view=login`;
 
+  // Ecosystem Firewall: Restrict access to 管理/POS routes
+  // Except for Digital Menu and Public Success pages
+  const isPublicPath = location.pathname.startsWith('/cardapio') || location.pathname === '/pagamento-ok' || location.pathname === '/login';
+  
+  if (checkingAuth) return <div className="min-h-screen bg-slate-900 flex items-center justify-center"><Loader2 className="animate-spin text-secondary" size={48} /></div>;
+
+  // If not on a public path, and not a Master Google user, redirect or block
+  if (!isPublicPath) {
+    if (!googleUser) {
+      return <Navigate to={`/login${lojaParam}`} replace />;
+    }
+    if (!isMaster) {
+      return (
+        <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6 text-center">
+          <div className="bg-white p-10 rounded-[3rem] shadow-2xl max-w-sm space-y-6">
+            <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto">
+              <ShieldAlert size={48} className="text-red-500" />
+            </div>
+            <h1 className="text-2xl font-brand font-bold text-slate-800">Acesso Restrito</h1>
+            <p className="text-slate-400 font-medium leading-relaxed">
+              Esta área é reservada para a administração master. Sua conta ({googleUser.email}) não tem permissão de acesso.
+            </p>
+            <button 
+              onClick={handleGoogleLogout}
+              className="w-full py-4 bg-primary text-white rounded-2xl font-bold hover:bg-black transition-colors"
+            >
+              Trocar de Conta
+            </button>
+            <Link 
+              to={`/cardapio${lojaParam}`}
+              className="block mt-4 text-xs font-bold text-slate-300 uppercase tracking-widest"
+            >
+              Ir para o Cardápio
+            </Link>
+          </div>
+        </div>
+      );
+    }
+  }
+
   return (
     <Routes>
       <Route path="/atendimento" element={
@@ -867,7 +936,7 @@ function StoreContext() {
       } />
       <Route path="/cardapio/*" element={<DigitalMenu storeId={currentStore?.id} products={products} categories={categories} settings={settings} orders={orders} addOrder={addOrder} tableNumber={activeTable} onLogout={() => setActiveTable(null)} isWaitstaff={!!adminUser} ecosystemUsage={ecosystemUsage} refreshEcosystemUsage={loadEcosystemUsage} />} />
       <Route path="/master" element={<SuperAdminPanel />} />
-      <Route path="/login" element={<LoginPage onLoginSuccess={handleSetUser} />} />
+      <Route path="/login" element={<LoginPage onLoginSuccess={handleSetUser} onGoogleLogin={handleGoogleLogin} isGoogleAuthenticated={!!googleUser} />} />
 
       <Route path="/pagamento-ok" element={
         <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
@@ -990,6 +1059,11 @@ function AdminLayout({ settings, onLogout }: { settings: StoreSettings, onLogout
     { to: `/configuracoes${lojaParam}`, label: 'Ajustes', icon: <Settings size={20} /> },
   ];
 
+  const handleFullLogout = () => {
+    onLogout();
+    signOut(auth);
+  };
+
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-gray-50 pb-20 md:pb-0 text-zinc-900">
       {/* Mobile Header */}
@@ -998,7 +1072,7 @@ function AdminLayout({ settings, onLogout }: { settings: StoreSettings, onLogout
           <img src={settings.logoUrl} className="w-8 h-8 rounded-full border border-secondary object-cover" alt="Logo" />
           <span className="font-brand font-bold truncate max-w-[150px]">{settings.storeName}</span>
         </div>
-        <button onClick={onLogout} className="p-2 bg-white/10 rounded-xl text-red-400 hover:bg-white/20 transition-all">
+        <button onClick={handleFullLogout} className="p-2 bg-white/10 rounded-xl text-red-400 hover:bg-white/20 transition-all">
           <LogOut size={20} />
         </button>
       </header>
@@ -1022,7 +1096,7 @@ function AdminLayout({ settings, onLogout }: { settings: StoreSettings, onLogout
           <a href={`#/cozinha${lojaParam}`} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-gray-300"><ChefHat size={20} /> Produção</a>
           <a href={`#/tv${lojaParam}`} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-gray-300"><Tv size={20} /> Painel TV</a>
         </nav>
-        <div className="p-4 border-t border-white/10"><button onClick={onLogout} className="w-full flex items-center gap-3 p-3 text-red-400 font-bold"><LogOut size={18} /> Sair</button></div>
+        <div className="p-4 border-t border-white/10"><button onClick={handleFullLogout} className="w-full flex items-center gap-3 p-3 text-red-400 font-bold"><LogOut size={18} /> Sair</button></div>
       </aside>
       <main className="flex-1 overflow-auto md:p-8 p-4 bg-gray-50"><Outlet /></main>
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t h-20 md:hidden flex items-center overflow-x-auto no-scrollbar z-50 no-print px-2">
@@ -1036,7 +1110,7 @@ function AdminLayout({ settings, onLogout }: { settings: StoreSettings, onLogout
           <Truck size={20} />
           <span className="text-[9px] font-bold uppercase truncate w-full text-center px-1">Entregas</span>
         </a>
-        <button onClick={onLogout} className="flex flex-col items-center justify-center gap-1 flex-shrink-0 min-w-[72px] h-full text-red-500">
+        <button onClick={handleFullLogout} className="flex flex-col items-center justify-center gap-1 flex-shrink-0 min-w-[72px] h-full text-red-500">
           <LogOut size={20} />
           <span className="text-[9px] font-bold uppercase truncate w-full text-center px-1">Sair</span>
         </button>
