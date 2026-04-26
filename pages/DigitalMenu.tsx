@@ -294,11 +294,15 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
     setIsCalculatingFee(true);
     try {
       // Geocode Store Address
-      const storeRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(settings.address)}`);
+      const storeRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(settings.address)}&countrycodes=br&limit=1`);
       const storeData = await storeRes.json();
       
-      // Geocode Customer Address
-      const customerRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(targetAddress)}`);
+      // Geocode Customer Address - Add context from store address to help Nominatim
+      const storeParts = settings.address.split(',');
+      const cityContext = storeParts.length > 1 ? storeParts[storeParts.length - 1].trim() : '';
+      const customerQuery = cityContext ? `${targetAddress}, ${cityContext}` : targetAddress;
+
+      const customerRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(customerQuery)}&countrycodes=br&limit=1`);
       const customerData = await customerRes.json();
 
       if (storeData.length === 0) {
@@ -347,7 +351,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
           setDeliveryFee(appliedFee);
           setIsFeeConfirmed(false); // Require confirmation
         } else {
-          alert("Endereço fora da área de entrega programada.");
+          alert(`Endereço fora da área de entrega programada. (Distância calculada: ${distance.toFixed(1)}km). Por favor, fale conosco pelo WhatsApp.`);
           setDeliveryFee(null);
           setDeliveryDistanceKm(null);
           setIsFeeConfirmed(false);
@@ -1452,7 +1456,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                   </div>
                                   {settings.isDeliveryFeeActive && (
                                     <button 
-                                      onClick={calculateDeliveryFee}
+                                      onClick={() => calculateDeliveryFee()}
                                       disabled={isCalculatingFee || !deliveryAddress.trim()}
                                       className="px-4 py-4 bg-orange-50 text-orange-600 rounded-2xl font-bold text-xs uppercase tracking-widest border border-orange-100 disabled:opacity-50 whitespace-nowrap"
                                     >

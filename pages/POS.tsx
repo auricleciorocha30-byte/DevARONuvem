@@ -322,11 +322,15 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
     setIsCalculatingFee(true);
     try {
       // Geocode Store Address
-      const storeRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(settings.address)}`);
+      const storeRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(settings.address)}&countrycodes=br&limit=1`);
       const storeData = await storeRes.json();
       
-      // Geocode Customer Address
-      const customerRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(deliveryDetails.address)}`);
+      // Geocode Customer Address - Add context from store address
+      const storeParts = settings.address.split(',');
+      const cityContext = storeParts.length > 1 ? storeParts[storeParts.length - 1].trim() : '';
+      const customerQuery = cityContext ? `${deliveryDetails.address}, ${cityContext}` : deliveryDetails.address;
+
+      const customerRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(customerQuery)}&countrycodes=br&limit=1`);
       const customerData = await customerRes.json();
 
       if (storeData.length === 0) {
