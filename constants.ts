@@ -8,6 +8,11 @@ export const COLORS = {
   text: '#1f2937'
 };
 
+export const ALLOWED_EMAILS = [
+  'auricleciorocha30@gmail.com',
+  'backup.loja.dev@gmail.com' // Placeholder for second email as requested
+];
+
 export const INITIAL_SETTINGS: StoreSettings = {
   isStoreOpen: true,
   isDeliveryActive: true,

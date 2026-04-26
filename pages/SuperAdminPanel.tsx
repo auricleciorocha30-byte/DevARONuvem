@@ -35,19 +35,62 @@ import {
   LogOut,
   Download,
   Upload,
-  Clock
+  Clock,
+  LogIn
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { auth, googleProvider, signInWithPopup, onAuthStateChanged, signOut, User } from '../lib/firebase';
+import { ALLOWED_EMAILS } from '../constants';
 import { StoreProfile, Product, Waitstaff } from '../types';
 import { INITIAL_SETTINGS } from '../constants';
 
 export default function SuperAdminPanel() {
-  const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    return localStorage.getItem('master_logged_in') === 'true';
-  });
-  const [loginUsername, setLoginUsername] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
+  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
+  const [isAuthenticating, setIsAuthenticating] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loginError, setLoginError] = useState('');
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user && user.email && ALLOWED_EMAILS.includes(user.email)) {
+        setFirebaseUser(user);
+        setIsLoggedIn(true);
+      } else {
+        setFirebaseUser(null);
+        setIsLoggedIn(false);
+        if (user && user.email) {
+            setLoginError(`Acesso negado: ${user.email} não autorizado.`);
+            signOut(auth);
+        }
+      }
+      setIsAuthenticating(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleGoogleLogin = async () => {
+    setLoginError('');
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+      if (user.email && ALLOWED_EMAILS.includes(user.email)) {
+        setIsLoggedIn(true);
+      } else {
+        setLoginError(`O e-mail ${user.email} não tem permissão de acesso.`);
+        await signOut(auth);
+      }
+    } catch (error: any) {
+      console.error("Erro no login:", error);
+      if (error.code !== 'auth/popup-closed-by-user') {
+          setLoginError('Falha na autenticação com Google.');
+      }
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    setIsLoggedIn(false);
+  };
 
   const [stores, setStores] = useState<StoreProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -627,21 +670,13 @@ export default function SuperAdminPanel() {
     s.slug.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (loginUsername === 'master' && loginPassword === 'master123') {
-      setIsLoggedIn(true);
-      localStorage.setItem('master_logged_in', 'true');
-      setLoginError('');
-    } else {
-      setLoginError('Credenciais inválidas');
-    }
-  };
-
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    localStorage.removeItem('master_logged_in');
-  };
+  if (isAuthenticating) {
+    return (
+      <div className="min-h-screen bg-[#F0F2F5] flex items-center justify-center">
+        <Loader2 className="animate-spin text-primary" size={48} />
+      </div>
+    );
+  }
 
   if (!isLoggedIn) {
     return (
@@ -653,38 +688,26 @@ export default function SuperAdminPanel() {
             </div>
           </div>
           <h1 className="text-3xl font-brand font-bold text-center text-slate-800 mb-2">Master Control</h1>
-          <p className="text-center text-slate-500 font-medium mb-8">Acesso restrito ao administrador do sistema</p>
+          <p className="text-center text-slate-500 font-medium mb-8">Acesso restrito ao administrador do sistema via Google</p>
           
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Usuário</label>
-              <input 
-                required 
-                type="text" 
-                value={loginUsername} 
-                onChange={e => setLoginUsername(e.target.value)} 
-                className="w-full px-6 py-4 bg-slate-50 rounded-2xl outline-none font-bold border border-transparent focus:border-slate-200 transition-all" 
-                placeholder="Digite seu usuário"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Senha</label>
-              <input 
-                required 
-                type="password" 
-                value={loginPassword} 
-                onChange={e => setLoginPassword(e.target.value)} 
-                className="w-full px-6 py-4 bg-slate-50 rounded-2xl outline-none font-bold border border-transparent focus:border-slate-200 transition-all" 
-                placeholder="Digite sua senha"
-              />
-            </div>
+          <div className="space-y-6">
+            <p className="text-sm text-center text-slate-400">
+              Para acessar o ecossistema, faça login com um dos e-mails autorizados.
+            </p>
             
             {loginError && <p className="text-red-500 text-sm font-bold text-center bg-red-50 py-3 rounded-xl">{loginError}</p>}
             
-            <button type="submit" className="w-full py-5 bg-[#001F3F] text-white rounded-[1.8rem] font-bold shadow-xl hover:bg-black transition-all flex items-center justify-center gap-2 mt-4">
-              <Lock size={18} /> Acessar Painel
+            <button 
+              onClick={handleGoogleLogin}
+              className="w-full py-5 bg-[#001F3F] text-white rounded-[1.8rem] font-bold shadow-xl hover:bg-black transition-all flex items-center justify-center gap-3 mt-4"
+            >
+              <LogIn size={20} /> Entrar com Google
             </button>
-          </form>
+            
+            <div className="pt-4 text-center">
+              <p className="text-[10px] text-slate-300 uppercase tracking-tighter">Powered by DevARO Ecosystem</p>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -713,6 +736,7 @@ export default function SuperAdminPanel() {
                 <button onClick={() => setActiveSubTab('perfil')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${activeSubTab === 'perfil' ? 'bg-white shadow-sm text-primary' : 'text-slate-400'}`}>Perfil</button>
                 <button onClick={() => setActiveSubTab('inventario')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${activeSubTab === 'inventario' ? 'bg-white shadow-sm text-primary' : 'text-slate-400'}`}>Produtos</button>
                 <button onClick={() => setActiveSubTab('equipe')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${activeSubTab === 'equipe' ? 'bg-white shadow-sm text-primary' : 'text-slate-400'}`}>Usuários/Acesso</button>
+                <button onClick={handleLogout} className="px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all text-red-500 hover:bg-red-50">Sair</button>
              </div>
            </div>
 
@@ -1032,6 +1056,7 @@ export default function SuperAdminPanel() {
           <span className="font-brand font-bold text-xl tracking-tight">Master Control <span className="text-secondary font-sans text-[10px] uppercase ml-2 bg-white/10 px-2 py-0.5 rounded">v2.4</span></span>
         </div>
         <div className="flex items-center gap-4">
+            <span className="hidden md:inline text-[10px] font-bold text-white/40 uppercase tracking-widest">{firebaseUser?.email}</span>
             <button onClick={() => setShowGlobalSettings(true)} className="flex items-center gap-2 text-white/70 hover:text-white transition-colors font-bold text-sm bg-white/5 px-4 py-2 rounded-xl">
               <Settings size={18} /> Configurações Globais
             </button>
