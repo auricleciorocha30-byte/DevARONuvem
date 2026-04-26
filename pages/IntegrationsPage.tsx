@@ -19,16 +19,10 @@ import { StoreSettings } from '../types';
 interface Props {
   settings: StoreSettings;
   onSave: (settings: Partial<StoreSettings>) => Promise<void>;
-  masterEmail?: string;
-  secondaryEmail?: string;
-  onUpdateMasterEmails?: (email: string, recoveryEmail: string) => Promise<void>;
 }
 
-export default function IntegrationsPage({ settings, onSave, masterEmail, secondaryEmail, onUpdateMasterEmails }: Props) {
+export default function IntegrationsPage({ settings, onSave }: Props) {
   const [isSaving, setIsSaving] = useState(false);
-  const [newMasterEmail, setNewMasterEmail] = useState(masterEmail || '');
-  const [newSecondaryEmail, setNewSecondaryEmail] = useState(secondaryEmail || '');
-  const [isUpdatingMaster, setIsUpdatingMaster] = useState(false);
   const [formData, setFormData] = useState<Partial<StoreSettings>>({
     focusNfeToken: settings.focusNfeToken || '',
     focusNfeEnvironment: settings.focusNfeEnvironment || 'homologation',
@@ -388,86 +382,6 @@ export default function IntegrationsPage({ settings, onSave, masterEmail, second
             )}
           </div>
         </div>
-
-        {/* MASTER CONFIGURATION SECTION */}
-        {onUpdateMasterEmails && (
-          <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 flex flex-col h-full">
-            <div className="flex items-center gap-4 mb-8">
-              <div className="p-4 bg-purple-50 text-purple-600 rounded-2xl">
-                <Shield size={32} />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-gray-800">Segurança Master</h3>
-                <p className="text-xs text-gray-500">Configuração de acesso ao ecossistema</p>
-              </div>
-            </div>
-
-            <div className="space-y-6 flex-1">
-              <div className="p-4 bg-purple-50 rounded-2xl border border-purple-100 flex gap-3">
-                <AlertCircle className="text-purple-500 shrink-0" size={20} />
-                <p className="text-xs text-purple-800 leading-relaxed">
-                  Defina os e-mails Master (Google) que terão acesso total. O e-mail secundário serve como redundância caso perca acesso ao principal.
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">E-mail Master Principal</label>
-                  <div className="relative">
-                    <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                    <input
-                      type="email"
-                      value={newMasterEmail}
-                      onChange={(e) => setNewMasterEmail(e.target.value)}
-                      className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-purple-500/20 transition-all font-mono text-sm"
-                      placeholder="seu-email@gmail.com"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">E-mail de Recuperação (Secundário)</label>
-                  <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                    <input
-                      type="email"
-                      value={newSecondaryEmail}
-                      onChange={(e) => setNewSecondaryEmail(e.target.value)}
-                      className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-purple-500/20 transition-all font-mono text-sm"
-                      placeholder="email-recuperacao@gmail.com"
-                    />
-                  </div>
-                </div>
-                
-                <button
-                  onClick={async () => {
-                    if (!newMasterEmail || !newMasterEmail.includes('@')) {
-                      alert('Informe um e-mail principal válido.');
-                      return;
-                    }
-                    if (confirm(`Tem certeza que deseja atualizar os acessos master para ${newMasterEmail}${newSecondaryEmail ? ' e ' + newSecondaryEmail : ''}?`)) {
-                      setIsUpdatingMaster(true);
-                      await onUpdateMasterEmails(newMasterEmail, newSecondaryEmail);
-                      setIsUpdatingMaster(false);
-                    }
-                  }}
-                  disabled={isUpdatingMaster || (newMasterEmail === masterEmail && newSecondaryEmail === secondaryEmail)}
-                  className="w-full flex items-center justify-center gap-2 py-4 bg-purple-600 text-white rounded-2xl font-bold shadow-lg hover:opacity-90 transition-all active:scale-95 disabled:opacity-50"
-                >
-                  {isUpdatingMaster ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
-                  {isUpdatingMaster ? 'Atualizando...' : 'Atualizar Acessos Master'}
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-8 pt-6 border-t border-gray-50 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="text-purple-500" size={16} />
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Proteção Google Auth Ativa</span>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
