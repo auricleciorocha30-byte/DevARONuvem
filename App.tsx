@@ -46,8 +46,9 @@ import KitchenBoard from './pages/KitchenBoard.tsx';
 import SuperAdminPanel from './pages/SuperAdminPanel.tsx';
 import IntegrationsPage from './pages/IntegrationsPage.tsx';
 
-import { auth, signInWithGoogle } from './lib/firebase.ts';
+import { auth, signInWithGoogle, db } from './lib/firebase.ts';
 import { onAuthStateChanged, User, signOut } from 'firebase/auth';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 
 const SOUNDS = {
   NEW_ORDER: 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3',
@@ -72,17 +73,38 @@ function StoreContext() {
 
   const [googleUser, setGoogleUser] = useState<User | null>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [masterEmail, setMasterEmail] = useState(import.meta.env.VITE_MASTER_EMAIL || 'auricleciorocha30@gmail.com');
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       setGoogleUser(user);
       setCheckingAuth(false);
     });
-    return () => unsubscribe();
+
+    const unsubscribeConfig = onSnapshot(doc(db, 'system_config', 'master'), (doc) => {
+      if (doc.exists()) {
+        setMasterEmail(doc.data().email);
+      }
+    });
+
+    return () => {
+      unsubscribeAuth();
+      unsubscribeConfig();
+    };
   }, []);
 
-  const MASTER_EMAIL = 'auricleciorocha30@gmail.com';
-  const isMaster = googleUser?.email === MASTER_EMAIL;
+  const isMaster = googleUser?.email === masterEmail;
+
+  const handleUpdateMasterEmail = async (newEmail: string) => {
+    if (!isMaster) return;
+    try {
+      await setDoc(doc(db, 'system_config', 'master'), { email: newEmail });
+      alert("E-mail master atualizado com sucesso!");
+    } catch (e) {
+      console.error("Erro ao atualizar e-mail master:", e);
+      alert("Erro ao atualizar e-mail master. Verifique as permissões.");
+    }
+  };
 
   const handleGoogleLogin = async () => {
     try {
@@ -1034,7 +1056,7 @@ function StoreContext() {
         <Route path="pedidos" element={<OrdersList orders={orders} updateStatus={updateOrderStatus} products={products} addOrder={addOrder} settings={settings} updateOrder={updateOrder} />} />
         <Route path="equipe" element={<WaitstaffManagement ecosystemUsage={ecosystemUsage} refreshEcosystemUsage={loadEcosystemUsage} currentStore={currentStore!} settings={settings} onUpdateSettings={handleUpdateSettings} />} />
         <Route path="clientes" element={<CustomerManagement storeId={currentStore?.id} />} />
-        <Route path="integracoes" element={<IntegrationsPage settings={settings} onSave={handleUpdateSettings} />} />
+        <Route path="integracoes" element={<IntegrationsPage settings={settings} onSave={handleUpdateSettings} masterEmail={masterEmail} onUpdateMasterEmail={handleUpdateMasterEmail} />} />
         <Route path="configuracoes" element={<StoreSettingsPage settings={settings} products={products} onSave={handleUpdateSettings} storeId={currentStore?.id} />} />
       </Route>
 

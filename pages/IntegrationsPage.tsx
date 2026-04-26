@@ -19,10 +19,14 @@ import { StoreSettings } from '../types';
 interface Props {
   settings: StoreSettings;
   onSave: (settings: Partial<StoreSettings>) => Promise<void>;
+  masterEmail?: string;
+  onUpdateMasterEmail?: (email: string) => Promise<void>;
 }
 
-export default function IntegrationsPage({ settings, onSave }: Props) {
+export default function IntegrationsPage({ settings, onSave, masterEmail, onUpdateMasterEmail }: Props) {
   const [isSaving, setIsSaving] = useState(false);
+  const [newMasterEmail, setNewMasterEmail] = useState(masterEmail || '');
+  const [isUpdatingMaster, setIsUpdatingMaster] = useState(false);
   const [formData, setFormData] = useState<Partial<StoreSettings>>({
     focusNfeToken: settings.focusNfeToken || '',
     focusNfeEnvironment: settings.focusNfeEnvironment || 'homologation',
@@ -382,6 +386,73 @@ export default function IntegrationsPage({ settings, onSave }: Props) {
             )}
           </div>
         </div>
+
+        {/* MASTER CONFIGURATION SECTION */}
+        {onUpdateMasterEmail && (
+          <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 flex flex-col h-full">
+            <div className="flex items-center gap-4 mb-8">
+              <div className="p-4 bg-purple-50 text-purple-600 rounded-2xl">
+                <Shield size={32} />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-800">Segurança Master</h3>
+                <p className="text-xs text-gray-500">Configuração de acesso ao ecossistema</p>
+              </div>
+            </div>
+
+            <div className="space-y-6 flex-1">
+              <div className="p-4 bg-purple-50 rounded-2xl border border-purple-100 flex gap-3">
+                <AlertCircle className="text-purple-500 shrink-0" size={20} />
+                <p className="text-xs text-purple-800 leading-relaxed">
+                  Defina o e-mail Master (Google) que terá acesso total a todas as áreas administrativas sem restrições. 
+                  <strong className="block mt-1">Cuidado: Ao trocar, você perderá acesso se não usar o novo e-mail.</strong>
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">E-mail Master Atual</label>
+                  <div className="relative">
+                    <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                    <input
+                      type="email"
+                      value={newMasterEmail}
+                      onChange={(e) => setNewMasterEmail(e.target.value)}
+                      className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-purple-500/20 transition-all font-mono text-sm"
+                      placeholder="seu-email@gmail.com"
+                    />
+                  </div>
+                </div>
+                
+                <button
+                  onClick={async () => {
+                    if (!newMasterEmail || !newMasterEmail.includes('@')) {
+                      alert('Informe um e-mail válido.');
+                      return;
+                    }
+                    if (confirm(`Tem certeza que deseja transferir o acesso master para ${newMasterEmail}?`)) {
+                      setIsUpdatingMaster(true);
+                      await onUpdateMasterEmail(newMasterEmail);
+                      setIsUpdatingMaster(false);
+                    }
+                  }}
+                  disabled={isUpdatingMaster || newMasterEmail === masterEmail}
+                  className="w-full flex items-center justify-center gap-2 py-4 bg-purple-600 text-white rounded-2xl font-bold shadow-lg hover:opacity-90 transition-all active:scale-95 disabled:opacity-50"
+                >
+                  {isUpdatingMaster ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+                  {isUpdatingMaster ? 'Atualizando...' : 'Atualizar E-mail Master'}
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-8 pt-6 border-t border-gray-50 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Lock className="text-purple-500" size={16} />
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Proteção Google Auth</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
