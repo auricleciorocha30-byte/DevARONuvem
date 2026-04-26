@@ -17,10 +17,15 @@ service cloud.firestore {
     match /system_config/master {
       allow read: if true;
       allow write: if isSignedIn() && (
-        // Allow bootstrap or existing master
+        // Allow bootstrap or existing master (primary or secondary)
         (resource == null && request.auth.token.email == 'auricleciorocha30@gmail.com') ||
-        (resource != null && request.auth.token.email == resource.data.email)
-      ) && isValidEmail(request.resource.data.email);
+        (resource != null && (
+          request.auth.token.email == resource.data.email || 
+          (resource.data.keys().hasAll(['secondaryEmail']) && request.auth.token.email == resource.data.secondaryEmail)
+        ))
+      ) && 
+      isValidEmail(request.resource.data.email) &&
+      (!request.resource.data.keys().hasAll(['secondaryEmail']) || isValidEmail(request.resource.data.secondaryEmail));
     }
   }
 }

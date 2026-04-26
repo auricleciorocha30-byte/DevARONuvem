@@ -74,6 +74,7 @@ function StoreContext() {
   const [googleUser, setGoogleUser] = useState<User | null>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [masterEmail, setMasterEmail] = useState(import.meta.env.VITE_MASTER_EMAIL || 'auricleciorocha30@gmail.com');
+  const [secondaryEmail, setSecondaryEmail] = useState('');
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
@@ -84,6 +85,7 @@ function StoreContext() {
     const unsubscribeConfig = onSnapshot(doc(db, 'system_config', 'master'), (doc) => {
       if (doc.exists()) {
         setMasterEmail(doc.data().email);
+        setSecondaryEmail(doc.data().secondaryEmail || '');
       }
     });
 
@@ -93,16 +95,19 @@ function StoreContext() {
     };
   }, []);
 
-  const isMaster = googleUser?.email === masterEmail;
+  const isMaster = googleUser?.email === masterEmail || (secondaryEmail && googleUser?.email === secondaryEmail);
 
-  const handleUpdateMasterEmail = async (newEmail: string) => {
+  const handleUpdateMasterEmails = async (email: string, recoveryEmail: string) => {
     if (!isMaster) return;
     try {
-      await setDoc(doc(db, 'system_config', 'master'), { email: newEmail });
-      alert("E-mail master atualizado com sucesso!");
+      await setDoc(doc(db, 'system_config', 'master'), { 
+        email: email,
+        secondaryEmail: recoveryEmail
+      });
+      alert("E-mails de administração atualizados com sucesso!");
     } catch (e) {
-      console.error("Erro ao atualizar e-mail master:", e);
-      alert("Erro ao atualizar e-mail master. Verifique as permissões.");
+      console.error("Erro ao atualizar e-mails master:", e);
+      alert("Erro ao atualizar e-mails. Verifique as permissões.");
     }
   };
 
@@ -1056,7 +1061,7 @@ function StoreContext() {
         <Route path="pedidos" element={<OrdersList orders={orders} updateStatus={updateOrderStatus} products={products} addOrder={addOrder} settings={settings} updateOrder={updateOrder} />} />
         <Route path="equipe" element={<WaitstaffManagement ecosystemUsage={ecosystemUsage} refreshEcosystemUsage={loadEcosystemUsage} currentStore={currentStore!} settings={settings} onUpdateSettings={handleUpdateSettings} />} />
         <Route path="clientes" element={<CustomerManagement storeId={currentStore?.id} />} />
-        <Route path="integracoes" element={<IntegrationsPage settings={settings} onSave={handleUpdateSettings} masterEmail={masterEmail} onUpdateMasterEmail={handleUpdateMasterEmail} />} />
+        <Route path="integracoes" element={<IntegrationsPage settings={settings} onSave={handleUpdateSettings} masterEmail={masterEmail} secondaryEmail={secondaryEmail} onUpdateMasterEmails={handleUpdateMasterEmails} />} />
         <Route path="configuracoes" element={<StoreSettingsPage settings={settings} products={products} onSave={handleUpdateSettings} storeId={currentStore?.id} />} />
       </Route>
 

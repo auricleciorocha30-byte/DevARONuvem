@@ -5,7 +5,8 @@
       "description": "Global settings for the ecosystem",
       "type": "object",
       "properties": {
-        "email": { "type": "string", "format": "email", "description": "Master administration email" }
+        "email": { "type": "string", "format": "email", "description": "Primary master administration email" },
+        "secondaryEmail": { "type": "string", "format": "email", "description": "Secondary/Recovery master administration email" }
       },
       "required": ["email"]
     }
