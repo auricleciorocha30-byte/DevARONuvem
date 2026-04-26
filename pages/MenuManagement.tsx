@@ -106,6 +106,26 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
     (p.barcode && p.barcode.includes(searchTerm))
   );
 
+  const [visibleCount, setVisibleCount] = useState(12);
+  const loadMoreRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setVisibleCount(12);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    if (!loadMoreRef.current) return;
+    
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        setVisibleCount(prev => prev + 12);
+      }
+    }, { threshold: 0.1 });
+
+    observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [filtered, loadMoreRef.current]);
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -344,7 +364,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 overflow-y-auto custom-scrollbar max-h-[calc(100vh-200px)] p-2 -m-2">
-        {filtered.map(product => (
+        {filtered.slice(0, visibleCount).map(product => (
           <div key={product.id} className={`bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 group relative ${!product.isActive ? 'opacity-50 grayscale' : ''}`}>
             <div className="absolute top-2 right-2 flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10">
               <button onClick={() => { setEditingProduct(product); setProductTab('INFO'); setShowProductModal(true); }} className="p-2 bg-white rounded-lg shadow text-blue-500 hover:bg-blue-50">
@@ -369,7 +389,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                 )}
             </div>
 
-            <img src={product.imageUrl} className="w-full h-40 object-cover" alt={product.name} />
+            <img src={product.imageUrl} className="w-full h-40 object-cover" alt={product.name} loading="lazy" />
             <div className="p-4">
               <div className="flex justify-between items-start">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-orange-600 bg-orange-50 px-2 py-1 rounded">
@@ -383,6 +403,12 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
             </div>
           </div>
         ))}
+
+        {filtered.length > visibleCount && (
+          <div ref={loadMoreRef} className="col-span-full h-20 flex items-center justify-center">
+            <Loader2 className="animate-spin text-orange-500" size={32} />
+          </div>
+        )}
       </div>
 
       {showCategoryModal && (

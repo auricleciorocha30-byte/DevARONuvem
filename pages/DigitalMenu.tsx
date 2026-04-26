@@ -428,6 +428,26 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
     });
   }, [products, activeCategory, searchTerm]);
 
+  const [visibleCount, setVisibleCount] = useState(12);
+  const loadMoreRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setVisibleCount(12);
+  }, [searchTerm, activeCategory]);
+
+  useEffect(() => {
+    if (!loadMoreRef.current) return;
+    
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        setVisibleCount(prev => prev + 12);
+      }
+    }, { threshold: 0.1 });
+
+    observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [filteredProducts, loadMoreRef.current]);
+
   const handleBack = () => {
     if (onCloseMenu) {
       onCloseMenu();
@@ -1121,6 +1141,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                           className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-700 cursor-pointer" 
                           alt={featuredProduct.name} 
                           onClick={(e) => { e.stopPropagation(); setExpandedImage(featuredProduct.imageUrl!); }}
+                          loading="lazy"
                         />
                     </div>
                     <div className="flex-1 min-w-0 flex flex-col justify-between py-1 px-1">
@@ -1180,7 +1201,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
-          {filteredProducts.map(product => (
+          {filteredProducts.slice(0, visibleCount).map(product => (
             <div 
               key={product.id} 
               className={`bg-white rounded-[1.5rem] p-3 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] flex gap-4 items-center border border-slate-100 transition-all w-full box-border group ${!product.isActive ? 'opacity-50 grayscale' : ''}`}
@@ -1191,6 +1212,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                   className="w-24 h-24 sm:w-28 sm:h-28 object-cover rounded-xl cursor-pointer transition-transform group-hover:scale-105" 
                   alt={product.name} 
                   onClick={(e) => { e.stopPropagation(); setExpandedImage(product.imageUrl!); }}
+                  loading="lazy"
                 />
                 {product.isByWeight && <div className="absolute -top-2 -right-2 bg-blue-600 text-white p-1.5 rounded-lg shadow-md border-2 border-white"><Scale size={12} /></div>}
               </div>
@@ -1237,6 +1259,12 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
             </div>
           ))}
         </div>
+
+        {filteredProducts.length > visibleCount && (
+          <div ref={loadMoreRef} className="col-span-full h-20 flex items-center justify-center">
+            <Loader2 className="animate-spin text-primary" size={32} />
+          </div>
+        )}
       </main>
 
       {/* FLOATING CART BUTTON */}
