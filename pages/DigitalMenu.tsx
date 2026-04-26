@@ -263,6 +263,10 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
               setCustomerId(customer.id);
               setCustomerPoints(customer.points || 0);
               showSuccessAlert('Cadastro encontrado! Dados preenchidos.');
+              
+              if (orderType === 'ENTREGA' && customer.address) {
+                  calculateDeliveryFee(customer.address);
+              }
           } else {
               showAlert('Nenhum cadastro encontrado para este telefone.');
               setCustomerId(null);
@@ -276,13 +280,14 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
       }
   };
 
-  const calculateDeliveryFee = async () => {
+  const calculateDeliveryFee = async (addressOverride?: string) => {
+    const targetAddress = addressOverride || deliveryAddress;
     if (!settings.address) {
-      alert("Endereço da loja não configurado. Não é possível calcular a taxa.");
+      if (!addressOverride) alert("Endereço da loja não configurado. Não é possível calcular a taxa.");
       return;
     }
-    if (!deliveryAddress) {
-      alert("Preencha seu endereço para calcular a taxa.");
+    if (!targetAddress) {
+      if (!addressOverride) alert("Preencha seu endereço para calcular a taxa.");
       return;
     }
 
@@ -293,16 +298,16 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
       const storeData = await storeRes.json();
       
       // Geocode Customer Address
-      const customerRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(deliveryAddress)}`);
+      const customerRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(targetAddress)}`);
       const customerData = await customerRes.json();
 
       if (storeData.length === 0) {
-        alert("Não foi possível localizar o endereço da loja.");
+        if (!addressOverride) alert("Não foi possível localizar o endereço da loja.");
         setIsCalculatingFee(false);
         return;
       }
       if (customerData.length === 0) {
-        alert("Não foi possível localizar o seu endereço. Tente ser mais específico (Rua, Número, Cidade).");
+        if (!addressOverride) alert("Não foi possível localizar o seu endereço. Tente ser mais específico (Rua, Número, Cidade).");
         setIsCalculatingFee(false);
         return;
       }
@@ -396,6 +401,9 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                 }
                 if (data.address && !deliveryAddress) {
                     setDeliveryAddress(data.address);
+                    if (orderType === 'ENTREGA') {
+                        calculateDeliveryFee(data.address);
+                    }
                 }
             } else {
                 setCustomerId(null);
@@ -1344,27 +1352,10 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                      <button onClick={() => setCheckoutStep('cart')} className="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2"><ChevronLeft size={14}/> Voltar para Sacola</button>
                      
                      <div className="space-y-4">
-                        {orderType === 'MESA' || orderType === 'COMANDA' ? (
+                        {orderType === 'ENTREGA' && (
                            <div className="space-y-2">
-                              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Número da {orderType === 'MESA' ? 'Mesa' : 'Comanda'}</label>
-                              <div className="relative">
-                                 <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                                 <input type="number" value={manualTable} onChange={e => setManualTable(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-lg" placeholder="EX: 01" />
-                              </div>
-                           </div>
-                        ) : (
-                           <div className="space-y-2">
-                              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Nome do Cliente</label>
-                              <div className="relative">
-                                 <UserRound className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                                 <input type="text" value={customerName} onChange={e => setCustomerName(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold" placeholder="Digite seu nome" />
-                              </div>
-                           </div>
-                        )}
-
-                        <div className="space-y-2">
                               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">
-                                Telefone (WhatsApp) {(orderType !== 'ENTREGA' && orderType !== 'BALCAO' && orderType !== 'MESA') || isWaitstaff ? '(Opcional)' : ''}
+                                Telefone (WhatsApp)
                               </label>
                               <div className="flex gap-2">
                                 <div className="relative flex-1">
@@ -1395,6 +1386,60 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                 </button>
                               </div>
                            </div>
+                        )}
+                        {orderType === 'MESA' || orderType === 'COMANDA' ? (
+                           <div className="space-y-2">
+                              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Número da {orderType === 'MESA' ? 'Mesa' : 'Comanda'}</label>
+                              <div className="relative">
+                                 <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                                 <input type="number" value={manualTable} onChange={e => setManualTable(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-lg" placeholder="EX: 01" />
+                              </div>
+                           </div>
+                        ) : (
+                           <div className="space-y-2">
+                              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Nome do Cliente</label>
+                              <div className="relative">
+                                 <UserRound className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                                 <input type="text" value={customerName} onChange={e => setCustomerName(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold" placeholder="Digite seu nome" />
+                              </div>
+                           </div>
+                        )}
+
+                        {orderType !== 'ENTREGA' && (
+                           <div className="space-y-2">
+                              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">
+                                Telefone (WhatsApp) {(orderType !== 'BALCAO' && orderType !== 'MESA') || isWaitstaff ? '(Opcional)' : ''}
+                              </label>
+                              <div className="flex gap-2">
+                                <div className="relative flex-1">
+                                   <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                                   <input 
+                                      type="tel" 
+                                      value={customerPhone} 
+                                      onChange={e => setCustomerPhone(e.target.value)} 
+                                      onBlur={e => {
+                                          let val = e.target.value.trim();
+                                          if (val && !val.startsWith('+55') && !val.startsWith('55')) {
+                                              val = '+55' + val;
+                                          } else if (val.startsWith('55')) {
+                                              val = '+' + val;
+                                          }
+                                          setCustomerPhone(val);
+                                      }}
+                                      className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold" 
+                                      placeholder="85 9..." 
+                                   />
+                                </div>
+                                <button 
+                                  onClick={handleConsultCustomer}
+                                  disabled={isConsulting || !customerPhone.trim()}
+                                  className="px-4 py-4 bg-blue-50 text-blue-600 rounded-2xl font-bold text-xs uppercase tracking-widest border border-blue-100 disabled:opacity-50"
+                                >
+                                  {isConsulting ? '...' : 'Consultar'}
+                                </button>
+                              </div>
+                           </div>
+                        )}
 
                         {orderType === 'ENTREGA' && (
                           <>
