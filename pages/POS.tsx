@@ -339,7 +339,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         return;
       }
       if (customerData.length === 0) {
-        alert("Não foi possível localizar o endereço de destino. Tente ser mais específico (Rua, Número, Cidade).");
+        alert("Não foi possível localizar o endereço de destino. Tente ser mais específico em sua busca.");
         setIsCalculatingFee(false);
         return;
       }
@@ -375,14 +375,14 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         }
         if (appliedFee !== null) {
           setDeliveryFee(appliedFee);
-          alert(`Distância: ${distance.toFixed(1)}km. Taxa aplicada: R$ ${appliedFee.toFixed(2)}`);
+          alert(`Taxa de entrega: R$ ${appliedFee.toFixed(2)}`);
         } else {
-          alert(`Distância: ${distance.toFixed(1)}km. Endereço fora da área de entrega programada.`);
+          alert("Endereço fora da área de entrega programada.");
           setDeliveryFee(0);
         }
       } else {
         setDeliveryFee(0);
-        alert(`Distância: ${distance.toFixed(1)}km. Nenhuma regra de taxa definida.`);
+        alert("Nenhuma regra de taxa de entrega definida.");
       }
     } catch (error) {
       console.error("Error calculating fee:", error);

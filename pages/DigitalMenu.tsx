@@ -306,12 +306,12 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
       const customerData = await customerRes.json();
 
       if (storeData.length === 0) {
-        if (!addressOverride) alert("Não foi possível localizar o endereço da loja.");
+        if (!addressOverride) showAlert("Não foi possível localizar o endereço da loja.");
         setIsCalculatingFee(false);
         return;
       }
       if (customerData.length === 0) {
-        if (!addressOverride) alert("Não foi possível localizar o seu endereço. Tente ser mais específico (Rua, Número, Cidade).");
+        if (!addressOverride) showAlert("Não foi possível localizar o seu endereço. Tente ser mais específico em sua busca.");
         setIsCalculatingFee(false);
         return;
       }
@@ -351,7 +351,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
           setDeliveryFee(appliedFee);
           setIsFeeConfirmed(false); // Require confirmation
         } else {
-          alert(`Endereço fora da área de entrega programada. (Distância calculada: ${distance.toFixed(1)}km). Por favor, fale conosco pelo WhatsApp.`);
+          showAlert("Endereço fora da área de entrega programada.");
           setDeliveryFee(null);
           setDeliveryDistanceKm(null);
           setIsFeeConfirmed(false);
