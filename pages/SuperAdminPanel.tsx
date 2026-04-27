@@ -730,7 +730,7 @@ export default function SuperAdminPanel() {
 
            <div className="bg-white rounded-[3rem] p-8 shadow-xl flex flex-col md:flex-row md:items-center justify-between border border-slate-100 gap-6">
              <div className="flex items-center gap-6">
-               <img src={editingStore.logoUrl} className="w-20 h-20 rounded-2xl object-cover border-4 border-slate-50 shadow-sm" alt="Logo" />
+               <img src={editingStore.logoUrl || undefined} className="w-20 h-20 rounded-2xl object-cover border-4 border-slate-50 shadow-sm" alt="Logo" />
                <div>
                  <h1 className="text-3xl font-brand font-bold text-slate-800">{editingStore.name}</h1>
                  <p className="text-sm font-bold text-slate-400">GERENCIAMENTO DE UNIDADE</p>
@@ -762,7 +762,7 @@ export default function SuperAdminPanel() {
                     <div className="space-y-2">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Logotipo</label>
                         <div className="flex items-center gap-6">
-                            <img src={editProfileData.logoUrl} className="w-24 h-24 rounded-2xl object-cover border-4 border-slate-100 shadow-sm" alt="Preview" />
+                            <img src={editProfileData.logoUrl || undefined} className="w-24 h-24 rounded-2xl object-cover border-4 border-slate-100 shadow-sm" alt="Preview" />
                             <button type="button" onClick={() => fileInputRef.current?.click()} className="px-6 py-3 bg-slate-100 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-200 transition-all flex items-center gap-2">
                                 <Camera size={16} /> Alterar Imagem
                             </button>
@@ -982,7 +982,7 @@ export default function SuperAdminPanel() {
                     ) : storeProducts.map((prod, idx) => (
                       <div key={prod.id || idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4 group">
                         {prod.imageUrl ? (
-                           <img src={prod.imageUrl} className="w-16 h-16 rounded-xl object-cover" alt={prod.name} />
+                           <img src={prod.imageUrl || undefined} className="w-16 h-16 rounded-xl object-cover" alt={prod.name} />
                         ) : (
                            <div className="w-16 h-16 rounded-xl bg-slate-200 flex items-center justify-center text-slate-400"><Package size={24} /></div>
                         )}
@@ -1023,7 +1023,7 @@ export default function SuperAdminPanel() {
                       onClick={() => productImgInputRef.current?.click()}
                       className="w-24 h-24 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center cursor-pointer overflow-hidden relative shadow-inner"
                     >
-                      {productFormData.imageUrl ? <img src={productFormData.imageUrl} className="w-full h-full object-cover" alt="Thumb" /> : <Camera className="text-slate-300" />}
+                      {productFormData.imageUrl ? <img src={productFormData.imageUrl || undefined} className="w-full h-full object-cover" alt="Thumb" /> : <Camera className="text-slate-300" />}
                       <input type="file" ref={productImgInputRef} onChange={(e) => handleFileChange(e, 'product')} className="hidden" accept="image/*" />
                     </div>
                     <div className="flex-1 space-y-4">
@@ -1113,7 +1113,7 @@ export default function SuperAdminPanel() {
                 )}
 
                 <div className="flex items-center gap-5 mb-8">
-                  <img src={store.logoUrl} className={`w-20 h-20 rounded-[1.5rem] object-cover border-4 ${store.isActive ? 'border-secondary' : 'border-slate-200'} shadow-sm`} alt="Logo" />
+                  <img src={store.logoUrl || undefined} className={`w-20 h-20 rounded-[1.5rem] object-cover border-4 ${store.isActive ? 'border-secondary' : 'border-slate-200'} shadow-sm`} alt="Logo" />
                   <div className="min-w-0">
                     <h3 className="font-bold text-2xl text-slate-800 truncate">{store.name}</h3>
                     <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest">/{store.slug}</div>
@@ -1213,7 +1213,7 @@ export default function SuperAdminPanel() {
                 <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Logotipo</label>
                     <div onClick={() => fileInputRef.current?.click()} className="w-full h-32 bg-slate-50 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer relative overflow-hidden shadow-inner border-slate-200">
-                      {formData.logoUrl ? <img src={formData.logoUrl} className="w-full h-full object-cover" alt="Logo" /> : <Camera className="text-slate-300" />}
+                      {formData.logoUrl ? <img src={formData.logoUrl || undefined} className="w-full h-full object-cover" alt="Logo" /> : <Camera className="text-slate-300" />}
                       <input type="file" ref={fileInputRef} onChange={e => handleFileChange(e, 'store')} className="hidden" accept="image/*" />
                     </div>
                 </div>

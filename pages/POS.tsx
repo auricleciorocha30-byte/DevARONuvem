@@ -2593,7 +2593,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
           <div className="flex flex-col md:flex-row justify-between items-center gap-3">
             <div className="flex justify-between w-full md:w-auto items-center gap-3">
               {settings.logoUrl && (
-                <img src={settings.logoUrl} alt="Logo" className="h-10 w-10 md:h-12 md:w-12 object-contain rounded-full bg-white/10 p-1" />
+                <img src={settings.logoUrl || undefined} alt="Logo" className="h-10 w-10 md:h-12 md:w-12 object-contain rounded-full bg-white/10 p-1" />
               )}
               <div>
                 <h1 className="text-lg md:text-xl font-bold" style={{ color: settings.primaryColor ? '#ffffff' : '#1f2937' }}>
@@ -2841,7 +2841,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                   <div className="aspect-square rounded-lg overflow-hidden mb-2 bg-gray-50 relative shrink-0">
                     {product.imageUrl ? (
                       <img 
-                        src={product.imageUrl} 
+                        src={product.imageUrl || undefined} 
                         alt={product.name} 
                         className="w-full h-full object-cover transition-transform group-hover:scale-110" 
                         loading="lazy"
@@ -3621,7 +3621,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                       {currentPaymentMethod === 'PIX' && (!orderType || orderType !== 'ENTREGA' || !deliveryDetails.payOnDelivery) && (
                         <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex flex-col items-center gap-4 text-center">
                           {settings.pixQrCodeUrl ? (
-                            <img src={settings.pixQrCodeUrl} alt="QR Pix" className="w-48 h-48 object-contain mix-blend-multiply bg-white p-2 rounded-xl shadow-sm" />
+                            <img src={settings.pixQrCodeUrl || undefined} alt="QR Pix" className="w-48 h-48 object-contain mix-blend-multiply bg-white p-2 rounded-xl shadow-sm" />
                           ) : (
                             <QrCode size={48} className="text-gray-400" />
                           )}

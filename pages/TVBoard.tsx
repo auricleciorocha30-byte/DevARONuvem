@@ -78,7 +78,7 @@ const TVBoard: React.FC<Props> = ({ orders, settings, products }) => {
     <div className="min-h-screen bg-primary text-white p-8 overflow-hidden flex flex-col">
       <header className="flex justify-between items-center mb-8 border-b border-white/10 pb-6">
         <div className="flex items-center gap-6">
-          <img src={settings.logoUrl} className="w-20 h-20 rounded-full border-4 border-secondary shadow-xl" alt="Logo" />
+          <img src={settings.logoUrl || undefined} className="w-20 h-20 rounded-full border-4 border-secondary shadow-xl" alt="Logo" />
           <div>
             <h1 className="text-4xl font-brand font-bold">{settings.storeName}</h1>
             <p className="text-lg text-secondary uppercase tracking-widest font-medium">Painel de Atendimento</p>
@@ -141,7 +141,7 @@ const TVBoard: React.FC<Props> = ({ orders, settings, products }) => {
               {todayOffer ? (
                 <div key={todayOffer.id} className="space-y-6 flex-1 flex flex-col justify-center animate-fade-in transition-all duration-1000">
                   <div className="relative">
-                    <img src={todayOffer.imageUrl} className="w-full aspect-square object-cover rounded-[2rem] shadow-2xl border-4 border-yellow-400/20" alt="Destaque" />
+                    <img src={todayOffer.imageUrl || undefined} className="w-full aspect-square object-cover rounded-[2rem] shadow-2xl border-4 border-yellow-400/20" alt="Destaque" />
                     {todayOffers.length > 1 && (
                       <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
                         {todayOffers.map((_, i) => (

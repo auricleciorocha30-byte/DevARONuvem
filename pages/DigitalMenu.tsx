@@ -1032,7 +1032,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
           <div className="absolute -top-10 -right-10 w-32 h-32 bg-secondary opacity-10 rounded-full blur-3xl"></div>
           <div className="text-center relative z-10">
             <div className="relative inline-block mb-6">
-                <img src={settings.logoUrl} className="w-24 h-24 rounded-full border-4 border-orange-50 object-cover shadow-2xl" alt="Logo" />
+                <img src={settings.logoUrl || undefined} className="w-24 h-24 rounded-full border-4 border-orange-50 object-cover shadow-2xl" alt="Logo" />
                 {!isStoreClosed && <div className="absolute -bottom-1 -right-1 bg-green-500 w-6 h-6 rounded-full border-4 border-white"></div>}
             </div>
             <h1 className="text-2xl font-brand font-bold text-primary leading-tight">Olá! Seja bem-vindo.</h1>
@@ -1149,7 +1149,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                     <div className="absolute top-4 right-4 bg-orange-500 text-white text-[8px] font-black uppercase px-2 py-1 rounded-full z-20 shadow-sm flex items-center gap-1"><Flame size={10} className="animate-pulse" /> Top</div>
                     <div className="w-full h-40 rounded-2xl overflow-hidden shrink-0 bg-slate-50 relative group-hover:shadow-inner transition-shadow">
                         <img 
-                          src={featuredProduct.imageUrl} 
+                          src={featuredProduct.imageUrl || undefined} 
                           className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-700 cursor-pointer" 
                           alt={featuredProduct.name} 
                           onClick={(e) => { e.stopPropagation(); setExpandedImage(featuredProduct.imageUrl!); }}
@@ -1220,7 +1220,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
             >
               <div className="relative shrink-0">
                 <img 
-                  src={product.imageUrl} 
+                  src={product.imageUrl || undefined} 
                   className="w-24 h-24 sm:w-28 sm:h-28 object-cover rounded-xl cursor-pointer transition-transform group-hover:scale-105" 
                   alt={product.name} 
                   onClick={(e) => { e.stopPropagation(); setExpandedImage(product.imageUrl!); }}
@@ -1686,7 +1686,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
           <div className="bg-white w-full max-w-sm rounded-[3rem] shadow-2xl animate-scale-up overflow-hidden border border-orange-100">
             <div className="p-8 border-b bg-orange-50 text-center relative text-zinc-900">
                <button onClick={() => setIsInfoOpen(false)} className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-600 bg-white rounded-full shadow-sm"><X size={20} /></button>
-               <img src={settings.logoUrl} className="w-20 h-20 rounded-full border-4 border-white shadow-xl mx-auto mb-4 object-cover" />
+               <img src={settings.logoUrl || undefined} className="w-20 h-20 rounded-full border-4 border-white shadow-xl mx-auto mb-4 object-cover" />
                <h2 className="text-xl font-brand font-bold text-primary">{settings.storeName}</h2>
                <div className={`inline-block px-3 py-1 rounded-full text-[9px] font-black uppercase mt-2 tracking-widest ${settings.isStoreOpen ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>{settings.isStoreOpen ? 'Aberto Agora' : 'Fechado no Momento'}</div>
             </div>
@@ -1946,7 +1946,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
               >
                   <X size={24} />
               </button>
-              <img src={expandedImage} className="w-full h-auto max-h-[85vh] object-contain rounded-2xl shadow-2xl animate-scale-up" alt="Produto" />
+              <img src={expandedImage || undefined} className="w-full h-auto max-h-[85vh] object-contain rounded-2xl shadow-2xl animate-scale-up" alt="Produto" />
            </div>
         </div>
       )}

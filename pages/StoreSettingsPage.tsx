@@ -591,7 +591,7 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                                           className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${isSelected ? 'border-orange-500 bg-orange-50' : 'border-gray-100 bg-white hover:border-gray-200'}`}
                                       >
                                           <div className="relative">
-                                            <img src={product.imageUrl} className="w-10 h-10 rounded-lg object-cover" />
+                                            <img src={product.imageUrl || undefined} className="w-10 h-10 rounded-lg object-cover" />
                                             {isSelected && (
                                                 <div className="absolute -top-1 -right-1 bg-orange-500 text-white p-0.5 rounded-full shadow-sm">
                                                     <Check size={10} />
@@ -617,7 +617,7 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
             <div className="relative group cursor-pointer" onClick={() => document.getElementById('pix-upload')?.click()}>
               <div className="w-40 h-40 rounded-2xl border-4 border-blue-100 overflow-hidden bg-gray-50 flex items-center justify-center shadow-inner relative transition-transform hover:scale-105">
                 {localSettings.pixQrCodeUrl ? (
-                  <img src={localSettings.pixQrCodeUrl} alt="QR Code Pix" className="w-full h-full object-contain" />
+                  <img src={localSettings.pixQrCodeUrl || undefined} alt="QR Code Pix" className="w-full h-full object-contain" />
                 ) : (
                   <div className="flex flex-col items-center text-gray-300">
                     <ImageIcon size={32} />
@@ -690,7 +690,7 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
             <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
               <div className="w-40 h-40 rounded-full border-4 border-orange-100 overflow-hidden bg-gray-50 flex items-center justify-center shadow-inner relative transition-transform hover:scale-105">
                 {localSettings.logoUrl ? (
-                  <img src={localSettings.logoUrl} alt="Logo Preview" className="w-full h-full object-cover" />
+                  <img src={localSettings.logoUrl || undefined} alt="Logo Preview" className="w-full h-full object-cover" />
                 ) : (
                   <ImageIcon size={48} className="text-gray-200" />
                 )}

@@ -389,7 +389,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                 )}
             </div>
 
-            <img src={product.imageUrl} className="w-full h-40 object-cover" alt={product.name} loading="lazy" />
+            <img src={product.imageUrl || undefined} className="w-full h-40 object-cover" alt={product.name} loading="lazy" />
             <div className="p-4">
               <div className="flex justify-between items-start">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-orange-600 bg-orange-50 px-2 py-1 rounded">
@@ -525,7 +525,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
               <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
                   <div className="flex flex-row sm:flex-col gap-2 w-full sm:w-auto">
                     <div className="w-24 h-24 bg-gray-100 rounded-xl flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-200 cursor-pointer overflow-hidden relative shrink-0">
-                      {editingProduct?.imageUrl ? ( <img src={editingProduct.imageUrl} className="w-full h-full object-cover" alt="Preview" /> ) : ( <> <Camera size={24} /> <span className="text-[10px]">Galeria</span> </> )}
+                      {editingProduct?.imageUrl ? ( <img src={editingProduct.imageUrl || undefined} className="w-full h-full object-cover" alt="Preview" /> ) : ( <> <Camera size={24} /> <span className="text-[10px]">Galeria</span> </> )}
                       <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" onChange={handleImageUpload} />
                     </div>
                     <div className="h-24 sm:h-8 flex-1 sm:w-24 bg-gray-100 rounded-lg flex flex-col sm:flex-row items-center justify-center text-gray-500 border border-gray-200 cursor-pointer relative hover:bg-gray-200 transition-colors">

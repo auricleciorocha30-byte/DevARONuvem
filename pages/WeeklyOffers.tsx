@@ -71,7 +71,7 @@ const WeeklyOffers: React.FC<Props> = ({ products, saveProduct }) => {
               {product ? (
                 <div className="space-y-4">
                   <div className="relative aspect-video rounded-2xl overflow-hidden shadow-md">
-                    <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                    <img src={product.imageUrl || undefined} alt={product.name} className="w-full h-full object-cover" />
                     <div className="absolute top-2 right-2 p-2 bg-yellow-400 rounded-full text-white shadow-lg">
                       <Star size={16} fill="currentColor" />
                     </div>
@@ -130,7 +130,7 @@ const WeeklyOffers: React.FC<Props> = ({ products, saveProduct }) => {
                   onClick={() => handleSetOffer(p.id, selectedDay!)}
                   className="p-4 border border-gray-100 rounded-3xl flex items-center gap-4 hover:border-orange-500 hover:bg-orange-50 transition-all text-left group"
                 >
-                  <img src={p.imageUrl} className="w-16 h-16 rounded-2xl object-cover shadow-sm" alt={p.name} />
+                  <img src={p.imageUrl || undefined} className="w-16 h-16 rounded-2xl object-cover shadow-sm" alt={p.name} />
                   <div className="flex-1 overflow-hidden">
                     <p className="font-bold text-sm text-gray-800 truncate">{p.name}</p>
                     <p className="text-xs text-gray-500">{p.category}</p>

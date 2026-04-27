@@ -995,7 +995,7 @@ function AdminLayout({ settings, onLogout }: { settings: StoreSettings, onLogout
       {/* Mobile Header */}
       <header className="md:hidden bg-primary text-white p-4 flex items-center justify-between sticky top-0 z-50 shadow-md no-print">
         <div className="flex items-center gap-3">
-          <img src={settings.logoUrl} className="w-8 h-8 rounded-full border border-secondary object-cover" alt="Logo" />
+          <img src={settings.logoUrl || undefined} className="w-8 h-8 rounded-full border border-secondary object-cover" alt="Logo" />
           <span className="font-brand font-bold truncate max-w-[150px]">{settings.storeName}</span>
         </div>
         <button onClick={onLogout} className="p-2 bg-white/10 rounded-xl text-red-400 hover:bg-white/20 transition-all">
@@ -1005,7 +1005,7 @@ function AdminLayout({ settings, onLogout }: { settings: StoreSettings, onLogout
 
       <aside className="w-64 bg-primary text-white hidden md:flex flex-col border-r border-black/10 no-print">
         <div className="p-6 flex items-center gap-3 border-b border-white/10">
-          <img src={settings.logoUrl} className="w-10 h-10 rounded-full border-2 border-secondary object-cover" alt="Logo" />
+          <img src={settings.logoUrl || undefined} className="w-10 h-10 rounded-full border-2 border-secondary object-cover" alt="Logo" />
           <span className="font-brand text-lg font-bold truncate">{settings.storeName}</span>
         </div>
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto custom-scrollbar">
