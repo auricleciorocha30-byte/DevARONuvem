@@ -213,6 +213,58 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
   const [deliveryFee, setDeliveryFee] = useState<number>(0);
   const [isCalculatingFee, setIsCalculatingFee] = useState(false);
 
+  const handleConsultNfcePOS = async (order: Order) => {
+    if (!order.nfce_reference || !settings.focusNfeToken) return;
+
+    const newWindow = window.open('about:blank', '_blank');
+    if (!newWindow) {
+      alert("Seu navegador bloqueou o pop-up para o PDF. Emitindo mesmo assim...");
+    }
+    setIsEmittingNfce(true);
+    try {
+        const queryParams = new URLSearchParams({
+            token: settings.focusNfeToken,
+            environment: settings.focusNfeEnvironment || 'homologation',
+            reference: order.nfce_reference
+        });
+        const response = await fetch(`/api/focus-nfe/consult-nfce?${queryParams.toString()}`);
+        const result = await response.json();
+
+        if (response.ok) {
+            let danfeUrl = result.caminho_danfe;
+            if (!danfeUrl && result.caminho_xml_nota_fiscal) {
+                 danfeUrl = result.caminho_xml_nota_fiscal.replace('.xml', '.html');
+            }
+            if (danfeUrl && newWindow) {
+               const url = `https://${settings.focusNfeEnvironment === 'production' ? 'api' : 'homologacao'}.focusnfe.com.br${danfeUrl}`;
+               try {
+                 newWindow.location.href = url;
+                 newWindow.focus();
+               } catch(e) {
+                 console.log("Could not set newWindow location...", e);
+                 window.open(url, '_blank')?.focus();
+                 newWindow.close();
+               }
+            } else if (danfeUrl) {
+               const url = `https://${settings.focusNfeEnvironment === 'production' ? 'api' : 'homologacao'}.focusnfe.com.br${danfeUrl}`;
+               window.open(url, '_blank')?.focus();
+            } else if(newWindow) {
+               newWindow.close();
+            }
+            if (!danfeUrl) {
+                alert(`NFC-e Status: ${result.status}\nMensagem: ${result.mensagem_sefaz || 'Sem mensagem'}`);
+            }
+        } else {
+            alert(`Erro ao consultar NFC-e: ${result.mensagem || JSON.stringify(result)}`);
+        }
+    } catch (err) {
+      if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
+      console.error("Erro Consultar NFC-e:", err);
+    } finally {
+        setIsEmittingNfce(false);
+    }
+  };
+
   const handleEmitNfcePOS = async (order: Order) => {
     if (settings?.lockedFeatures?.includes('NFE')) {
       alert("Módulo bloqueado. Fale com seu consultor para desbloquear a emissão de notas fiscais.");
@@ -322,6 +374,16 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         if (!danfeUrl && finalResult.caminho_xml_nota_fiscal) {
              danfeUrl = finalResult.caminho_xml_nota_fiscal.replace('.xml', '.html');
         }
+        
+        // Update local order to reflect successfully emitted NFC-e
+        if (finalResult.status === 'autorizado') {
+            await supabase.from('orders').eq('id', order.id).update({
+                nfce_reference: reference, // store reference
+                nfce_status: 'AUTHORIZED'
+            });
+            setLastOrder(prev => prev && prev.id === order.id ? { ...prev, nfce_reference: reference, nfce_status: 'AUTHORIZED' } : prev);
+        }
+
         if (danfeUrl && newWindow) {
            const url = `https://${settings.focusNfeEnvironment === 'production' ? 'api' : 'homologacao'}.focusnfe.com.br${danfeUrl}`;
            try {
@@ -2769,12 +2831,18 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                    </button>
                    {settings.focusNfeToken && (
                      <button 
-                      onClick={() => handleEmitNfcePOS(lastOrder)} 
+                      onClick={() => {
+                        if (lastOrder.nfce_status === 'AUTHORIZED' || lastOrder.nfce_reference) {
+                           handleConsultNfcePOS(lastOrder);
+                        } else {
+                           handleEmitNfcePOS(lastOrder);
+                        }
+                      }}
                       disabled={isEmittingNfce}
                       className="p-2 text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl border border-indigo-700 flex items-center gap-2" 
-                      title="Emitir NFC-e do Último Pedido">
-                        {isEmittingNfce ? <Loader2 size={18} className="animate-spin" /> : <Tag size={18} />}
-                        <span className="text-xs font-bold hidden md:inline">Emitir NF</span>
+                      title={lastOrder.nfce_reference ? "Consultar/Reimprimir NFC-e" : "Emitir NFC-e do Último Pedido"}>
+                        {isEmittingNfce ? <Loader2 size={18} className="animate-spin" /> : (lastOrder.nfce_reference ? <Search size={18} /> : <Tag size={18} />)}
+                        <span className="text-xs font-bold hidden md:inline">{lastOrder.nfce_reference ? "Consultar NF" : "Emitir NF"}</span>
                      </button>
                    )}
                  </div>
