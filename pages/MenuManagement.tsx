@@ -51,6 +51,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
             icms_situacao_tributaria: prev.icms_situacao_tributaria || '102'
           };
         });
+        alert("Dados do produto preenchidos via código de barras!");
       }
     } catch (error) {
       console.error("Erro ao consultar código de barras:", error);

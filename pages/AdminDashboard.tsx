@@ -137,10 +137,6 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
       const staffName = order.waitstaffName.trim();
       const staffMember = waitstaff.find(w => w.name.trim().toLowerCase() === staffName.toLowerCase());
       
-      if (!staffMember) return; // Ignore deleted or renamed waitstaff
-      
-      const staffId = staffMember.id;
-      
       // Tenta pegar a taxa pelo ID (convertendo para string para garantir)
       let rate = 0;
       if (staffMember) {
@@ -153,6 +149,8 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
           if (foundKey) rate = settings.waitstaffCommissions[foundKey];
         }
       }
+      
+      const staffId = staffMember ? staffMember.id : `deleted-${staffName.toLowerCase().replace(/\s+/g, '-')}`;
       
       const existing = comms.get(staffId);
       const orderTotal = Number(order.total) || 0;

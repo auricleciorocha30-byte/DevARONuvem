@@ -122,6 +122,10 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
       return;
     }
 
+    const newWindow = window.open('about:blank', '_blank');
+    if (!newWindow) {
+      alert("Seu navegador bloqueou o pop-up para o PDF. Emitindo mesmo assim...");
+    }
     setIsEmittingNfce(group.id);
     const reference = `order_${group.id}_${Date.now()}`;
     try {
@@ -145,6 +149,8 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
             valor_unitario_comercial: item.price,
             valor_unitario_tributavel: item.price,
             valor_bruto: item.price * item.quantity,
+            codigo_barras_comercial: product?.barcode || 'SEM GTIN',
+            codigo_barras_tributavel: product?.barcode || 'SEM GTIN',
             codigo_ncm: (product?.ncm || '21069090').replace(/\D/g, ''), 
             cfop: product?.cfop || (group.type === 'ENTREGA' ? '5102' : '5102'),
             icms_origem: 0,
@@ -175,24 +181,70 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
 
       const result = await response.json();
 
+      let finalResult = result;
       if (response.ok) {
-        alert("NFC-e emitida com sucesso!");
-        // Update each order in the group with reference and status
-        for (const orderId of group.originalOrderIds) {
-            await updateOrder(orderId, {
-                nfce_reference: reference,
-                nfce_status: 'AUTHORIZED'
-            });
+        // Prepare new window text
+        if (newWindow) {
+            newWindow.document.write('<h2>Aguardando autorização da SEFAZ...</h2><p>Isso geralmente leva alguns segundos.</p>');
         }
-        const danfeUrl = result.caminho_danfe || result.caminho_xml_nota_fiscal;
+
+        // Loop while status is processando_autorizacao
+        let retries = 0;
+        while ((finalResult.status === 'processando_autorizacao' || finalResult.status === 'processando') && retries < 10) {
+            await new Promise(r => setTimeout(r, 2000));
+            const queryParams = new URLSearchParams({
+                token: settings.focusNfeToken,
+                environment: settings.focusNfeEnvironment || 'homologation',
+                reference: reference
+            });
+            try {
+                const checkRes = await fetch(`/api/focus-nfe/consult-nfce?${queryParams.toString()}`);
+                if (checkRes.ok) finalResult = await checkRes.json();
+            } catch (e) {
+                console.error("Polling error", e);
+            }
+            retries++;
+        }
+
+        // Update each order in the group with reference and status
+        if (finalResult.status === 'autorizado') {
+            for (const orderId of group.originalOrderIds) {
+                await updateOrder(orderId, {
+                    nfce_reference: reference,
+                    nfce_status: 'AUTHORIZED'
+                });
+            }
+        }
+        
+        let danfeUrl = finalResult.caminho_danfe;
+        if (!danfeUrl && finalResult.caminho_xml_nota_fiscal) {
+             danfeUrl = finalResult.caminho_xml_nota_fiscal.replace('.xml', '.html');
+        }
         if (danfeUrl && newWindow) {
            const url = `https://${settings.focusNfeEnvironment === 'production' ? 'api' : 'homologacao'}.focusnfe.com.br${danfeUrl}`;
-           newWindow.location.href = url;
+           try {
+             newWindow.location.href = url;
+             newWindow.focus();
+           } catch(e) {
+             console.log("Could not set newWindow location...", e);
+             window.open(url, '_blank')?.focus();
+             newWindow.close();
+           }
         } else if (danfeUrl) {
            const url = `https://${settings.focusNfeEnvironment === 'production' ? 'api' : 'homologacao'}.focusnfe.com.br${danfeUrl}`;
-           window.open(url, '_blank');
-        } else if(newWindow) {
-           newWindow.close();
+           window.open(url, '_blank')?.focus();
+        } else {
+           if (newWindow) newWindow.close();
+           if (finalResult.status === 'processando_autorizacao' || finalResult.status === 'processando') {
+             alert('A nota fiscal ainda está sendo processada pela SEFAZ. Você pode usar a opção "Consultar/Imprimir" em alguns instantes para imprimi-la.');
+           } else if (finalResult.status === 'autorizado') {
+              alert('Nota fiscal autorizada, mas sem link de impressão retornado pela API. Consulte o painel da SEFAZ ou Focus.');
+           } else if (finalResult.status === 'erro_autorizacao') {
+              const erros = finalResult.erros ? finalResult.erros.map((e: any) => `- ${e.codigo || ''}: ${e.mensagem}`).join('\n') : finalResult.mensagem_sefaz;
+              alert(`Erro na autorização da SEFAZ:\n${erros || 'Erro desconhecido'}`);
+           } else {
+              alert(`NFC-e enviada, status: ${finalResult.status || 'desconhecido'}`);
+           }
         }
       } else {
         if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
@@ -207,7 +259,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
     } catch (error) {
       if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
       console.error("Erro ao emitir NFC-e:", error);
-      alert("Erro de conexão ao emitir NFC-e.");
+      alert(`Erro de conexão ao emitir NFC-e: ${error instanceof Error ? error.message : JSON.stringify(error)}`);
     } finally {
       setIsEmittingNfce(null);
     }
@@ -231,16 +283,28 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
         const result = await response.json();
 
         if (response.ok) {
-            alert(`NFC-e Status: ${result.status}\nMensagem: ${result.mensagem_sefaz || 'Sem mensagem'}`);
-            const danfeUrl = result.caminho_danfe || result.caminho_xml_nota_fiscal;
+            let danfeUrl = result.caminho_danfe;
+            if (!danfeUrl && result.caminho_xml_nota_fiscal) {
+                 danfeUrl = result.caminho_xml_nota_fiscal.replace('.xml', '.html');
+            }
         if (danfeUrl && newWindow) {
            const url = `https://${settings.focusNfeEnvironment === 'production' ? 'api' : 'homologacao'}.focusnfe.com.br${danfeUrl}`;
-           newWindow.location.href = url;
+           try {
+             newWindow.location.href = url;
+             newWindow.focus();
+           } catch(e) {
+             console.log("Could not set newWindow location...", e);
+             window.open(url, '_blank')?.focus();
+             newWindow.close();
+           }
         } else if (danfeUrl) {
            const url = `https://${settings.focusNfeEnvironment === 'production' ? 'api' : 'homologacao'}.focusnfe.com.br${danfeUrl}`;
-           window.open(url, '_blank');
+           window.open(url, '_blank')?.focus();
         } else if(newWindow) {
            newWindow.close();
+        }
+        if (!danfeUrl) {
+            alert(`NFC-e Status: ${result.status}\nMensagem: ${result.mensagem_sefaz || 'Sem mensagem'}`);
         }
         } else {
             alert(`Erro ao consultar NFC-e: ${result.mensagem || JSON.stringify(result)}`);
