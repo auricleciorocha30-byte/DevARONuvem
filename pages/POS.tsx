@@ -289,10 +289,18 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
 
       if (response.ok) {
         alert("NFC-e emitida com sucesso!");
-        if (result.caminho_xml_nota_fiscal) {
-           window.open(`https://${settings.focusNfeEnvironment === 'production' ? 'api' : 'homologacao'}.focusnfe.com.br${result.caminho_xml_nota_fiscal}`, '_blank');
+        const danfeUrl = result.caminho_danfe || result.caminho_xml_nota_fiscal;
+        if (danfeUrl && newWindow) {
+           const url = `https://${settings.focusNfeEnvironment === 'production' ? 'api' : 'homologacao'}.focusnfe.com.br${danfeUrl}`;
+           newWindow.location.href = url;
+        } else if (danfeUrl) {
+           const url = `https://${settings.focusNfeEnvironment === 'production' ? 'api' : 'homologacao'}.focusnfe.com.br${danfeUrl}`;
+           window.open(url, '_blank');
+        } else if(newWindow) {
+           newWindow.close();
         }
       } else {
+        if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
         console.error("Erro Focus NFe:", result);
         let errorMessage = result.mensagem || JSON.stringify(result);
         if (result.erros && Array.isArray(result.erros)) {
@@ -302,6 +310,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         alert(`Erro ao emitir NFC-e:\n${errorMessage}`);
       }
     } catch (error) {
+      if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
       console.error("Erro ao emitir NFC-e:", error);
       alert("Erro de conexão ao emitir NFC-e.");
     } finally {
@@ -385,6 +394,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         alert("Nenhuma regra de taxa de entrega definida.");
       }
     } catch (error) {
+      if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
       console.error("Error calculating fee:", error);
       alert("Erro ao calcular taxa de entrega. Tente novamente.");
     } finally {
@@ -423,7 +433,8 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
             }
           );
         } catch (err) {
-          console.error("Error starting scanner:", err);
+      if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
+      console.error("Error starting scanner:", err);
           alert("Erro ao iniciar a câmera. Verifique as permissões.");
           setShowScanner(false);
         }
@@ -449,7 +460,8 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
       try {
         setContingencyOrders(JSON.parse(saved));
       } catch (e) {
-        console.error('Error parsing contingency orders', e);
+      if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
+      console.error('Error parsing contingency orders', e);
       }
     }
   }, [storeId]);
@@ -599,7 +611,8 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                     try {
                         items = JSON.parse(order.items);
                     } catch (e) {
-                        console.error("Error parsing items for order", order.id, e);
+      if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
+      console.error("Error parsing items for order", order.id, e);
                     }
                 } else if (Array.isArray(order.items)) {
                     items = order.items;
@@ -720,7 +733,8 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
             alert(`Nenhum pedido em aberto para a ${type === 'MESA' ? 'Mesa' : type === 'COMANDA' ? 'Comanda' : 'Pedido'} ${cleanNum}.`);
         }
     } catch (err) {
-        console.error("Erro ao consultar:", err);
+      if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
+      console.error("Erro ao consultar:", err);
         alert("Erro ao consultar.");
     } finally {
         setIsLookingUpCommand(false);
@@ -758,7 +772,8 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
           setNewOrdersCount(counts);
         }
       } catch (err) {
-        console.error("Erro ao buscar novos pedidos:", err);
+      if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
+      console.error("Erro ao buscar novos pedidos:", err);
       }
     };
 
@@ -829,7 +844,8 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                     try {
                         items = JSON.parse(items);
                     } catch (e) {
-                        console.error("Error parsing items for order", order.id, e);
+      if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
+      console.error("Error parsing items for order", order.id, e);
                         items = [];
                     }
                 }
@@ -844,7 +860,8 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
             alert(`Nenhum pedido de ${type.toLowerCase()} encontrado.`);
         }
     } catch (err) {
-        console.error(err);
+      if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
+      console.error(err);
         alert("Erro ao buscar pedidos.");
     } finally {
         setIsLookingUpCommand(false);
@@ -857,7 +874,8 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
           try {
               items = JSON.parse(order.items);
           } catch (e) {
-              console.error("Error parsing items for order", order.id, e);
+      if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
+      console.error("Error parsing items for order", order.id, e);
           }
       } else if (Array.isArray(order.items)) {
           items = order.items;
@@ -1030,6 +1048,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         }
       }
     } catch (err: any) {
+      if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
       console.error(err);
       setScaleError('Erro ao conectar balança: ' + err.message);
       setIsScaleConnected(false);
@@ -1072,6 +1091,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
       if (error) throw error;
       setCustomers(data || []);
     } catch (err) {
+      if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
       console.error("Erro ao buscar clientes:", err);
     }
   };
@@ -1101,6 +1121,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         setIsOpeningRegister(true);
       }
     } catch (e) {
+      if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
       console.error("Error fetching session:", e);
       setCurrentSession(null);
       setIsOpeningRegister(true);
@@ -1162,6 +1183,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         localStorage.setItem(`cached_products_${storeId}`, JSON.stringify(data));
       }
     } catch (e) {
+      if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
       console.error("Error fetching products:", e);
       const cached = localStorage.getItem(`cached_products_${storeId}`);
       if (cached) {
@@ -1185,6 +1207,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         localStorage.setItem(`cached_couriers_${storeId}`, JSON.stringify(data));
       }
     } catch (e) {
+      if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
       console.error("Error fetching couriers:", e);
       const cached = localStorage.getItem(`cached_couriers_${storeId}`);
       if (cached) {
@@ -1441,7 +1464,8 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         try {
           data = JSON.parse(responseText);
         } catch (e: any) {
-          console.error('Failed to parse API response:', responseText);
+      if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
+      console.error('Failed to parse API response:', responseText);
           throw new Error(`Resposta inválida do servidor. Verifique se o app está rodando como "estático" em vez de "full-stack".`);
         }
 
@@ -1525,7 +1549,8 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                     setPointStatus(null);
                 }
             } catch (err) {
-                console.error("Erro ao consultar status do Point:", err);
+      if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
+      console.error("Erro ao consultar status do Point:", err);
             }
         }, 3000);
     }
@@ -1803,6 +1828,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
       setShowNewCustomerModal(false);
       fetchCustomers();
     } catch (err: any) {
+      if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
       console.error("Erro ao cadastrar cliente:", err);
       alert("Erro ao cadastrar cliente: " + (err.message || "Erro desconhecido"));
     }
@@ -2025,7 +2051,8 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                         setSelectedCustomer({ ...selectedCustomer, points: Math.max(0, newCashbackBalance) });
                     }
                 } catch (e) {
-                    console.error("Erro ao atualizar cashback do cliente:", e);
+      if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
+      console.error("Erro ao atualizar cashback do cliente:", e);
                 }
             }
         }
@@ -2198,6 +2225,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
       
       setDailySales(sales);
     } catch (err) {
+      if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
       console.error(err);
       setDailySales({ total: 0, byMethod: {}, count: 0, bleeds: 0, products: [] });
     }
@@ -2234,6 +2262,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
       setDailySales(null);
       setIsOpeningRegister(true);
     } catch (err) {
+      if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
       console.error("Erro ao fechar caixa:", err);
       alert("Erro ao fechar o caixa. Tente novamente.");
     }
@@ -2332,7 +2361,8 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
           console.warn("Impressora USB não encontrada. Tentando impressão padrão.");
         }
       } catch (error) {
-        console.error("Erro na impressão USB:", error);
+      if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
+      console.error("Erro na impressão USB:", error);
       }
     }
 
@@ -3874,7 +3904,8 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                                                     // Refresh the list
                                                     lookupOrdersList(lookupType);
                                                 } catch (err) {
-                                                    console.error("Erro ao cancelar pedido:", err);
+      if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
+      console.error("Erro ao cancelar pedido:", err);
                                                     alert("Erro ao cancelar pedido.");
                                                 }
                                             }

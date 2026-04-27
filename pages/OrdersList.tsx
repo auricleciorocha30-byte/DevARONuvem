@@ -184,10 +184,18 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                 nfce_status: 'AUTHORIZED'
             });
         }
-        if (result.caminho_xml_nota_fiscal) {
-           window.open(`https://${settings.focusNfeEnvironment === 'production' ? 'api' : 'homologacao'}.focusnfe.com.br${result.caminho_xml_nota_fiscal}`, '_blank');
+        const danfeUrl = result.caminho_danfe || result.caminho_xml_nota_fiscal;
+        if (danfeUrl && newWindow) {
+           const url = `https://${settings.focusNfeEnvironment === 'production' ? 'api' : 'homologacao'}.focusnfe.com.br${danfeUrl}`;
+           newWindow.location.href = url;
+        } else if (danfeUrl) {
+           const url = `https://${settings.focusNfeEnvironment === 'production' ? 'api' : 'homologacao'}.focusnfe.com.br${danfeUrl}`;
+           window.open(url, '_blank');
+        } else if(newWindow) {
+           newWindow.close();
         }
       } else {
+        if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
         console.error("Erro Focus NFe:", result);
         let errorMessage = result.mensagem || JSON.stringify(result);
         if (result.erros && Array.isArray(result.erros)) {
@@ -197,6 +205,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
         alert(`Erro ao emitir NFC-e:\n${errorMessage}`);
       }
     } catch (error) {
+      if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
       console.error("Erro ao emitir NFC-e:", error);
       alert("Erro de conexão ao emitir NFC-e.");
     } finally {
@@ -207,6 +216,10 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
   const handleConsultNfce = async (group: GroupedOrder) => {
     if (!group.nfceReference || !settings.focusNfeToken) return;
 
+    const newWindow = window.open('about:blank', '_blank');
+    if (!newWindow) {
+      alert("Seu navegador bloqueou o pop-up para o PDF. Emitindo mesmo assim...");
+    }
     setIsEmittingNfce(group.id);
     try {
         const queryParams = new URLSearchParams({
@@ -219,14 +232,22 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
 
         if (response.ok) {
             alert(`NFC-e Status: ${result.status}\nMensagem: ${result.mensagem_sefaz || 'Sem mensagem'}`);
-            if (result.caminho_xml_nota_fiscal) {
-                window.open(`https://${settings.focusNfeEnvironment === 'production' ? 'api' : 'homologacao'}.focusnfe.com.br${result.caminho_xml_nota_fiscal}`, '_blank');
-            }
+            const danfeUrl = result.caminho_danfe || result.caminho_xml_nota_fiscal;
+        if (danfeUrl && newWindow) {
+           const url = `https://${settings.focusNfeEnvironment === 'production' ? 'api' : 'homologacao'}.focusnfe.com.br${danfeUrl}`;
+           newWindow.location.href = url;
+        } else if (danfeUrl) {
+           const url = `https://${settings.focusNfeEnvironment === 'production' ? 'api' : 'homologacao'}.focusnfe.com.br${danfeUrl}`;
+           window.open(url, '_blank');
+        } else if(newWindow) {
+           newWindow.close();
+        }
         } else {
             alert(`Erro ao consultar NFC-e: ${result.mensagem || JSON.stringify(result)}`);
         }
     } catch (err) {
-        console.error("Erro Consultar NFC-e:", err);
+      if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
+      console.error("Erro Consultar NFC-e:", err);
     } finally {
         setIsEmittingNfce(null);
     }
@@ -236,6 +257,10 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
     if (!group.nfceReference || !settings.focusNfeToken) return;
     if (!window.confirm("Deseja realmente cancelar esta NFC-e?")) return;
 
+    const newWindow = window.open('about:blank', '_blank');
+    if (!newWindow) {
+      alert("Seu navegador bloqueou o pop-up para o PDF. Emitindo mesmo assim...");
+    }
     setIsEmittingNfce(group.id);
     try {
         const response = await fetch('/api/focus-nfe/cancel-nfce', {
@@ -260,7 +285,8 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
             alert(`Erro ao cancelar NFC-e: ${result.mensagem || JSON.stringify(result)}`);
         }
     } catch (err) {
-        console.error("Erro Cancelar NFC-e:", err);
+      if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
+      console.error("Erro Cancelar NFC-e:", err);
     } finally {
         setIsEmittingNfce(null);
     }
@@ -501,7 +527,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                           className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg"
                         >
                           {isEmittingNfce === group.id ? <Loader2 className="animate-spin" size={14} /> : <Search size={14} />}
-                          CONSULTAR
+                          CONSULTAR / IMPRIMIR
                         </button>
                         {group.nfceStatus !== 'CANCELLED' && (
                           <button
