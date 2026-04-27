@@ -137,7 +137,9 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
       const staffName = order.waitstaffName.trim();
       const staffMember = waitstaff.find(w => w.name.trim().toLowerCase() === staffName.toLowerCase());
       
-      const staffId = staffMember?.id || `name_${staffName}`;
+      if (!staffMember) return; // Ignore deleted or renamed waitstaff
+      
+      const staffId = staffMember.id;
       
       // Tenta pegar a taxa pelo ID (convertendo para string para garantir)
       let rate = 0;
