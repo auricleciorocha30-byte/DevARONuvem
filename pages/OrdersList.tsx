@@ -44,22 +44,42 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
   const [printOrder, setPrintOrder] = useState<GroupedOrder | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isEmittingNfce, setIsEmittingNfce] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const displayGroups = useMemo(() => {
     let filteredOrders = orders;
+    
+    // Sort orders by created date descending (newest first)
+    filteredOrders = [...filteredOrders].sort((a, b) => b.createdAt - a.createdAt);
+
     if (filterType === 'FINALIZADOS') {
-      filteredOrders = orders.filter(o => o.status === 'ENTREGUE');
+      filteredOrders = filteredOrders.filter(o => o.status === 'ENTREGUE');
     } else {
-      filteredOrders = orders.filter(o => o.status !== 'ENTREGUE' && o.status !== 'CANCELADO');
+      filteredOrders = filteredOrders.filter(o => o.status !== 'ENTREGUE' && o.status !== 'CANCELADO');
       if (filterType !== 'TODOS') {
         filteredOrders = filteredOrders.filter(o => o.type === filterType);
       }
     }
     
+    // Apply search filter if one exists
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      filteredOrders = filteredOrders.filter(o => 
+        (o.customerName?.toLowerCase().includes(term)) ||
+        (o.customerPhone?.toLowerCase().includes(term)) ||
+        (o.displayId?.toLowerCase().includes(term)) ||
+        (o.tableNumber?.toLowerCase().includes(term)) ||
+        (o.id.toLowerCase().includes(term))
+      );
+    }
+    
     const groupsMap = new Map<string, GroupedOrder>();
     
     filteredOrders.forEach(order => {
-        const key = order.type === 'MESA' || order.type === 'COMANDA' 
+        // Grouping logic:
+        // Only group by table if it's NOT a finished order.
+        // Finished orders should be separated to avoid accumulation over time.
+        const key = (order.type === 'MESA' || order.type === 'COMANDA') && order.status !== 'ENTREGUE'
             ? `${order.type}-${order.tableNumber}` 
             : `${order.type}-${order.customerName}-${order.customerPhone}-${order.id}`;
             
@@ -319,11 +339,20 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
 
   const handleCancelNfce = async (group: GroupedOrder) => {
     if (!group.nfceReference || !settings.focusNfeToken) return;
-    if (!window.confirm("Deseja realmente cancelar esta NFC-e?")) return;
+
+    if (!window.confirm("Este pedido tem uma NFC-e emitida. Deseja cancelar a nota fiscal na SEFAZ também?")) {
+        return;
+    }
+
+    const justificativa = prompt("Informe o motivo do cancelamento (mínimo 15 caracteres):", "Erro na digitacao dos itens do pedido");
+    if (!justificativa || (justificativa && justificativa.length < 15)) {
+        alert("A justificativa é obrigatória e deve ter pelo menos 15 caracteres.");
+        return;
+    }
 
     const newWindow = window.open('about:blank', '_blank');
     if (!newWindow) {
-      alert("Seu navegador bloqueou o pop-up para o PDF. Emitindo mesmo assim...");
+      alert("Seu navegador bloqueou o pop-up. O cancelamento prosseguirá.");
     }
     setIsEmittingNfce(group.id);
     try {
@@ -333,7 +362,8 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
             body: JSON.stringify({
                 token: settings.focusNfeToken,
                 environment: settings.focusNfeEnvironment,
-                reference: group.nfceReference
+                reference: group.nfceReference,
+                justificativa: justificativa
             })
         });
         const result = await response.json();
@@ -366,6 +396,14 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
 
   const handleStatusUpdate = async (group: GroupedOrder, newStatus: OrderStatus) => {
     if (isProcessing) return;
+
+    // Auto-cancel NFC-e if order is being canceled
+    if (newStatus === 'CANCELADO' && group.nfceReference && group.nfceStatus === 'AUTHORIZED') {
+        const proceed = await handleCancelNfce(group);
+        // We still allow canceling the order even if NFC-e cancel fails, or should we?
+        // User asked to "possibilidade para cancelar nota quando cancelar o pedido"
+    }
+
     setIsProcessing(true);
     try {
         const uniqueIds = Array.from(new Set(group.originalOrderIds));
@@ -406,10 +444,25 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
         }
       `}</style>
 
-      <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-          {['TODOS', 'MESA', 'COMANDA', 'BALCAO', 'ENTREGA', 'FINALIZADOS'].map(f => (
-            <button key={f} onClick={() => setFilterType(f as any)} className={`px-6 py-2.5 rounded-2xl font-bold text-sm border transition-all ${filterType === f ? 'bg-primary text-white border-primary shadow-md' : 'bg-white text-gray-400 border-gray-100'}`}>{f}</button>
-          ))}
+      <div className="flex flex-wrap gap-4 items-center justify-between">
+          <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+              {['TODOS', 'MESA', 'COMANDA', 'BALCAO', 'ENTREGA', 'FINALIZADOS'].map(f => (
+                <button key={f} onClick={() => setFilterType(f as any)} className={`px-6 py-2.5 rounded-2xl font-bold text-sm border transition-all ${filterType === f ? 'bg-primary text-white border-primary shadow-md' : 'bg-white text-gray-400 border-gray-100'}`}>{f}</button>
+              ))}
+          </div>
+
+          <div className="relative group w-full md:w-80">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400 group-focus-within:text-primary transition-colors">
+              <Search size={18} />
+            </div>
+            <input 
+              type="text"
+              placeholder="Pesquisar pedido, cliente, mesa..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all shadow-sm"
+            />
+          </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-h-[calc(100vh-200px)] overflow-y-auto pr-2 pb-10 custom-scrollbar">
@@ -574,7 +627,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                  
                  {settings.focusNfeToken && (
                    <div className="flex-1 flex gap-2 min-w-full">
-                     {!group.nfceReference ? (
+                     {(!group.nfceReference || group.nfceStatus === 'CANCELLED') ? (
                         <button
                           onClick={() => handleEmitNfce(group)}
                           disabled={isEmittingNfce === group.id}
@@ -593,14 +646,14 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                           {isEmittingNfce === group.id ? <Loader2 className="animate-spin" size={14} /> : <Search size={14} />}
                           CONSULTAR / IMPRIMIR
                         </button>
-                        {group.nfceStatus !== 'CANCELLED' && (
+                        {group.nfceStatus === 'AUTHORIZED' && (
                           <button
                             onClick={() => handleCancelNfce(group)}
                             disabled={isEmittingNfce === group.id}
                             className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg"
                           >
                             {isEmittingNfce === group.id ? <Loader2 className="animate-spin" size={14} /> : <Trash2 size={14} />}
-                            CANCELAR
+                            CANCELAR NFC-E
                           </button>
                         )}
                        </>
