@@ -138,7 +138,7 @@ const WaitressPanel: React.FC<Props> = ({ onSelectTable, orders, settings }) => 
           </div>
           <div className="flex gap-2">
             <InstallPrompt />
-            <button onClick={() => handleQuickOrder('BALCAO')} className="flex items-center gap-2 px-4 py-3 bg-white/10 rounded-2xl hover:bg-white/20 font-bold text-xs"><ShoppingBag size={18} /> Balcão</button>
+            <button onClick={() => handleQuickOrder('BALCAO')} className="flex items-center gap-2 px-4 py-3 bg-white/10 rounded-2xl hover:bg-white/20 font-bold text-xs"><ShoppingBag size={18} /> Viagem</button>
             <button onClick={() => handleQuickOrder('ENTREGA')} className="flex items-center gap-2 px-4 py-3 bg-white/10 rounded-2xl hover:bg-white/20 font-bold text-xs"><Truck size={18} /> Entrega</button>
             <button onClick={handleLogout} className="p-3 bg-red-500/10 text-red-400 rounded-2xl hover:bg-red-500 hover:text-white transition-all"><LogOut size={24} /></button>
           </div>

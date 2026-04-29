@@ -1074,8 +1074,8 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                       <div className="flex items-center gap-5">
                           <div className="p-4 bg-white rounded-2xl text-blue-600 shadow-sm transition-transform group-hover:scale-110"><ShoppingBag size={28} /></div>
                           <div>
-                            <p className="font-bold text-lg text-primary leading-none">Balcão</p>
-                            <p className="text-[10px] text-blue-700 opacity-60 font-black uppercase mt-1 tracking-wider">Vou retirar aqui</p>
+                            <p className="font-bold text-lg text-primary leading-none">{isWaitstaff ? 'Viagem' : 'Retirada'}</p>
+                            <p className="text-[10px] text-blue-700 opacity-60 font-black uppercase mt-1 tracking-wider">{isWaitstaff ? 'Levar para viagem' : 'Vou retirar aqui'}</p>
                           </div>
                       </div>
                       <ArrowRight className="text-blue-200 group-hover:text-blue-400 group-hover:translate-x-1 transition-all" size={20} />
@@ -1111,7 +1111,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
             <div className="flex flex-col min-w-0">
                 <h1 className="font-brand text-base md:text-lg font-bold leading-none truncate">{settings.storeName}</h1>
                 <button onClick={handleResetMode} className="text-[10px] uppercase font-black opacity-60 truncate mt-0.5 text-left hover:opacity-100 decoration-dotted underline-offset-2 transition-opacity">
-                  {orderType} {(orderType === 'MESA' || orderType === 'COMANDA') && manualTable ? `• ${orderType === 'MESA' ? 'Mesa' : 'Comanda'} ${manualTable}` : ''}
+                  {orderType === 'BALCAO' ? (isWaitstaff ? 'VIAGEM' : 'RETIRADA') : orderType} {(orderType === 'MESA' || orderType === 'COMANDA') && manualTable ? `• ${orderType === 'MESA' ? 'Mesa' : 'Comanda'} ${manualTable}` : ''}
                 </button>
             </div>
           </div>

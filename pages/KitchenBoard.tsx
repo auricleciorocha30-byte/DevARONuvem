@@ -80,12 +80,12 @@ const KitchenBoard: React.FC<Props> = ({ orders, updateStatus }) => {
           </div>
         </section>
 
-        {/* COLUNA BALCÃO */}
+        {/* COLUNA RETIRADA / VIAGEM */}
         <section className="flex flex-col bg-zinc-800/40 rounded-[2.5rem] border border-white/5 overflow-hidden">
           <div className="p-6 flex items-center justify-between border-b border-white/5 bg-orange-500/10">
             <div className="flex items-center gap-3">
               <ShoppingBag className="text-orange-400" />
-              <h2 className="text-xl font-bold uppercase tracking-tight">Balcão</h2>
+              <h2 className="text-xl font-bold uppercase tracking-tight">Retirada / Viagem</h2>
             </div>
             <span className="bg-orange-500 text-[10px] font-black px-3 py-1 rounded-full">{columns.balcao.length}</span>
           </div>
@@ -93,7 +93,7 @@ const KitchenBoard: React.FC<Props> = ({ orders, updateStatus }) => {
             {columns.balcao.map(order => (
               <OrderCard key={order.id} order={order} onReady={handleMarkReady} elapsed={getTimeElapsed(order.createdAt)} />
             ))}
-            {columns.balcao.length === 0 && <EmptyState text="Nenhum balcão pendente" />}
+            {columns.balcao.length === 0 && <EmptyState text="Nenhum pedido pendente" />}
           </div>
         </section>
 

@@ -447,7 +447,9 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
       <div className="flex flex-wrap gap-4 items-center justify-between">
           <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
               {['TODOS', 'MESA', 'COMANDA', 'BALCAO', 'ENTREGA', 'FINALIZADOS'].map(f => (
-                <button key={f} onClick={() => setFilterType(f as any)} className={`px-6 py-2.5 rounded-2xl font-bold text-sm border transition-all ${filterType === f ? 'bg-primary text-white border-primary shadow-md' : 'bg-white text-gray-400 border-gray-100'}`}>{f}</button>
+                <button key={f} onClick={() => setFilterType(f as any)} className={`px-6 py-2.5 rounded-2xl font-bold text-sm border transition-all ${filterType === f ? 'bg-primary text-white border-primary shadow-md' : 'bg-white text-gray-400 border-gray-100'}`}>
+                  {f === 'BALCAO' ? 'RETIRADA / VIAGEM' : f}
+                </button>
               ))}
           </div>
 
@@ -476,7 +478,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap gap-2 mb-2">
                   <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${group.type === 'ENTREGA' ? 'bg-green-100 text-green-600' : group.type === 'MESA' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}>
-                    {group.type} {group.tableNumber && `(Mesa ${group.tableNumber})`}
+                    {group.type === 'BALCAO' ? 'RETIRADA / VIAGEM' : group.type} {group.tableNumber && `(Mesa ${group.tableNumber})`}
                   </span>
                   {group.waitstaffName && (
                     <span className="bg-zinc-100 text-zinc-600 px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-widest flex items-center gap-1">

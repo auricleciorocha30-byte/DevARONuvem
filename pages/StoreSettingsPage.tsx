@@ -317,7 +317,7 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                 <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
                     <div className="flex items-center gap-2">
                         <ShoppingBag size={16} className="text-blue-500" />
-                        <span className="text-xs font-bold text-gray-600">Pedidos Balcão</span>
+                        <span className="text-xs font-bold text-gray-600">Pedidos Retirada / Viagem</span>
                     </div>
                     <Switch checked={localSettings.isCounterPickupActive} onChange={(v) => setLocalSettings({...localSettings, isCounterPickupActive: v})} />
                 </div>

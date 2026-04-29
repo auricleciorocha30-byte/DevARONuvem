@@ -2866,7 +2866,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
             <div className="flex items-center gap-1 shrink-0"><kbd className="bg-black/10 px-1.5 py-0.5 rounded border border-white/10 shrink-0">F6</kbd> Comanda</div>
             <div className="flex items-center gap-1 shrink-0"><kbd className="bg-black/10 px-1.5 py-0.5 rounded border border-white/10 shrink-0">F7</kbd> Mesa</div>
             <div className="flex items-center gap-1 shrink-0"><kbd className="bg-black/10 px-1.5 py-0.5 rounded border border-white/10 shrink-0">F8</kbd> Entrega</div>
-            <div className="flex items-center gap-1 shrink-0"><kbd className="bg-black/10 px-1.5 py-0.5 rounded border border-white/10 shrink-0">F9</kbd> Balcão</div>
+            <div className="flex items-center gap-1 shrink-0"><kbd className="bg-black/10 px-1.5 py-0.5 rounded border border-white/10 shrink-0">F9</kbd> Retirada / Viagem</div>
             <div className="flex items-center gap-1 shrink-0"><kbd className="bg-black/10 px-1.5 py-0.5 rounded border border-white/10 shrink-0">F10</kbd> Lançar</div>
             <div className="flex items-center gap-1 shrink-0"><kbd className="bg-black/10 px-1.5 py-0.5 rounded border border-white/10 shrink-0">ESC</kbd> Limpar</div>
           </div>
@@ -3052,35 +3052,39 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
 
       {/* Right Side - Cart */}
       <div className="w-full lg:w-96 bg-white shadow-xl flex flex-col border-t lg:border-l border-gray-200 z-20 h-[45dvh] lg:h-full">
-        <div className="p-3 border-b bg-gray-50 flex flex-wrap justify-between items-center gap-2 shrink-0">
-          <h2 className="font-bold text-gray-800 flex items-center gap-2 whitespace-nowrap">
-            <ShoppingCart size={18} />
-            <span className="hidden sm:inline">Carrinho</span>
-          </h2>
-          <div className="flex flex-wrap gap-2 shrink-0">
-              {cart.length > 0 && (
-                  <button 
-                    onClick={() => {
-                        if (confirm("Limpar carrinho?")) {
-                            setCart([]);
-                            setOriginalCart([]);
-                            setLoadedCommandIds([]);
-                            setLoadedPayments([]);
-                            setLoadedWaitstaffName(null);
-                            setLoadedServiceFee(0);
-                            setCommandNumber('');
-                        }
-                    }}
-                    className="p-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition-colors"
-                    title="Limpar Carrinho"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-              )}
+        <div className="p-3 border-b bg-gray-50 flex flex-col gap-3 shrink-0">
+          <div className="flex justify-between items-center w-full">
+            <h2 className="font-bold text-gray-800 flex items-center gap-2 shrink-0">
+              <ShoppingCart size={18} />
+              <span>Carrinho</span>
+            </h2>
+            {cart.length > 0 && (
+                <button 
+                  onClick={() => {
+                      if (confirm("Limpar carrinho?")) {
+                          setCart([]);
+                          setOriginalCart([]);
+                          setLoadedCommandIds([]);
+                          setLoadedPayments([]);
+                          setLoadedWaitstaffName(null);
+                          setLoadedServiceFee(0);
+                          setCommandNumber('');
+                      }
+                  }}
+                  className="p-2 flex items-center gap-1 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition-colors text-xs font-bold"
+                  title="Limpar Carrinho"
+                >
+                  <Trash2 size={16} />
+                  <span className="hidden sm:inline">Limpar</span>
+                </button>
+            )}
+          </div>
+          <div className="flex gap-2 overflow-x-auto no-scrollbar w-full">
               <button 
                 onClick={() => lookupOrdersList('COMANDA')}
                 disabled={isLookingUpCommand}
-                className="relative p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors flex items-center gap-1 text-xs font-bold whitespace-nowrap"
+                title="Lista de Comandas"
+                className="relative flex-1 p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors flex items-center justify-center gap-1.5 text-xs font-bold whitespace-nowrap"
                 style={{
                     backgroundColor: settings.primaryColor ? `${settings.primaryColor}20` : undefined,
                     color: settings.primaryColor || undefined
@@ -3093,12 +3097,13 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                   </span>
                 )}
                 {isLookingUpCommand ? <Loader2 className="animate-spin" size={16} /> : <Tag size={16} />}
-                <span className="hidden sm:inline">Comanda</span>
+                <span>Comanda</span>
               </button>
               <button 
                 onClick={() => lookupOrdersList('MESA')}
                 disabled={isLookingUpCommand}
-                className="relative p-2 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 transition-colors flex items-center gap-1 text-xs font-bold whitespace-nowrap"
+                title="Lista de Mesas"
+                className="relative flex-1 p-2 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 transition-colors flex items-center justify-center gap-1.5 text-xs font-bold whitespace-nowrap"
               >
                 {newOrdersCount.MESA > 0 && (
                   <span className="absolute -top-1 -right-1 flex h-3 w-3">
@@ -3107,12 +3112,13 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                   </span>
                 )}
                 {isLookingUpCommand ? <Loader2 className="animate-spin" size={16} /> : <Hash size={16} />}
-                <span className="hidden sm:inline">Mesa</span>
+                <span>Mesa</span>
               </button>
               <button 
                 onClick={() => lookupOrdersList('ENTREGA')}
                 disabled={isLookingUpCommand}
-                className="relative p-2 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition-colors flex items-center gap-1 text-xs font-bold whitespace-nowrap"
+                title="Lista de Entregas"
+                className="relative flex-1 p-2 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition-colors flex items-center justify-center gap-1.5 text-xs font-bold whitespace-nowrap"
               >
                 {newOrdersCount.ENTREGA > 0 && (
                   <span className="absolute -top-1 -right-1 flex h-3 w-3">
@@ -3126,7 +3132,8 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
               <button 
                 onClick={() => lookupOrdersList('BALCAO')}
                 disabled={isLookingUpCommand}
-                className="relative p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors flex items-center gap-1 text-xs font-bold whitespace-nowrap"
+                title="Pedidos Retirada / Viagem"
+                className="relative flex-1 p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors flex items-center justify-center gap-1.5 text-xs font-bold whitespace-nowrap"
               >
                 {newOrdersCount.BALCAO > 0 && (
                   <span className="absolute -top-1 -right-1 flex h-3 w-3">
@@ -3135,7 +3142,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                   </span>
                 )}
                 {isLookingUpCommand ? <Loader2 className="animate-spin" size={16} /> : <ShoppingBag size={16} />}
-                <span className="hidden sm:inline">Balcão</span>
+                <span className="hidden sm:inline">Viagem</span>
               </button>
           </div>
         </div>
@@ -3366,7 +3373,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                     onClick={() => setOrderType('BALCAO')}
                     className={`flex-1 py-4 font-bold text-sm uppercase tracking-wider ${orderType === 'BALCAO' ? 'bg-white text-blue-600 border-b-2 border-blue-600' : 'bg-gray-50 text-gray-400'}`}
                 >
-                    Balcão
+                    Retirada / Viagem
                 </button>
                 <button 
                     onClick={() => setOrderType('ENTREGA')}
@@ -3845,7 +3852,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                      lookupType === 'MESA' ? <Hash size={24} className="text-orange-600" /> :
                      <Tag size={24} className="text-blue-600" />}
                     {lookupType === 'ENTREGA' ? 'Entregas Pendentes' : 
-                     lookupType === 'BALCAO' ? 'Pedidos Balcão Pendentes' :
+                     lookupType === 'BALCAO' ? 'Pedidos Retirada / Viagem Pendentes' :
                      lookupType === 'MESA' ? 'Mesas Pendentes' : 'Comandas Pendentes'}
                 </h2>
                 <button onClick={() => setShowDeliveryModal(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
