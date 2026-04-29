@@ -142,9 +142,22 @@ async function startServer() {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Basic ${Buffer.from(token + ':').toString('base64')}` },
         body: JSON.stringify(nfceData)
       });
-      const data = await resp.json();
+      let data;
+      const text = await resp.text();
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.error('Focus NFe gave non-JSON response:', text);
+        if (text.includes('HTTP Basic: Access denied')) {
+           return res.status(401).json({ error: `Acesso negado: O token configurado é inválido. Se você mudou para o ambiente de Produção, lembre-se de configurar o token de Produção (que é diferente do token de Homologação).` });
+        }
+        return res.status(resp.status).json({ error: `Erro na Focus NFe: ${text.substring(0, 100)}` });
+      }
       res.status(resp.status).json(data);
-    } catch (error) { res.status(500).json({ error: 'Erro na Focus NFe.' }); }
+    } catch (error) { 
+      console.error('Focus NFe API Error:', error);
+      res.status(500).json({ error: `Erro na Focus NFe. ${error instanceof Error ? error.message : String(error)}` }); 
+    }
   });
 
   apiRouter.get('/focus-nfe/consult-nfce', async (req, res) => {
@@ -153,9 +166,19 @@ async function startServer() {
     const baseUrl = (environment as string) === 'production' ? 'https://api.focusnfe.com.br' : 'https://homologacao.focusnfe.com.br';
     try {
       const resp = await fetch(`${baseUrl}/v2/nfce/${reference}`, { headers: { 'Authorization': `Basic ${Buffer.from(token + ':').toString('base64')}` } });
-      const data = await resp.json();
+      let data;
+      const text = await resp.text();
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.error('Focus NFe consult gave non-JSON response:', text);
+        if (text.includes('HTTP Basic: Access denied')) {
+           return res.status(401).json({ error: `Acesso negado: O token configurado é inválido para este ambiente.` });
+        }
+        return res.status(resp.status).json({ error: `Erro na Focus NFe (consulta): ${text.substring(0, 100)}` });
+      }
       res.status(resp.status).json(data);
-    } catch (error) { res.status(500).json({ error: 'Erro de consulta.' }); }
+    } catch (error) { res.status(500).json({ error: `Erro de consulta. ${error instanceof Error ? error.message : String(error)}` }); }
   });
 
   apiRouter.delete('/focus-nfe/cancel-nfce', async (req, res) => {
@@ -168,9 +191,19 @@ async function startServer() {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Basic ${Buffer.from(token + ':').toString('base64')}` },
         body: JSON.stringify({ justificativa: justificativa || 'Cancelamento solicitado.' })
       });
-      const data = await resp.json();
+      let data;
+      const text = await resp.text();
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.error('Focus NFe cancel gave non-JSON response:', text);
+        if (text.includes('HTTP Basic: Access denied')) {
+           return res.status(401).json({ error: `Acesso negado: O token configurado é inválido para este ambiente.` });
+        }
+        return res.status(resp.status).json({ error: `Erro na Focus NFe (cancelamento): ${text.substring(0, 100)}` });
+      }
       res.status(resp.status).json(data);
-    } catch (error) { res.status(500).json({ error: 'Erro ao cancelar.' }); }
+    } catch (error) { res.status(500).json({ error: `Erro ao cancelar. ${error instanceof Error ? error.message : String(error)}` }); }
   });
 
   // API Route for PagBank - GENERIC NAME TO AVOID CLOUDFLARE WAF

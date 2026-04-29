@@ -172,6 +172,9 @@ export default function IntegrationsPage({ settings, onSave }: Props) {
                     placeholder="Seu token da Focus NFe"
                   />
                 </div>
+                <p className="text-[10px] text-gray-400 mt-2 ml-1 italic leading-relaxed">
+                  * Nota: O token do ambiente de <strong className="text-gray-500 whitespace-nowrap">Produção</strong> é <strong>diferente</strong> do token de <strong className="text-gray-500 whitespace-nowrap">Homologação</strong>. Certifique-se de configurar o token correto para o ambiente escolhido.
+                </p>
               </div>
 
               <div>

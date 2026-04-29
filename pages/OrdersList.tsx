@@ -269,7 +269,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
       } else {
         if (typeof newWindow !== 'undefined' && newWindow) newWindow.close();
         console.error("Erro Focus NFe:", result);
-        let errorMessage = result.mensagem || JSON.stringify(result);
+        let errorMessage = result.error || result.mensagem || JSON.stringify(result);
         if (result.erros && Array.isArray(result.erros)) {
             const detalhamento = result.erros.map((e: any) => `- ${e.codigo}: ${e.mensagem}`).join('\n');
             errorMessage = `${result.mensagem || 'Erros de validação:'}\n\n${detalhamento}`;
