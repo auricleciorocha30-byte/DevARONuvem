@@ -376,12 +376,14 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         }
         
         // Update local order to reflect successfully emitted NFC-e
-        if (finalResult.status === 'autorizado') {
-            await supabase.from('orders').eq('id', order.id).update({
+        const isError = finalResult.status === 'erro_autorizacao' || finalResult.status === 'denegado' || finalResult.status === 'rejeitado';
+        if (!isError) {
+            const nfceStatusStr = finalResult.status === 'autorizado' ? 'AUTHORIZED' : 'PROCESSING';
+            await supabase.from('orders').update({
                 nfce_reference: reference, // store reference
-                nfce_status: 'AUTHORIZED'
-            });
-            setLastOrder(prev => prev && prev.id === order.id ? { ...prev, nfce_reference: reference, nfce_status: 'AUTHORIZED' } : prev);
+                nfce_status: nfceStatusStr
+            }).eq('id', order.id);
+            setLastOrder(prev => prev && prev.id === order.id ? { ...prev, nfce_reference: reference, nfce_status: nfceStatusStr } : prev);
         }
 
         if (danfeUrl && newWindow) {

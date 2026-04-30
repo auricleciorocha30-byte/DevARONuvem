@@ -227,11 +227,12 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
         }
 
         // Update each order in the group with reference and status
-        if (finalResult.status === 'autorizado') {
+        const isError = finalResult.status === 'erro_autorizacao' || finalResult.status === 'denegado' || finalResult.status === 'rejeitado';
+        if (!isError) {
             for (const orderId of group.originalOrderIds) {
                 await updateOrder(orderId, {
                     nfce_reference: reference,
-                    nfce_status: 'AUTHORIZED'
+                    nfce_status: finalResult.status === 'autorizado' ? 'AUTHORIZED' : 'PROCESSING'
                 });
             }
         }
