@@ -28,6 +28,7 @@
         const isDelivery = urlParams.get('role') === 'entregador' || hash.includes('role=entregador') || hash.includes('/entregas');
         const isAttendant = urlParams.get('role') === 'atendente' || hash.includes('role=atendente') || hash.includes('/atendimento');
         const isMenu = hash.includes('/cardapio');
+        const isPDV = hash.includes('/pdv');
         
         let shouldGenerateManifest = false;
         let appName = "G&C Staff";
@@ -48,6 +49,11 @@
           appName = loja ? `Cardápio - ${loja}` : "Cardápio Digital";
           shortName = "Cardápio";
           startUrl = `/#/cardapio${loja ? '?loja=' + loja : ''}`;
+          shouldGenerateManifest = true;
+        } else if (isPDV) {
+          appName = loja ? `PDV - ${loja}` : "PDV DevARO";
+          shortName = "PDV";
+          startUrl = `/#/pdv${loja ? '?loja=' + loja : ''}`;
           shouldGenerateManifest = true;
         }
         
@@ -78,6 +84,11 @@
           };
           const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
           document.getElementById('app-manifest').href = URL.createObjectURL(blob);
+          
+          window.__SHOULD_REGISTER_SW__ = true;
+        } else {
+          document.getElementById('app-manifest')?.remove();
+          window.__SHOULD_REGISTER_SW__ = false;
         }
       })();
     </script>
@@ -133,9 +144,17 @@
 
       // Registro do Service Worker para PWA
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration failed:', err));
-        });
+        if (window.__SHOULD_REGISTER_SW__) {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration failed:', err));
+          });
+        } else {
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            for(let registration of registrations) {
+              registration.unregister();
+            }
+          });
+        }
       }
     </script>
 </head>
