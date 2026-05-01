@@ -259,7 +259,7 @@ function StoreContext() {
         } else if (storeData.settings) {
             parsedSettings = storeData.settings;
         }
-
+        
         const mergedSettings = { ...INITIAL_SETTINGS, ...parsedSettings };
         
         const fullStoreData = { 
