@@ -223,7 +223,8 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
     setIsEmittingNfce(true);
     try {
         const queryParams = new URLSearchParams({
-            storeId: storeId || order.store_id || '',
+            token: settings.focusNfeToken,
+            environment: settings.focusNfeEnvironment || 'homologation',
             reference: order.nfce_reference
         });
         const response = await fetch(`/api/focus-nfe/consult-nfce?${queryParams.toString()}`);
@@ -335,7 +336,8 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          storeId: storeId || order.store_id || '',
+          token: settings.focusNfeToken,
+          environment: settings.focusNfeEnvironment,
           nfceData,
           reference: reference
         })
@@ -355,7 +357,8 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         while ((finalResult.status === 'processando_autorizacao' || finalResult.status === 'processando') && retries < 10) {
             await new Promise(r => setTimeout(r, 2000));
             const queryParams = new URLSearchParams({
-                storeId: storeId || order.store_id || '',
+                token: settings.focusNfeToken,
+                environment: settings.focusNfeEnvironment || 'homologation',
                 reference: reference
             });
             try {
@@ -1548,12 +1551,14 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                storeId: storeId,
+                token: settings.onlinePaymentAccessToken,
+                accessToken: settings.onlinePaymentAccessToken,
                 environment: settings.pagbankEnvironment || 'sandbox',
                 orderData: mockOrder,
                 status: 'pending',
                 storeUrl: redirectStoreUrl,
-                storeSlug: settings.slug
+                storeSlug: settings.slug,
+                storeId: storeId
             })
         });
 
@@ -1610,7 +1615,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                storeId: storeId,
+                accessToken: settings.onlinePaymentAccessToken,
                 deviceId: settings.mercadoPagoPointDeviceId,
                 amount: amount,
                 description: `Venda PDV - ${settings.storeName}`,
@@ -1637,7 +1642,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
     if (isPointProcessing && pointPaymentId) {
         interval = setInterval(async () => {
             try {
-                const response = await fetch(`/api/mercado-pago/point/payment-intent/${pointPaymentId}?storeId=${storeId}`);
+                const response = await fetch(`/api/mercado-pago/point/payment-intent/${pointPaymentId}?accessToken=${settings.onlinePaymentAccessToken}`);
                 const data = await response.json();
                 
                 if (data.state === 'FINISHED') {

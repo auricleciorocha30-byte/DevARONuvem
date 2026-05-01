@@ -938,7 +938,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                method: 'POST',
                headers: { 'Content-Type': 'application/json' },
                body: JSON.stringify({
-                 storeId: storeId,
+                 accessToken: settings.onlinePaymentAccessToken,
                  orderData: finalOrder,
                  storeSlug: settings.slug || storeSlug,
                })
@@ -960,7 +960,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                 storeId: storeId,
+                accessToken: settings.onlinePaymentAccessToken,
                 orderData: finalOrder,
                 storeUrl: redirectStoreUrl,
                 storeSlug: settings.slug || storeSlug,
@@ -986,7 +986,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                 storeId: storeId,
+                token: settings.onlinePaymentAccessToken,
                 environment: settings.pagbankEnvironment || 'sandbox',
                 orderData: finalOrder,
                 storeUrl: redirectStoreUrl,
