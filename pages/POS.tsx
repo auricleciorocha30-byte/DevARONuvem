@@ -379,10 +379,10 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         const isError = finalResult.status === 'erro_autorizacao' || finalResult.status === 'denegado' || finalResult.status === 'rejeitado';
         if (!isError) {
             const nfceStatusStr = finalResult.status === 'autorizado' ? 'AUTHORIZED' : 'PROCESSING';
-            await supabase.from('orders').update({
+            await supabase.from('orders').eq('id', order.id).update({
                 nfce_reference: reference, // store reference
                 nfce_status: nfceStatusStr
-            }).eq('id', order.id);
+            });
             setLastOrder(prev => prev && prev.id === order.id ? { ...prev, nfce_reference: reference, nfce_status: nfceStatusStr } : prev);
         }
 
