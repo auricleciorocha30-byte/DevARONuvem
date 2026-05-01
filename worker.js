@@ -54,11 +54,11 @@ export default {
           
           if (slug) {
               try {
-                  const querySql = `SELECT dbUrl, dbAuthToken FROM store_profiles WHERE slug = '${slug}' LIMIT 1`;
+                  const querySql = `SELECT dbUrl, dbAuthToken FROM store_profiles WHERE slug = ? LIMIT 1`;
                   const resp = await fetch(mainTursoUrl, {
                       method: 'POST',
                       headers: { 'Authorization': `Bearer ${mainTursoToken}`, 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ statements: [{ q: querySql, params: [] }] })
+                      body: JSON.stringify({ statements: [{ q: querySql, params: [slug] }] })
                   });
                   const json = await resp.json();
                   if (json[0]?.results?.rows?.length > 0) {
@@ -87,7 +87,7 @@ export default {
             newStatus = 'CANCELADO';
           }
 
-          const updateSql = `UPDATE orders SET status = '${newStatus}' WHERE id = '${reference_id}' OR id = ${isNaN(Number(reference_id)) ? -1 : Number(reference_id)}`;
+          const updateSql = `UPDATE orders SET status = ? WHERE id = ? OR id = ?`;
           await fetch(targetDbUrl, {
             method: 'POST',
             headers: {
@@ -95,7 +95,7 @@ export default {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              statements: [{ q: updateSql, params: [] }]
+              statements: [{ q: updateSql, params: [newStatus, reference_id, isNaN(Number(reference_id)) ? -1 : Number(reference_id)] }]
             })
           });
           
@@ -135,11 +135,11 @@ export default {
               let onlinePaymentAccessToken = '';
 
               try {
-                  const querySql = `SELECT dbUrl, dbAuthToken, settings FROM store_profiles WHERE slug = '${slug}' LIMIT 1`;
+                  const querySql = `SELECT dbUrl, dbAuthToken, settings FROM store_profiles WHERE slug = ? LIMIT 1`;
                   const resp = await fetch(mainTursoUrl, {
                       method: 'POST',
                       headers: { 'Authorization': `Bearer ${mainTursoToken}`, 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ statements: [{ q: querySql, params: [] }] })
+                      body: JSON.stringify({ statements: [{ q: querySql, params: [slug] }] })
                   });
                   const json = await resp.json();
                   if (json[0]?.results?.rows?.length > 0) {
@@ -177,11 +177,11 @@ export default {
                               if (status === 'approved') newStatus = 'PAGO';
                               else if (status === 'cancelled' || status === 'rejected') newStatus = 'CANCELADO';
                     
-                              const updateSql = `UPDATE orders SET status = '${newStatus}' WHERE id = '${external_reference}' OR id = ${isNaN(Number(external_reference)) ? -1 : Number(external_reference)}`;
+                              const updateSql = `UPDATE orders SET status = ? WHERE id = ? OR id = ?`;
                               await fetch(targetDbUrl, {
                                 method: 'POST',
                                 headers: { 'Authorization': `Bearer ${targetDbToken}`, 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ statements: [{ q: updateSql, params: [] }] })
+                                body: JSON.stringify({ statements: [{ q: updateSql, params: [newStatus, external_reference, isNaN(Number(external_reference)) ? -1 : Number(external_reference)] }] })
                               });
                           }
                       }
