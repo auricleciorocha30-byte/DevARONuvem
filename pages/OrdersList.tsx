@@ -192,8 +192,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          token: settings.focusNfeToken,
-          environment: settings.focusNfeEnvironment,
+          storeId: group.originalOrderIds[0] ? orders.find(o => o.id === group.originalOrderIds[0])?.store_id || '' : '',
           nfceData,
           reference: reference
         })
@@ -213,8 +212,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
         while ((finalResult.status === 'processando_autorizacao' || finalResult.status === 'processando') && retries < 10) {
             await new Promise(r => setTimeout(r, 2000));
             const queryParams = new URLSearchParams({
-                token: settings.focusNfeToken,
-                environment: settings.focusNfeEnvironment || 'homologation',
+                storeId: group.originalOrderIds[0] ? orders.find(o => o.id === group.originalOrderIds[0])?.store_id || '' : '',
                 reference: reference
             });
             try {
@@ -296,8 +294,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
     setIsEmittingNfce(group.id);
     try {
         const queryParams = new URLSearchParams({
-            token: settings.focusNfeToken,
-            environment: settings.focusNfeEnvironment || 'homologation',
+            storeId: group.originalOrderIds[0] ? orders.find(o => o.id === group.originalOrderIds[0])?.store_id || '' : '',
             reference: group.nfceReference
         });
         const response = await fetch(`/api/focus-nfe/consult-nfce?${queryParams.toString()}`);
@@ -361,8 +358,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                token: settings.focusNfeToken,
-                environment: settings.focusNfeEnvironment,
+                storeId: group.originalOrderIds[0] ? orders.find(o => o.id === group.originalOrderIds[0])?.store_id || '' : '',
                 reference: group.nfceReference,
                 justificativa: justificativa
             })

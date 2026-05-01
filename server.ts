@@ -11,6 +11,37 @@ const __dirname = path.dirname(__filename);
 export const app = express();
 const PORT = 3000;
 
+const DEFAULT_TURSO_URL = 'https://produtodevaro-auricleciorocha30-byte.aws-us-east-1.turso.io';
+const DEFAULT_TURSO_AUTH_TOKEN = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzIxMzYwOTMsImlkIjoiMDE5YzliNzctZGMwMS03MmIwLWFmYWItYWRlOGY0MjM5YTBjIiwicmlkIjoiYTQyYjFmY2EtYjc0YS00MGMwLTk3M2QtODlmNmFlMTBkYzFiIn0.A7LAbG4yZ70-XPczvHXgaVUm2t_rJuTlsMpefd86FVprMb50rPZU5aICZdVvQvXpdnwOiav_nNMRCOOmi2cQDQ';
+
+async function fetchStoreSettings(storeId: string) {
+  let httpUrl = DEFAULT_TURSO_URL.replace(/^libsql:\/\//, 'https://').replace(/\/$/, '');
+  try {
+    const response = await fetch(`${httpUrl}/v2/pipeline`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${DEFAULT_TURSO_AUTH_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        requests: [
+          { type: 'execute', stmt: { sql: 'SELECT settings FROM store_profiles WHERE id = ?', args: [{ type: 'text', value: storeId }] } },
+          { type: 'close' }
+        ]
+      })
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    const rows = data.results[0].response.result.rows;
+    if (!rows || rows.length === 0) return null;
+    const settingsStr = rows[0][0].value;
+    return JSON.parse(settingsStr);
+  } catch (e) {
+    console.error("Error fetching settings from DB", e);
+    return null;
+  }
+}
+
 async function startServer() {
   app.use(cors());
   app.use(express.json({ limit: '10mb' }));
@@ -44,8 +75,16 @@ async function startServer() {
 
   // API Route for Mercado Pago Checkout Pro
   apiRouter.post('/mercado-pago/create-preference', async (req, res) => {
-    const { accessToken, orderData, storeUrl } = req.body;
-    // ... logic remains same, just moved to router
+    let { accessToken, orderData, storeUrl, storeId } = req.body;
+    
+    // Auto-fetch credentials if not provided safely (from Public Views)
+    if (!accessToken && storeId) {
+      const settings = await fetchStoreSettings(storeId);
+      if (settings && settings.onlinePaymentAccessToken) {
+        accessToken = settings.onlinePaymentAccessToken;
+      }
+    }
+
     if (!accessToken) return res.status(400).json({ error: 'Access Token do Mercado Pago não fornecido.' });
     try {
       const client = new MercadoPagoConfig({ accessToken });
@@ -93,7 +132,15 @@ async function startServer() {
 
   // API Route for Mercado Pago Point
   apiRouter.post('/mercado-pago/point/create-payment-intent', async (req, res) => {
-    const { accessToken, deviceId, amount, description, externalReference } = req.body;
+    let { accessToken, deviceId, amount, description, externalReference, storeId } = req.body;
+    
+    if (!accessToken && storeId) {
+      const settings = await fetchStoreSettings(storeId);
+      if (settings && settings.onlinePaymentAccessToken) {
+        accessToken = settings.onlinePaymentAccessToken;
+      }
+    }
+
     if (!accessToken || !deviceId) return res.status(400).json({ error: 'Access Token ou Device ID não fornecido.' });
     try {
       const resp = await fetch(`https://api.mercadopago.com/point/integration-api/devices/${deviceId}/payment-intents`, {
@@ -111,7 +158,16 @@ async function startServer() {
 
   apiRouter.get('/mercado-pago/point/payment-intent/:id', async (req, res) => {
     const { id } = req.params;
-    const accessToken = req.query.accessToken as string;
+    let accessToken = req.query.accessToken as string;
+    const storeId = req.query.storeId as string;
+    
+    if (!accessToken && storeId) {
+      const settings = await fetchStoreSettings(storeId);
+      if (settings && settings.onlinePaymentAccessToken) {
+        accessToken = settings.onlinePaymentAccessToken;
+      }
+    }
+
     if (!accessToken) return res.status(400).json({ error: 'Access Token não fornecido.' });
     try {
       const resp = await fetch(`https://api.mercadopago.com/point/integration-api/payment-intents/${id}`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
@@ -133,7 +189,15 @@ async function startServer() {
 
   // API Route for Focus NFe
   apiRouter.post('/focus-nfe/emit-nfce', async (req, res) => {
-    const { token, environment, nfceData, reference } = req.body;
+    let { token, environment, nfceData, reference, storeId } = req.body;
+    
+    // Auto-fetch credentials if not provided safely (from Public Views)
+    if (!token && storeId) {
+      const settings = await fetchStoreSettings(storeId);
+      if (settings && settings.focusNfeToken) token = settings.focusNfeToken;
+      if (settings && settings.focusNfeEnvironment) environment = settings.focusNfeEnvironment;
+    }
+
     if (!token) return res.status(400).json({ error: 'Token não fornecido.' });
     const baseUrl = environment === 'production' ? 'https://api.focusnfe.com.br' : 'https://homologacao.focusnfe.com.br';
     try {
@@ -149,7 +213,7 @@ async function startServer() {
       } catch (e) {
         console.error('Focus NFe gave non-JSON response:', text);
         if (text.includes('HTTP Basic: Access denied')) {
-           return res.status(401).json({ error: `Acesso negado: O token configurado é inválido. Se você mudou para o ambiente de Produção, lembre-se de configurar o token de Produção (que é diferente do token de Homologação).` });
+           return res.status(401).json({ error: `Acesso negado: O token configurado é inválido.` });
         }
         return res.status(resp.status).json({ error: `Erro na Focus NFe: ${text.substring(0, 100)}` });
       }
@@ -161,7 +225,14 @@ async function startServer() {
   });
 
   apiRouter.get('/focus-nfe/consult-nfce', async (req, res) => {
-    const { token, environment, reference } = req.query;
+    let { token, environment, reference, storeId } = req.query;
+    
+    if (!token && storeId) {
+      const settings = await fetchStoreSettings(storeId as string);
+      if (settings && settings.focusNfeToken) token = settings.focusNfeToken;
+      if (settings && settings.focusNfeEnvironment) environment = settings.focusNfeEnvironment;
+    }
+
     if (!token || !reference) return res.status(400).json({ error: 'Dados incompletos.' });
     const baseUrl = (environment as string) === 'production' ? 'https://api.focusnfe.com.br' : 'https://homologacao.focusnfe.com.br';
     try {
@@ -182,7 +253,14 @@ async function startServer() {
   });
 
   apiRouter.delete('/focus-nfe/cancel-nfce', async (req, res) => {
-    const { token, environment, reference, justificativa } = req.body;
+    let { token, environment, reference, justificativa, storeId } = req.body;
+    
+    if (!token && storeId) {
+      const settings = await fetchStoreSettings(storeId);
+      if (settings && settings.focusNfeToken) token = settings.focusNfeToken;
+      if (settings && settings.focusNfeEnvironment) environment = settings.focusNfeEnvironment;
+    }
+
     if (!token || !reference) return res.status(400).json({ error: 'Dados incompletos.' });
     const baseUrl = environment === 'production' ? 'https://api.focusnfe.com.br' : 'https://homologacao.focusnfe.com.br';
     try {
@@ -208,7 +286,14 @@ async function startServer() {
 
   // API Route for PagBank - GENERIC NAME TO AVOID CLOUDFLARE WAF
   apiRouter.post(['/pbank/checkout', '/v1/process-payment'], async (req, res) => {
-    const { token, environment, orderData, storeUrl } = req.body;
+    let { token, environment, orderData, storeUrl, storeId } = req.body;
+    
+    // Auto-fetch credentials if not provided safely (from Public Views)
+    if (!token && storeId) {
+      const settings = await fetchStoreSettings(storeId);
+      if (settings && settings.onlinePaymentAccessToken) token = settings.onlinePaymentAccessToken;
+    }
+
     if (!token) return res.status(400).json({ error: 'Token não fornecido.' });
     const baseUrl = environment === 'production' ? 'https://api.pagseguro.com' : 'https://sandbox.api.pagseguro.com';
     try {
@@ -271,7 +356,13 @@ async function startServer() {
   });
 
   apiRouter.post('/pagbank/public-key', async (req, res) => {
-    const { token, environment } = req.body;
+    let { token, environment, storeId } = req.body;
+    
+    if (!token && storeId) {
+      const settings = await fetchStoreSettings(storeId);
+      if (settings && settings.onlinePaymentAccessToken) token = settings.onlinePaymentAccessToken;
+    }
+
     if (!token) return res.status(400).json({ error: 'Token não fornecido.' });
     const baseUrl = environment === 'production' ? 'https://api.pagseguro.com' : 'https://sandbox.api.pagseguro.com';
     try {
