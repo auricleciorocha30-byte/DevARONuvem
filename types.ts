@@ -124,6 +124,7 @@ export interface Order {
   stockDeducted?: boolean;
   nfce_reference?: string;
   nfce_status?: string;
+  customerCpf?: string;
 }
 
 export interface CashMovement {

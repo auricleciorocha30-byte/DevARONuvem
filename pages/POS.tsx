@@ -103,6 +103,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
     return saved ? JSON.parse(saved) : {
       customerName: '',
       customerPhone: '',
+      customerCpf: '',
       address: '',
       referencePoint: '',
       driverId: '',
@@ -285,6 +286,12 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
     setIsEmittingNfce(true);
     const reference = `order_${order.id}_${Date.now()}`;
     try {
+      let customerCpf = order.customerCpf || '';
+      if (!customerCpf && order.customerId) {
+        const { data: customerData } = await supabase.from('customers').select('cpf').eq('id', order.customerId).maybeSingle();
+        if (customerData) customerCpf = customerData.cpf || '';
+      }
+
       let items = [];
       if (typeof order.items === 'string') {
         items = JSON.parse(order.items);
@@ -292,7 +299,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         items = order.items;
       }
 
-      const nfceData = {
+      const nfceData: any = {
         cnpj_emitente: settings.cnpj.replace(/\D/g, ''),
         data_emissao: new Date().toISOString(),
         indicador_inscricao_estadual_destinatario: 9,
@@ -330,6 +337,13 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
           }
         ]
       };
+
+      if (customerCpf || order.customerName) {
+        nfceData.destinatario = {
+          nome: order.customerName || 'Consumidor',
+          cpf: customerCpf.replace(/\D/g, '') || undefined,
+        };
+      }
 
       const response = await fetch('/api/focus-nfe/emit-nfce', {
         method: 'POST',
@@ -1982,6 +1996,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         deliveryDriverId: orderType === 'ENTREGA' && deliveryDetails.driverId ? deliveryDetails.driverId : undefined,
         session_id: currentSession?.id,
         customerId: selectedCustomer?.id,
+        customerCpf: (orderType === 'ENTREGA' || orderType === 'BALCAO') ? deliveryDetails.customerCpf : (selectedCustomer?.cpf || undefined),
         deliveryFee: orderType === 'ENTREGA' ? deliveryFee : undefined,
         stockDeducted: true
       };
@@ -3431,6 +3446,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                                   ...prev,
                                   customerName: c.name,
                                   customerPhone: c.phone,
+                                  customerCpf: c.cpf || '',
                                   address: c.address || ''
                                 }));
                               }
@@ -3516,6 +3532,19 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
                                   }}
                                   className="w-full pl-10 p-3 rounded-xl border border-blue-100 focus:ring-2 focus:ring-blue-400 outline-none"
                                   placeholder="(00) 00000-0000"
+                              />
+                          </div>
+                      </div>
+                      <div className="space-y-1">
+                          <label className="text-xs font-bold text-blue-700 uppercase">CPF (NFC-e)</label>
+                          <div className="relative">
+                              <User className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-300" size={16} />
+                              <input 
+                                  type="text" 
+                                  value={deliveryDetails.customerCpf || ''}
+                                  onChange={e => setDeliveryDetails({...deliveryDetails, customerCpf: e.target.value})}
+                                  className="w-full pl-10 p-3 rounded-xl border border-blue-100 focus:ring-2 focus:ring-blue-400 outline-none"
+                                  placeholder="CPF do Cliente"
                               />
                           </div>
                       </div>

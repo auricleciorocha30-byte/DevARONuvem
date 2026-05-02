@@ -1137,7 +1137,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
 
         <div className="relative group w-full mb-8">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input type="text" placeholder="O que deseja comer hoje?" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-11 pr-4 py-4 bg-white rounded-2xl outline-none shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100 focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all text-sm font-medium" />
+          <input type="text" placeholder="Qual vai ser o pedido de hoje?" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-11 pr-4 py-4 bg-white rounded-2xl outline-none shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100 focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all text-sm font-medium" />
         </div>
 
         {!searchTerm && featuredProducts.length > 0 && activeCategory === 'Todos' && (

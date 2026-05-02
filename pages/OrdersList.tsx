@@ -1,7 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { Order, OrderStatus, Product, OrderType, OrderItem, StoreSettings } from '../types';
-import { Clock, Printer, UserRound, CheckCircle2, DollarSign, AlertCircle, MapPin, Phone, MessageSquare, Ticket, Percent, Navigation, CreditCard, Wallet, Banknote, FileText, Loader2, Search, Trash2 } from 'lucide-react';
+import { Clock, Printer, UserRound, CheckCircle2, DollarSign, AlertCircle, MapPin, Phone, MessageSquare, Ticket, Percent, Navigation, CreditCard, Wallet, Banknote, FileText, Loader2, Search, Trash2, User } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 interface Props {
   orders: Order[];
@@ -20,6 +21,7 @@ interface GroupedOrder {
   tableNumber?: string;
   customerName?: string;
   customerPhone?: string;
+  customerCpf?: string;
   items: OrderItem[];
   status: OrderStatus;
   total: number;
@@ -39,7 +41,6 @@ interface GroupedOrder {
 }
 
 const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder, settings, updateOrder }) => {
-  console.log("OrdersList received orders:", orders);
   const [filterType, setFilterType] = useState<'TODOS' | OrderType | 'FINALIZADOS'>('TODOS');
   const [printOrder, setPrintOrder] = useState<GroupedOrder | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -76,9 +77,6 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
     const groupsMap = new Map<string, GroupedOrder>();
     
     filteredOrders.forEach(order => {
-        // Grouping logic:
-        // Only group by table if it's NOT a finished order.
-        // Finished orders should be separated to avoid accumulation over time.
         const key = (order.type === 'MESA' || order.type === 'COMANDA') && order.status !== 'ENTREGUE'
             ? `${order.type}-${order.tableNumber}` 
             : `${order.type}-${order.customerName}-${order.customerPhone}-${order.id}`;
@@ -97,6 +95,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
             existing.serviceFee = (existing.serviceFee || 0) + (order.serviceFee || 0);
             existing.originalOrderIds.push(order.id);
             if (order.notes && order.notes.trim() !== "") existing.notes.push(order.notes);
+            if (order.customerCpf && !existing.customerCpf) existing.customerCpf = order.customerCpf;
         } else {
             groupsMap.set(key, {
                 id: order.id,
@@ -106,6 +105,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                 tableNumber: order.tableNumber,
                 customerName: order.customerName,
                 customerPhone: order.customerPhone,
+                customerCpf: order.customerCpf,
                 items: [...order.items],
                 status: order.status,
                 total: order.total,
@@ -113,6 +113,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                 createdAt: order.createdAt,
                 paymentMethod: order.paymentMethod,
                 deliveryAddress: order.deliveryAddress,
+                referencePoint: order.referencePoint,
                 notes: order.notes && order.notes.trim() !== "" ? [order.notes] : [],
                 waitstaffName: order.waitstaffName,
                 changeFor: order.changeFor,
@@ -126,7 +127,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
     });
 
     return Array.from(groupsMap.values()).sort((a, b) => b.createdAt - a.createdAt);
-  }, [orders, filterType]);
+  }, [orders, filterType, searchTerm]);
 
   const handleEmitNfce = async (group: GroupedOrder) => {
     if (settings?.lockedFeatures?.includes('NFE')) {
@@ -149,7 +150,9 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
     setIsEmittingNfce(group.id);
     const reference = `order_${group.id}_${Date.now()}`;
     try {
-      const nfceData = {
+      let customerCpf = group.customerCpf || '';
+      
+      const nfceData: any = {
         cnpj_emitente: settings.cnpj.replace(/\D/g, ''),
         data_emissao: new Date().toISOString(),
         indicador_inscricao_estadual_destinatario: 9,
@@ -188,6 +191,13 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
         ]
       };
 
+      if (customerCpf || group.customerName) {
+        nfceData.destinatario = {
+          nome: group.customerName || 'Consumidor',
+          cpf: customerCpf.replace(/\D/g, '') || undefined,
+        };
+      }
+
       const response = await fetch('/api/focus-nfe/emit-nfce', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -203,12 +213,10 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
 
       let finalResult = result;
       if (response.ok) {
-        // Prepare new window text
         if (newWindow) {
             newWindow.document.write('<h2>Aguardando autorização da SEFAZ...</h2><p>Isso geralmente leva alguns segundos.</p>');
         }
 
-        // Loop while status is processando_autorizacao
         let retries = 0;
         while ((finalResult.status === 'processando_autorizacao' || finalResult.status === 'processando') && retries < 10) {
             await new Promise(r => setTimeout(r, 2000));
@@ -226,7 +234,6 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
             retries++;
         }
 
-        // Update each order in the group with reference and status
         const isError = finalResult.status === 'erro_autorizacao' || finalResult.status === 'denegado' || finalResult.status === 'rejeitado';
         if (!isError) {
             for (const orderId of group.originalOrderIds) {
@@ -247,7 +254,6 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
              newWindow.location.href = url;
              newWindow.focus();
            } catch(e) {
-             console.log("Could not set newWindow location...", e);
              window.open(url, '_blank')?.focus();
              newWindow.close();
            }
@@ -314,7 +320,6 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
              newWindow.location.href = url;
              newWindow.focus();
            } catch(e) {
-             console.log("Could not set newWindow location...", e);
              window.open(url, '_blank')?.focus();
              newWindow.close();
            }
@@ -398,11 +403,8 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
   const handleStatusUpdate = async (group: GroupedOrder, newStatus: OrderStatus) => {
     if (isProcessing) return;
 
-    // Auto-cancel NFC-e if order is being canceled
     if (newStatus === 'CANCELADO' && group.nfceReference && group.nfceStatus === 'AUTHORIZED') {
         const proceed = await handleCancelNfce(group);
-        // We still allow canceling the order even if NFC-e cancel fails, or should we?
-        // User asked to "possibilidade para cancelar nota quando cancelar o pedido"
     }
 
     setIsProcessing(true);
@@ -497,16 +499,27 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
               <button onClick={() => handlePrint(group)} className="p-3 bg-gray-50 text-gray-400 hover:text-orange-500 rounded-xl transition-colors shrink-0"><Printer size={20} /></button>
             </div>
 
-            {/* DETALHES DE ENTREGA / CONTATO */}
-            {(group.customerPhone || group.deliveryAddress) && (
+            {(group.customerPhone || group.deliveryAddress || group.customerCpf) && (
               <div className="mb-4 p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-2">
-                 {group.customerPhone && (
+                 {(group.customerPhone || group.customerCpf) && (
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Phone size={14} className="text-gray-400" />
-                            <span className="text-xs font-bold text-gray-700">{group.customerPhone}</span>
+                        <div className="flex flex-col gap-1">
+                            {group.customerPhone && (
+                              <div className="flex items-center gap-2">
+                                <Phone size={14} className="text-gray-400" />
+                                <span className="text-xs font-bold text-gray-700">{group.customerPhone}</span>
+                              </div>
+                            )}
+                            {group.customerCpf && (
+                              <div className="flex items-center gap-2">
+                                <User size={14} className="text-gray-400" />
+                                <span className="text-[10px] font-medium text-gray-500">CPF: {group.customerCpf}</span>
+                              </div>
+                            )}
                         </div>
-                        <a href={`https://wa.me/55${group.customerPhone.replace(/\D/g, '')}`} target="_blank" className="p-1 bg-green-500 text-white rounded-lg"><MessageSquare size={12} /></a>
+                        {group.customerPhone && (
+                          <a href={`https://wa.me/55${group.customerPhone.replace(/\D/g, '')}`} target="_blank" className="p-1 bg-green-500 text-white rounded-lg self-start"><MessageSquare size={12} /></a>
+                        )}
                     </div>
                  )}
                  {group.deliveryAddress && (
@@ -528,16 +541,6 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                     </span>
                     <span className="font-mono font-bold text-xs text-gray-400">R$ {(item.price * item.quantity).toFixed(2)}</span>
                   </div>
-                  {item.complements && item.complements.length > 0 && (
-                     <div className="ml-8 mt-0.5">
-                        {item.complements.map((comp, cIdx) => (
-                           <div key={cIdx} className="text-[10px] text-gray-500 flex justify-between">
-                              <span><span className="text-gray-400">{comp.quantity}x</span> {comp.name}</span>
-                              {comp.price > 0 ? <span>+R$ {(comp.price * comp.quantity).toFixed(2)}</span> : <span />}
-                           </div>
-                        ))}
-                     </div>
-                  )}
                 </div>
               ))}
               {group.deliveryFee && group.deliveryFee > 0 ? (
@@ -563,18 +566,6 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                       <p className="text-[8px] font-black text-gray-300 uppercase leading-none">Pagamento</p>
                       <div className="flex items-center gap-1">
                         <p className="text-[10px] font-bold text-gray-700 uppercase">{group.paymentMethod || 'A Definir'}</p>
-                        {group.paymentMethod === 'ONLINE' && (() => {
-                          const originalOrder = orders.find(o => o.id === group.id);
-                          if (originalOrder?.paymentDetails) {
-                            try {
-                              const details = JSON.parse(originalOrder.paymentDetails);
-                              const onlineDetail = details.find((d: any) => d.method === 'ONLINE');
-                              if (onlineDetail?.status === 'approved') return <span className="bg-green-100 text-green-600 px-1.5 py-0.5 rounded text-[8px] font-black uppercase">Aprovado</span>;
-                              if (onlineDetail?.status === 'rejected') return <span className="bg-red-100 text-red-600 px-1.5 py-0.5 rounded text-[8px] font-black uppercase">Recusado</span>;
-                            } catch (e) {}
-                          }
-                          return <span className="bg-yellow-100 text-yellow-600 px-1.5 py-0.5 rounded text-[8px] font-black uppercase">Pendente</span>;
-                        })()}
                       </div>
                    </div>
                 </div>
@@ -633,7 +624,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                      {(!group.nfceReference || group.nfceStatus === 'CANCELLED') ? (
                         <button
                           onClick={() => handleEmitNfce(group)}
-                          disabled={isEmittingNfce === group.id}
+                          disabled={!!isEmittingNfce}
                           className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg"
                         >
                           {isEmittingNfce === group.id ? <Loader2 className="animate-spin" size={14} /> : <FileText size={14} />}
@@ -643,7 +634,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                        <>
                         <button
                           onClick={() => handleConsultNfce(group)}
-                          disabled={isEmittingNfce === group.id}
+                          disabled={!!isEmittingNfce}
                           className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg"
                         >
                           {isEmittingNfce === group.id ? <Loader2 className="animate-spin" size={14} /> : <Search size={14} />}
@@ -652,7 +643,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                         {group.nfceStatus === 'AUTHORIZED' && (
                           <button
                             onClick={() => handleCancelNfce(group)}
-                            disabled={isEmittingNfce === group.id}
+                            disabled={!!isEmittingNfce}
                             className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg"
                           >
                             {isEmittingNfce === group.id ? <Loader2 className="animate-spin" size={14} /> : <Trash2 size={14} />}
@@ -716,16 +707,6 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                               </td>
                               <td style={{ textAlign: 'right', fontSize: '9pt', padding: '1.5mm 0 0 0' }}>{(it.price * it.quantity).toFixed(2)}</td>
                             </tr>
-                            {it.complements && it.complements.length > 0 && it.complements.map((comp, cIdx) => (
-                               <tr key={`c-${i}-${cIdx}`}>
-                                 <td style={{ fontSize: '8pt', padding: '0 0 0 4mm' }}>
-                                   {comp.quantity}x {comp.name.toUpperCase()}
-                                 </td>
-                                 <td style={{ textAlign: 'right', fontSize: '8pt' }}>
-                                   {comp.price > 0 ? (comp.price * comp.quantity).toFixed(2) : ''}
-                                 </td>
-                               </tr>
-                            ))}
                         </React.Fragment>
                       ))}
                     </tbody>
@@ -751,26 +732,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                     <p style={{ fontSize: '9pt', color: '#000' }}>TAXA DE ENTREGA: R$ {printOrder.deliveryFee.toFixed(2)}</p>
                   ) : null}
                   <p style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: '1mm' }}>TOTAL: R$ {printOrder.total.toFixed(2)}</p>
-                  {(() => {
-                      if (printOrder.paymentMethod === 'MISTO') {
-                          // We need the original order to get paymentDetails
-                          const originalOrder = orders.find(o => o.id === printOrder.originalOrderIds[0]);
-                          if (originalOrder && originalOrder.paymentDetails) {
-                              try {
-                                  const details = JSON.parse(originalOrder.paymentDetails);
-                                  return (
-                                      <div style={{ fontSize: '8pt', marginTop: '1mm' }}>
-                                          <p>PAGAMENTO:</p>
-                                          {details.map((p: any, i: number) => (
-                                              <p key={i} style={{ marginLeft: '10px' }}>{p.method}: R$ {p.amount.toFixed(2)}</p>
-                                          ))}
-                                      </div>
-                                  );
-                              } catch (e) {}
-                          }
-                      }
-                      return <p style={{ fontSize: '8pt', marginTop: '1mm' }}>PAGAMENTO: {printOrder.paymentMethod || 'A DEFINIR'}</p>;
-                  })()}
+                  <p style={{ fontSize: '8pt', marginTop: '1mm' }}>PAGAMENTO: {printOrder.paymentMethod || 'A DEFINIR'}</p>
                   
                   {printOrder.changeFor ? (
                     <div style={{ marginTop: '2mm' }}>
