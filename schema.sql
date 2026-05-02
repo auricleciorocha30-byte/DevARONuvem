@@ -77,5 +77,6 @@ CREATE TABLE IF NOT EXISTS orders (
     changeFor REAL,
     waitstaffName TEXT,
     couponApplied TEXT,
-    discountAmount REAL
+    discountAmount REAL,
+    customerCpf TEXT
 );

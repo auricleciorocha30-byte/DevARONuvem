@@ -293,6 +293,9 @@ async function ensureSchema() {
           if (!orderColumns.includes('serviceFee')) {
               try { await client.execute(`ALTER TABLE orders ADD COLUMN serviceFee REAL`); } catch (e) { console.warn(e); }
           }
+          if (!orderColumns.includes('customerCpf')) {
+              try { await client.execute(`ALTER TABLE orders ADD COLUMN customerCpf TEXT`); } catch (e) { console.warn(e); }
+          }
 
           const productsTableInfo = await client.execute(`PRAGMA table_info(products)`);
           const productColumns = productsTableInfo.rows.map((row: any) => row.name);
@@ -455,6 +458,9 @@ class TursoBridge {
             }
             if (!orderColumns.includes('serviceFee')) {
                 try { await this.executeSqlCustom(url, token, `ALTER TABLE orders ADD COLUMN serviceFee REAL`); } catch (e) { console.warn(e); }
+            }
+            if (!orderColumns.includes('customerCpf')) {
+                try { await this.executeSqlCustom(url, token, `ALTER TABLE orders ADD COLUMN customerCpf TEXT`); } catch (e) { console.warn(e); }
             }
 
             const productsTableInfo = await this.executeSqlCustom(url, token, `PRAGMA table_info(products)`);
