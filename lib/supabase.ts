@@ -829,7 +829,7 @@ class TursoBridge {
       for (const val of values) {
         const valCopy = { ...val };
 
-        if (!valCopy.id && (this.tableName === 'store_profiles' || this.tableName === 'waitstaff' || this.tableName === 'products')) {
+        if (!valCopy.id && (['store_profiles', 'waitstaff', 'products', 'customers', 'cash_movements', 'register_sessions'].includes(this.tableName))) {
              valCopy.id = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9);
         }
 
@@ -919,6 +919,10 @@ class TursoBridge {
   }
 
   async update(values: any) {
+    if (this.queries.length === 0) {
+        console.error("Tentativa de UPDATE sem filtros bloqueada por segurança.");
+        return { data: null, error: { message: "Filtros são necessários para atualização." } };
+    }
     await ensureSchema();
     try {
       const valCopy = { ...values };
@@ -981,6 +985,10 @@ class TursoBridge {
   }
 
   async delete() {
+    if (this.queries.length === 0) {
+        console.error("Tentativa de DELETE sem filtros bloqueada por segurança.");
+        return { data: null, error: { message: "Filtros são necessários para exclusão." } };
+    }
     if (this.tableName === 'store_profiles') await ensureSchema();
     try {
       let queryStr = `DELETE FROM ${this.tableName}`;
