@@ -305,7 +305,7 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
         indicador_inscricao_estadual_destinatario: 9,
         modalidade_frete: 9,
         local_destino: 1,
-        presenca_comprador: order.type === 'ENTREGA' ? 4 : 1,
+        presenca_comprador: 1,
         items: items.map((item: any, index: number) => {
           const product = products.find(p => p.id === item.productId);
           return {

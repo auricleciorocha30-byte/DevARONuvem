@@ -158,7 +158,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
         indicador_inscricao_estadual_destinatario: 9,
         modalidade_frete: 9,
         local_destino: 1,
-        presenca_comprador: group.type === 'ENTREGA' ? 4 : 1,
+        presenca_comprador: 1,
         items: group.items.map((item, index) => {
           const product = products.find(p => p.id === item.productId);
           return {
