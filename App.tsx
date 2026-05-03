@@ -389,20 +389,27 @@ function StoreContext() {
     loadEcosystemUsage();
   }, [loadEcosystemUsage]);
 
+  const lastSyncTimeRef = useRef<number>(0);
+
   const syncOrders = useCallback(async () => {
     if (!currentStore) return;
     if (document.hidden) return; 
     if (!navigator.onLine) return;
 
     setIsSyncing(true);
+    const syncStartTime = Date.now();
     try {
       console.log("Syncing orders for store:", currentStore.id);
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('store_id', currentStore.id)
-        .order('createdAt', { ascending: false })
-        .limit(100);
+      
+      let query = supabase.from('orders').select('*').eq('store_id', currentStore.id);
+      
+      if (initialLoadRef.current || lastSyncTimeRef.current === 0) {
+        query = query.gte('createdAt', Date.now() - 24 * 60 * 60 * 1000).order('createdAt', { ascending: false }).limit(200);
+      } else {
+        query = query.gte('updatedAt', lastSyncTimeRef.current - 5000).order('updatedAt', { ascending: false });
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error("Error syncing orders:", error);
@@ -411,23 +418,38 @@ function StoreContext() {
       
       console.log("Orders fetched:", data?.length);
 
-      if (data) {
-        const newOrders = data.map(mapOrderFromDb);
-        if (!initialLoadRef.current) {
-          if (newOrders.length > ordersRef.current.length) playAudio(SOUNDS.NEW_ORDER);
-          newOrders.forEach(no => {
-            const old = ordersRef.current.find(oo => oo.id === no.id);
-            if (old && old.status !== 'PRONTO' && no.status === 'PRONTO') playAudio(SOUNDS.ORDER_READY);
-          });
+      if (data && data.length > 0) {
+        const fetchedOrders = data.map(mapOrderFromDb);
+        let finalOrders = fetchedOrders;
+
+        if (!initialLoadRef.current && lastSyncTimeRef.current > 0) {
+            // Delta update
+            finalOrders = [...ordersRef.current];
+            fetchedOrders.forEach(newOrder => {
+                const idx = finalOrders.findIndex(o => o.id === newOrder.id);
+                if (idx > -1) {
+                    const oldStatus = finalOrders[idx].status;
+                    finalOrders[idx] = newOrder;
+                    if (oldStatus !== 'PRONTO' && newOrder.status === 'PRONTO') playAudio(SOUNDS.ORDER_READY);
+                } else {
+                    finalOrders.push(newOrder);
+                    playAudio(SOUNDS.NEW_ORDER);
+                }
+            });
+            // Sort to maintain newest first
+            finalOrders.sort((a, b) => b.createdAt - a.createdAt);
+        } else {
+             // Initial load: don't play sounds for old orders
         }
-        ordersRef.current = newOrders;
-        setOrders(newOrders);
-        
-        localStorage.setItem(`${ORDERS_CACHE_KEY}_${currentStore.id}`, JSON.stringify(newOrders));
-        
-        initialLoadRef.current = false;
-        setLastSyncTime(Date.now());
+
+        ordersRef.current = finalOrders;
+        setOrders(finalOrders);
+        localStorage.setItem(`${ORDERS_CACHE_KEY}_${currentStore.id}`, JSON.stringify(finalOrders));
       }
+
+      initialLoadRef.current = false;
+      lastSyncTimeRef.current = syncStartTime;
+      setLastSyncTime(syncStartTime);
     } catch (err) { console.warn('Erro Sync', err); }
     finally { setIsSyncing(false); }
   }, [currentStore, mapOrderFromDb]);

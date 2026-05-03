@@ -191,7 +191,9 @@ const SCHEMA_STATEMENTS = [
     originAddress TEXT,
     session_id TEXT,
     serviceFee REAL,
-    stockDeducted INTEGER DEFAULT 1
+    stockDeducted INTEGER DEFAULT 1,
+    customerCpf TEXT,
+    updatedAt INTEGER
   )`,
   `CREATE TABLE IF NOT EXISTS cash_movements (
     id TEXT PRIMARY KEY,
@@ -224,11 +226,23 @@ const SCHEMA_STATEMENTS = [
     points INTEGER DEFAULT 0,
     isLoyaltyParticipant INTEGER DEFAULT 1,
     createdAt INTEGER
-  )`
+  )`,
+];
+
+const INDEX_STATEMENTS = [
+  `CREATE INDEX IF NOT EXISTS idx_orders_store_updated ON orders(store_id, updatedAt)`,
+  `CREATE INDEX IF NOT EXISTS idx_orders_store_created ON orders(store_id, createdAt)`,
+  `CREATE INDEX IF NOT EXISTS idx_orders_store_status ON orders(store_id, status)`,
+  `CREATE INDEX IF NOT EXISTS idx_orders_store_driver ON orders(store_id, deliveryDriverId)`,
+  `CREATE INDEX IF NOT EXISTS idx_products_store_id ON products(store_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_customers_store_id ON customers(store_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_waitstaff_store_id ON waitstaff(store_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_categories_store_id ON categories(store_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_cash_movements_store_id ON cash_movements(store_id)`
 ];
 
 let schemaInitializedVersion = '';
-const CURRENT_SCHEMA_VERSION = 'v3';
+const CURRENT_SCHEMA_VERSION = 'v4';
 let initializationPromise: Promise<void> | null = null;
 
 async function ensureSchema() {
@@ -296,6 +310,9 @@ async function ensureSchema() {
           if (!orderColumns.includes('customerCpf')) {
               try { await client.execute(`ALTER TABLE orders ADD COLUMN customerCpf TEXT`); } catch (e) { console.warn(e); }
           }
+          if (!orderColumns.includes('updatedAt')) {
+              try { await client.execute(`ALTER TABLE orders ADD COLUMN updatedAt INTEGER`); } catch (e) { console.warn(e); }
+          }
 
           const productsTableInfo = await client.execute(`PRAGMA table_info(products)`);
           const productColumns = productsTableInfo.rows.map((row: any) => row.name);
@@ -353,6 +370,10 @@ async function ensureSchema() {
           }
           if (!customerColumns.includes('referencePoint')) {
               try { await client.execute(`ALTER TABLE customers ADD COLUMN referencePoint TEXT`); } catch (e) { console.warn(e); }
+          }
+          
+          for (const statement of INDEX_STATEMENTS) {
+              try { await client.execute(statement); } catch (e) { console.warn(e); }
           }
       } catch (e) {
           console.warn("Migration check failed (safe to ignore if columns exist):", e);
@@ -462,6 +483,9 @@ class TursoBridge {
             if (!orderColumns.includes('customerCpf')) {
                 try { await this.executeSqlCustom(url, token, `ALTER TABLE orders ADD COLUMN customerCpf TEXT`); } catch (e) { console.warn(e); }
             }
+            if (!orderColumns.includes('updatedAt')) {
+                try { await this.executeSqlCustom(url, token, `ALTER TABLE orders ADD COLUMN updatedAt INTEGER`); } catch (e) { console.warn(e); }
+            }
 
             const productsTableInfo = await this.executeSqlCustom(url, token, `PRAGMA table_info(products)`);
             const productColumns = productsTableInfo.rows.map((row: any) => row.name);
@@ -519,6 +543,10 @@ class TursoBridge {
             }
             if (!customerColumns.includes('referencePoint')) {
                 try { await this.executeSqlCustom(url, token, `ALTER TABLE customers ADD COLUMN referencePoint TEXT`); } catch (e) { console.warn(e); }
+            }
+
+            for (const statement of INDEX_STATEMENTS) {
+                try { await this.executeSqlCustom(url, token, statement); } catch (e) { console.warn(e); }
             }
           } catch (e) {
              console.warn("Store Migration check failed:", e);
@@ -828,6 +856,7 @@ class TursoBridge {
       const results = [];
       for (const val of values) {
         const valCopy = { ...val };
+        if (this.tableName === 'orders') valCopy.updatedAt = Date.now();
 
         if (!valCopy.id && (['store_profiles', 'waitstaff', 'products', 'customers', 'cash_movements', 'register_sessions'].includes(this.tableName))) {
              valCopy.id = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9);
@@ -926,6 +955,7 @@ class TursoBridge {
     await ensureSchema();
     try {
       const valCopy = { ...values };
+      if (this.tableName === 'orders') valCopy.updatedAt = Date.now();
       
       if (this.tableName === 'store_profiles' && valCopy.settings && typeof valCopy.settings === 'object') {
            valCopy.settings = JSON.stringify(valCopy.settings);
