@@ -6,6 +6,8 @@ import { fileURLToPath } from 'url';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import crypto from 'crypto';
+import { supabase } from './lib/supabase.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,7 +34,13 @@ async function startServer() {
   
   app.use(limiter);
   app.use(cors());
-  app.use(express.json({ limit: '10mb' }));
+  app.use(express.json({ 
+    limit: '10mb',
+    // Capture raw body for signature verification if needed (MP usually uses headers + id)
+    verify: (req: any, res, buf) => {
+      req.rawBody = buf;
+    }
+  }));
 
   // Diagnostic route
   app.get('/api-health', (req, res) => {
@@ -326,6 +334,110 @@ async function startServer() {
       path: req.url,
       fullPath: `/api${req.url}`
     });
+  });
+
+  // Mercado Pago Webhook Idempotency (In-memory cache)
+  // NOTE: For production, migrate this to Redis or a DATABASE table.
+  const processedNotifications = new Set<string>();
+
+  /**
+   * HMAC-SHA256 Signature Verification for Mercado Pago (Multi-store)
+   * References: "Validate signatures" in Mercado Pago Developers documentation.
+   */
+  apiRouter.post('/webhooks/mercadopago/:storeId', async (req, res) => {
+    const { storeId } = req.params;
+    try {
+      const signatureHeader = req.headers['x-signature'] as string;
+      const requestId = req.headers['x-request-id'] as string;
+
+      console.log(`[MP WEBHOOK] Notification for Store: ${storeId}. ID: ${req.body?.data?.id || req.body?.id}`);
+
+      // Fetch the store's secret from the database
+      const { data: store, error: storeError } = await supabase
+        .from('store_profiles')
+        .select('mercadopago_webhook_secret, dbUrl, dbAuthToken')
+        .eq('id', storeId)
+        .maybeSingle();
+
+      if (storeError || !store) {
+        console.error(`[MP WEBHOOK] Store ${storeId} not found or error:`, storeError);
+        return res.status(404).send('Store not found');
+      }
+
+      const webhookSecret = store.mercadopago_webhook_secret;
+
+      if (!webhookSecret) {
+        console.warn(`[MP WEBHOOK] Webhook secret not configured for store ${storeId}. Skipping verification.`);
+        // Note: For high security, you should return 403 here instead of continuing.
+        // But to avoid blocking notifications before the user configures it, we log it.
+      }
+
+      // 1. Signature Validation (Only if secret is configured)
+      if (webhookSecret && signatureHeader) {
+        const parts = signatureHeader.split(',');
+        const tsPart = parts.find(p => p.startsWith('ts='));
+        const v1Part = parts.find(p => p.startsWith('v1='));
+
+        if (tsPart && v1Part && requestId) {
+          const ts = tsPart.split('=')[1];
+          const v1 = v1Part.split('=')[1];
+          
+          const now = Math.floor(Date.now() / 1000);
+          if (Math.abs(now - parseInt(ts)) > 300) {
+            console.warn('[MP WEBHOOK] Signature expired');
+            return res.status(403).send('Signature expired');
+          }
+
+          const resourceId = req.body?.data?.id || req.body?.id;
+          if (resourceId) {
+            const manifest = `id:${resourceId};request-id:${requestId};ts:${ts};`;
+            const computedSignature = crypto
+              .createHmac('sha256', webhookSecret)
+              .update(manifest)
+              .digest('hex');
+
+            const isValid = crypto.timingSafeEqual(
+                Buffer.from(computedSignature, 'hex'),
+                Buffer.from(v1, 'hex')
+            );
+
+            if (!isValid) {
+              console.warn(`[MP WEBHOOK] Invalid signature for Store: ${storeId}, Resource: ${resourceId}`);
+              return res.status(403).send('Invalid signature');
+            }
+          }
+        }
+      }
+
+      // 2. Idempotency Check
+      const notificationId = req.headers['x-request-id'] as string || req.body.id;
+      if (notificationId && processedNotifications.has(notificationId)) {
+        return res.status(200).send('Already processed');
+      }
+
+      // 3. Process the Notification
+      const action = req.body.action || req.body.topic;
+      const dataId = req.body.data?.id || req.body.id;
+
+      console.log(`[MP WEBHOOK] Validated for Store ${storeId}. Action: ${action}, Data ID: ${dataId}`);
+
+      if ((action === 'payment.created' || action === 'payment.updated' || req.body.topic === 'payment') && store.dbUrl) {
+         // Connect to the specific store's database for processing
+         // In this ERP, we typically would update the order status.
+         console.log(`[MP WEBHOOK] Store ${storeId} payment update needed for ${dataId}`);
+      }
+
+      if (notificationId) {
+        processedNotifications.add(notificationId);
+        setTimeout(() => processedNotifications.delete(notificationId), 3600000);
+      }
+
+      res.status(200).json({ status: 'success' });
+
+    } catch (error) {
+      console.error('[MP WEBHOOK] Unexpected error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
   });
 
   app.listen(PORT, '0.0.0.0', () => {

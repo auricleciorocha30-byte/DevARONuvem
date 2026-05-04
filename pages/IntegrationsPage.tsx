@@ -33,6 +33,7 @@ export default function IntegrationsPage({ settings, onSave }: Props) {
     pagbankEnvironment: settings.pagbankEnvironment || 'sandbox',
     isOnlinePaymentActive: settings.isOnlinePaymentActive || false,
     mercadoPagoPointDeviceId: settings.mercadoPagoPointDeviceId || '',
+    mercadoPagoWebhookSecret: settings.mercadoPagoWebhookSecret || '',
   });
 
   const [isGeneratingKey, setIsGeneratingKey] = useState(false);
@@ -358,6 +359,53 @@ export default function IntegrationsPage({ settings, onSave }: Props) {
                   <p className="text-[10px] text-gray-400 mt-2 ml-1 italic">
                     * Necessário para enviar pagamentos diretamente para a maquininha Point.
                   </p>
+                </div>
+              )}
+
+              {formData.onlinePaymentProvider === 'mercado_pago' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">
+                      Assinatura Secreta do Webhook (Secret)
+                    </label>
+                    <div className="relative">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                      <input
+                        type="password"
+                        value={formData.mercadoPagoWebhookSecret}
+                        onChange={(e) => setFormData({ ...formData, mercadoPagoWebhookSecret: e.target.value })}
+                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-mono text-sm"
+                        placeholder="Gerada no painel do Mercado Pago"
+                      />
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-2 ml-1 italic">
+                      * Cole aqui a "Assinatura secreta" gerada no painel de Webhooks do Mercado Pago para sua segurança.
+                    </p>
+                  </div>
+
+                  <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Globe className="text-indigo-600" size={16} />
+                      <h4 className="text-xs font-bold text-indigo-900 uppercase">Sua URL de Webhook</h4>
+                    </div>
+                    <div className="flex items-center gap-2 bg-white p-2 rounded-lg border border-indigo-200">
+                      <code className="text-[9px] font-mono break-all flex-1 text-indigo-800">
+                        {window.location.origin}/api/webhooks/mercadopago/{settings.id || 'ID_DA_LOJA'}
+                      </code>
+                      <button 
+                        onClick={() => {
+                          navigator.clipboard.writeText(`${window.location.origin}/api/webhooks/mercadopago/${settings.id || 'ID_DA_LOJA'}`);
+                          alert('URL copiada para a área de transferência!');
+                        }}
+                        className="p-1 hover:bg-indigo-50 text-indigo-600 rounded"
+                      >
+                        <Upload size={14} />
+                      </button>
+                    </div>
+                    <p className="text-[9px] text-indigo-600 italic">
+                      Copie esta URL e cole no campo "URL para envio" no painel do Mercado Pago.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>

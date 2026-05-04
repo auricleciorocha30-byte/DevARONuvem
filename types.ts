@@ -213,6 +213,7 @@ export interface StoreSettings {
   onlinePaymentProvider?: 'mercado_pago' | 'pagbank' | 'asaas';
   onlinePaymentAccessToken?: string;
   onlinePaymentPublicKey?: string;
+  mercadoPagoWebhookSecret?: string;
   pagbankEnvironment?: 'production' | 'sandbox';
   isOnlinePaymentActive?: boolean;
   mercadoPagoPointDeviceId?: string;

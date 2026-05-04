@@ -125,7 +125,8 @@ const SCHEMA_STATEMENTS = [
     createdAt INTEGER,
     settings TEXT,
     dbUrl TEXT,
-    dbAuthToken TEXT
+    dbAuthToken TEXT,
+    mercadopago_webhook_secret TEXT
   )`,
   `CREATE TABLE IF NOT EXISTS categories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -265,6 +266,9 @@ async function ensureSchema() {
           }
           if (!columns.includes('dbAuthToken')) {
               try { await client.execute(`ALTER TABLE store_profiles ADD COLUMN dbAuthToken TEXT`); } catch (e) { console.warn(e); }
+          }
+          if (!columns.includes('mercadopago_webhook_secret')) {
+              try { await client.execute(`ALTER TABLE store_profiles ADD COLUMN mercadopago_webhook_secret TEXT`); } catch (e) { console.warn(e); }
           }
 
           const ordersTableInfo = await client.execute(`PRAGMA table_info(orders)`);
