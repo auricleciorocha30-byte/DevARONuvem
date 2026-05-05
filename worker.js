@@ -585,6 +585,20 @@ export default {
     }
 
     // ASSET FALLBACK
-    return env.ASSETS.fetch(request);
+    try {
+      const response = await env.ASSETS.fetch(request);
+      // Se o arquivo não existir (404), garantimos que não retorne 500 no Worker
+      if (response.status === 404 && (url.pathname.endsWith(".ico") || url.pathname.endsWith(".png"))) {
+        return new Response(null, { status: 204, headers: corsHeaders });
+      }
+      return response;
+    } catch (e) {
+      console.error("Asset fetch failed:", e);
+      // Fallback para SPA (index.html) ou erro silencioso para ícones
+      if (url.pathname.endsWith(".ico")) {
+        return new Response(null, { status: 204, headers: corsHeaders });
+      }
+      return new Response("Asset missing", { status: 404, headers: corsHeaders });
+    }
   }
 };
