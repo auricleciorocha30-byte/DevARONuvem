@@ -914,6 +914,7 @@ function StoreContext() {
             storeId={currentStore?.id || ''} 
             user={adminUser} 
             settings={settings}
+            orders={orders}
             onLogout={() => handleSetUser(null)}
             updateStatus={updateOrderStatus}
             isOffline={isOffline}
@@ -931,6 +932,7 @@ function StoreContext() {
             storeId={currentStore?.id || adminUser.store_id || ''} 
             user={adminUser} 
             settings={settings}
+            orders={orders}
             storeSlug={storeSlug || ''}
             onLogout={() => handleSetUser(null)}
           />

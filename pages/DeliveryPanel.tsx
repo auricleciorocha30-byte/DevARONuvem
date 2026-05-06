@@ -21,11 +21,12 @@ interface DeliveryPanelProps {
   storeId: string;
   user: Waitstaff;
   settings: StoreSettings;
+  orders: Order[];
   storeSlug?: string;
   onLogout: () => void;
 }
 
-export default function DeliveryPanel({ storeId, user, settings, storeSlug, onLogout }: DeliveryPanelProps) {
+export default function DeliveryPanel({ storeId, user, settings, orders, storeSlug, onLogout }: DeliveryPanelProps) {
   const [deliveries, setDeliveries] = useState<Order[]>([]);
   const [historyDeliveries, setHistoryDeliveries] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,13 +52,7 @@ export default function DeliveryPanel({ storeId, user, settings, storeSlug, onLo
   const previousCountRef = useRef(0);
 
   useEffect(() => {
-    fetchDeliveries();
     fetchWeeklyCount();
-    const interval = setInterval(() => {
-        fetchDeliveries();
-        fetchWeeklyCount();
-    }, (settings?.syncIntervals?.delivery || 20) * 1000); 
-    return () => clearInterval(interval);
   }, [storeId]);
 
   useEffect(() => {
@@ -65,6 +60,25 @@ export default function DeliveryPanel({ storeId, user, settings, storeSlug, onLo
           fetchHistory();
       }
   }, [activeTab]);
+
+  useEffect(() => {
+      const computedDeliveries = orders.filter(o => 
+          o.type === 'ENTREGA' && 
+          ['ENVIADO_PARA_ENTREGA', 'SAIU_PARA_ENTREGA', 'CHEGUEI_NA_ORIGEM'].includes(o.status)
+      );
+      
+      setDeliveries(computedDeliveries);
+
+      const newAvailableCount = computedDeliveries.filter((o: Order) => 
+          o.status === 'ENVIADO_PARA_ENTREGA' && (!o.deliveryDriverId || o.deliveryDriverId === '' || o.deliveryDriverId === 'null' || o.deliveryDriverId === 'undefined')
+      ).length;
+      
+      if (newAvailableCount > previousCountRef.current) {
+        playSound();
+      }
+      previousCountRef.current = newAvailableCount;
+      setLoading(false);
+  }, [orders]);
 
   const fetchWeeklyCount = async () => {
       if (!storeId || !user.id) return;
@@ -117,44 +131,6 @@ export default function DeliveryPanel({ storeId, user, settings, storeSlug, onLo
       } finally {
           setLoading(false);
       }
-  };
-
-  const fetchDeliveries = async () => {
-    if (!storeId) {
-      setLoading(false);
-      return;
-    }
-    // Don't set loading to true on poll to avoid flickering
-    // setLoading(true); 
-    try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('store_id', storeId)
-        .eq('type', 'ENTREGA')
-        .in('status', ['ENVIADO_PARA_ENTREGA', 'SAIU_PARA_ENTREGA', 'CHEGUEI_NA_ORIGEM'])
-        .order('createdAt', { ascending: false });
-      
-      if (error) throw error;
-
-      if (data) {
-        setDeliveries(data as Order[]);
-        
-        // Check for new unassigned "ENVIADO_PARA_ENTREGA" orders to play sound
-        const newAvailableCount = data.filter((o: Order) => 
-            o.status === 'ENVIADO_PARA_ENTREGA' && (!o.deliveryDriverId || o.deliveryDriverId === '' || o.deliveryDriverId === 'null' || o.deliveryDriverId === 'undefined')
-        ).length;
-        
-        if (newAvailableCount > previousCountRef.current) {
-          playSound();
-        }
-        previousCountRef.current = newAvailableCount;
-      }
-    } catch (err) {
-      console.error("Erro ao buscar entregas:", err);
-    } finally {
-      setLoading(false);
-    }
   };
 
   const playSound = () => {
@@ -226,7 +202,6 @@ export default function DeliveryPanel({ storeId, user, settings, storeSlug, onLo
                 .update({ status: 'ENTREGUE' });
         }
         setShowBulkFinalizeModal(false);
-        fetchDeliveries();
         fetchWeeklyCount();
     };
 

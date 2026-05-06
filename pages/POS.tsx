@@ -48,6 +48,7 @@ interface POSProps {
   storeId: string;
   user: Waitstaff;
   settings: StoreSettings;
+  orders: Order[];
   onLogout: () => void;
   updateStatus: (id: string, status: OrderStatus) => void;
   isOffline?: boolean;
@@ -64,7 +65,7 @@ interface Payment {
   amount: number;
 }
 
-export default function POS({ storeId, user, settings, onLogout, updateStatus, isOffline, ecosystemUsage, refreshEcosystemUsage }: POSProps) {
+export default function POS({ storeId, user, settings, orders, onLogout, updateStatus, isOffline, ecosystemUsage, refreshEcosystemUsage }: POSProps) {
   const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [couriers, setCouriers] = useState<Waitstaff[]>([]);
@@ -869,57 +870,26 @@ export default function POS({ storeId, user, settings, onLogout, updateStatus, i
   });
 
   useEffect(() => {
-    if (!storeId || isContingencyMode) return;
+    if (!storeId || isContingencyMode || !orders) return;
 
-    const fetchNewOrders = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('orders')
-          .select('type')
-          .eq('store_id', storeId)
-          .in('status', ['AGUARDANDO', 'AGUARDANDO_PAGAMENTO', 'PAGO']);
-        
-        if (error) throw error;
-        
-        if (data) {
-          const counts = { ENTREGA: 0, BALCAO: 0, MESA: 0, COMANDA: 0 };
-          data.forEach(order => {
-            if (order.type in counts) {
-              counts[order.type as keyof typeof counts]++;
-            }
-          });
-          setNewOrdersCount(counts);
-        }
-      } catch (err) {
-      console.error("Erro ao buscar novos pedidos:", err);
+    const counts = { ENTREGA: 0, BALCAO: 0, MESA: 0, COMANDA: 0 };
+    orders.forEach(order => {
+      if (
+        (order.status === 'AGUARDANDO' || order.status === 'AGUARDANDO_PAGAMENTO' || order.status === 'PAGO') &&
+        order.type in counts
+      ) {
+        counts[order.type as keyof typeof counts]++;
       }
-    };
-
-    fetchNewOrders();
-
-    const intervalId = setInterval(() => {
-      fetchNewOrders();
-    }, (settings?.syncIntervals?.pos || 20) * 1000); 
-
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, [storeId, isContingencyMode]);
+    });
+    setNewOrdersCount(counts);
+  }, [orders, storeId, isContingencyMode]);
 
   const lookupOrdersList = async (type: 'ENTREGA' | 'BALCAO' | 'MESA' | 'COMANDA') => {
     setIsLookingUpCommand(true);
     setLookupType(type);
     try {
-        const { data, error } = await supabase
-            .from('orders')
-            .select('*')
-            .eq('store_id', storeId)
-            .eq('type', type)
-            .in('status', ['AGUARDANDO', 'AGUARDANDO_PAGAMENTO', 'PAGO', 'PREPARANDO', 'PRONTO', 'ENVIADO_PARA_ENTREGA', 'SAIU_PARA_ENTREGA', 'CHEGUEI_NA_ORIGEM'])
-            .gte('createdAt', Date.now() - 24 * 60 * 60 * 1000)
-            .order('createdAt', { ascending: false });
-
-        if (error) throw error;
+        const data = orders.filter(o => o.type === type && ['AGUARDANDO', 'AGUARDANDO_PAGAMENTO', 'PAGO', 'PREPARANDO', 'PRONTO', 'ENVIADO_PARA_ENTREGA', 'SAIU_PARA_ENTREGA', 'CHEGUEI_NA_ORIGEM'].includes(o.status));
+        data.sort((a, b) => b.createdAt - a.createdAt);
 
         if (data && data.length > 0) {
             const unpaidData = data.filter(o => {
