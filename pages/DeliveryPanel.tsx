@@ -144,7 +144,6 @@ export default function DeliveryPanel({ storeId, user, settings, orders, storeSl
       .from('orders')
       .eq('id', orderId)
       .update({ status: newStatus });
-    fetchDeliveries();
   };
 
   const acceptDelivery = async (orderId: string) => {
@@ -159,7 +158,6 @@ export default function DeliveryPanel({ storeId, user, settings, orders, storeSl
       
     if (currentOrder && currentOrder.deliveryDriverId && currentOrder.deliveryDriverId !== '' && currentOrder.deliveryDriverId !== 'null' && currentOrder.deliveryDriverId !== 'undefined') {
       setErrorMsg("Ops! Esta entrega já foi aceita por outro entregador.");
-      fetchDeliveries();
       return;
     }
 
@@ -167,7 +165,6 @@ export default function DeliveryPanel({ storeId, user, settings, orders, storeSl
       .from('orders')
       .eq('id', orderId)
       .update({ deliveryDriverId: user.id });
-    fetchDeliveries();
     setActiveTab('mine');
   };
 
@@ -247,7 +244,7 @@ export default function DeliveryPanel({ storeId, user, settings, orders, storeSl
             </div>
             <div className="flex gap-2">
               <InstallPrompt />
-              <button onClick={fetchDeliveries} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+              <button onClick={() => window.location.reload()} className="p-2 hover:bg-white/10 rounded-full transition-colors">
                 <RefreshCw size={20} />
               </button>
               <button onClick={onLogout} className="p-2 hover:bg-red-500/20 rounded-full transition-colors text-red-200 hover:text-red-100">
@@ -557,7 +554,6 @@ export default function DeliveryPanel({ storeId, user, settings, orders, storeSl
                                                 .from('orders')
                                                 .eq('id', order.id)
                                                 .update({ deliveryDriverId: null, status: 'ENVIADO_PARA_ENTREGA' });
-                                            fetchDeliveries();
                                         }
                                     }}
                                     className="col-span-2 py-2 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-100 transition-all flex items-center justify-center gap-2 mt-2"
