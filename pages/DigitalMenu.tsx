@@ -1332,6 +1332,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                              <li key={idx} className="text-[10px] text-gray-500 font-medium">
                                                 <span className="text-gray-400 font-bold">{comp.quantity}x</span> {comp.name}
                                                 {comp.price > 0 && <span className="text-gray-400"> (+ R$ {(comp.price * comp.quantity).toFixed(2)})</span>}
+                                                {comp.description && <div className="italic text-gray-400 mt-0.5 ml-2">- {comp.description}</div>}
                                              </li>
                                           ))}
                                        </ul>
@@ -1891,6 +1892,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                    categoryName: category.name,
                    itemId: item.id,
                    name: item.name,
+                   description: item.description,
                    price: item.price,
                    quantity: 1
                 });
@@ -1918,6 +1920,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                       categoryName: category.name,
                       itemId: item.id,
                       name: item.name,
+                      description: item.description,
                       price: item.price,
                       quantity: 1
                    });

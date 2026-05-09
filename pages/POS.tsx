@@ -2462,6 +2462,7 @@ export default function POS({ storeId, user, settings, orders, onLogout, updateS
             <div style="margin: 0; padding-left: 10px; color: black !important; font-size: 13px;">
               + ${comp.quantity}x ${comp.name}
             </div>
+            ${comp.description ? `<div style="margin: 0; padding-left: 15px; font-style: italic; color: black !important; font-size: 11px;">- ${comp.description}</div>` : ''}
           `).join('') : ''}
         `).join('')}
         <div style="border-top: 2px dashed black; margin: 5px 0;"></div>
@@ -3127,6 +3128,7 @@ export default function POS({ storeId, user, settings, orders, onLogout, updateS
                            <li key={idx} className="text-[9px] text-gray-500 font-medium">
                               <span className="text-gray-400 font-bold">{comp.quantity}x</span> {comp.name}
                               {comp.price > 0 && <span className="text-gray-400"> (+ R$ {(comp.price * comp.quantity).toFixed(2)})</span>}
+                              {comp.description && <div className="italic text-gray-400 mt-0.5 ml-2">- {comp.description}</div>}
                            </li>
                         ))}
                      </ul>
@@ -3281,6 +3283,7 @@ export default function POS({ storeId, user, settings, orders, onLogout, updateS
                    categoryName: category.name,
                    itemId: item.id,
                    name: item.name,
+                   description: item.description,
                    price: item.price,
                    quantity: 1
                 });
@@ -3306,6 +3309,7 @@ export default function POS({ storeId, user, settings, orders, onLogout, updateS
                       categoryName: category.name,
                       itemId: item.id,
                       name: item.name,
+                      description: item.description,
                       price: item.price,
                       quantity: 1
                    });

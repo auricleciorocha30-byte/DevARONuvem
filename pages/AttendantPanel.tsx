@@ -460,9 +460,16 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
                         {it.complements && it.complements.length > 0 && (
                           <div className="mt-0.5 ml-8">
                             {it.complements.map((comp: any, idx: number) => (
-                              <p key={idx} className="text-[10px] text-zinc-400 font-medium leading-none mb-0.5">
-                                + {comp.quantity}x {comp.name}
-                              </p>
+                              <div key={idx} className="mb-0.5">
+                                <p className="text-[10px] text-zinc-400 font-medium leading-none">
+                                  + {comp.quantity}x {comp.name}
+                                </p>
+                                {comp.description && (
+                                  <p className="text-[9px] text-zinc-400 italic leading-none mt-0.5 ml-2">
+                                    - {comp.description}
+                                  </p>
+                                )}
+                              </div>
                             ))}
                           </div>
                         )}
@@ -687,7 +694,12 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
                             <tr>
                                 <td colSpan={2} style={{ fontSize: '8pt', paddingBottom: '1mm' }}>
                                     {it.complements.map((comp: any, idx: number) => (
-                                        <div key={idx} style={{ paddingLeft: '2mm' }}>+ {comp.quantity}x {comp.name.toUpperCase()}</div>
+                                        <div key={idx} style={{ paddingLeft: '2mm' }}>
+                                            <div>+ {comp.quantity}x {comp.name.toUpperCase()}</div>
+                                            {comp.description && (
+                                                <div style={{ fontStyle: 'italic', paddingLeft: '2mm' }}>- {comp.description.toUpperCase()}</div>
+                                            )}
+                                        </div>
                                     ))}
                                 </td>
                             </tr>

@@ -167,9 +167,16 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onReady, elapsed }) => {
                 {item.complements && item.complements.length > 0 && (
                   <div className="mt-1.5 space-y-0.5">
                     {item.complements.map((comp: any, idx: number) => (
-                       <p key={idx} className="text-xs text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded-md inline-block mr-2">
-                           + {comp.quantity}x {comp.name}
-                       </p>
+                       <div key={idx} className="inline-block mr-2 mb-1">
+                         <p className="text-xs text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded-md">
+                             + {comp.quantity}x {comp.name}
+                         </p>
+                         {comp.description && (
+                             <p className="text-[10px] text-zinc-500 italic mt-0.5 ml-2">
+                                 - {comp.description}
+                             </p>
+                         )}
+                       </div>
                     ))}
                   </div>
                 )}
