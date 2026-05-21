@@ -132,45 +132,65 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
     const comms = new Map<string, { name: string, totalSales: number, commissionValue: number, rate: number }>();
     
     filteredOrders.filter(o => o.status !== 'CANCELADO' && o.status !== 'PREPARANDO').forEach(order => {
-      if (!order.waitstaffName) return;
-      
-      const staffName = order.waitstaffName.trim();
-      const staffMember = waitstaff.find(w => w.name.trim().toLowerCase() === staffName.toLowerCase());
-      
-      // Tenta pegar a taxa pelo ID (convertendo para string para garantir)
-      let rate = 0;
-      if (staffMember) {
-        const idStr = String(staffMember.id);
-        rate = settings.waitstaffCommissions?.[idStr] || 0;
+      if (order.waitstaffName) {
+        const staffName = order.waitstaffName.trim();
+        const staffMember = waitstaff.find(w => w.name.trim().toLowerCase() === staffName.toLowerCase());
         
-        // Fallback: se não achou pelo ID, tenta ver se há alguma chave que bata com o ID
-        if (rate === 0 && settings.waitstaffCommissions) {
-          const foundKey = Object.keys(settings.waitstaffCommissions).find(k => String(k) === idStr);
-          if (foundKey) rate = settings.waitstaffCommissions[foundKey];
+        let rate = 0;
+        if (staffMember) {
+          const idStr = String(staffMember.id);
+          rate = settings.waitstaffCommissions?.[idStr] || 0;
+          if (rate === 0 && settings.waitstaffCommissions) {
+            const foundKey = Object.keys(settings.waitstaffCommissions).find(k => String(k) === idStr);
+            if (foundKey) rate = settings.waitstaffCommissions[foundKey];
+          }
+        }
+        
+        const staffId = staffMember ? staffMember.id : `deleted-${staffName.toLowerCase().replace(/\s+/g, '-')}`;
+        const existing = comms.get(staffId);
+        const orderTotal = Number(order.total) || 0;
+        const baseSales = orderTotal - (order.serviceFee || 0) - (order.deliveryFee || 0);
+        
+        const commValue = (order.serviceFee && Number(order.serviceFee) > 0) 
+          ? Number(order.serviceFee) 
+          : baseSales * (rate / 100);
+        
+        if (existing) {
+          existing.totalSales += baseSales;
+          existing.commissionValue += commValue;
+        } else {
+          comms.set(staffId, {
+            name: staffMember?.name || staffName,
+            totalSales: baseSales,
+            commissionValue: commValue,
+            rate: rate
+          });
         }
       }
-      
-      const staffId = staffMember ? staffMember.id : `deleted-${staffName.toLowerCase().replace(/\s+/g, '-')}`;
-      
-      const existing = comms.get(staffId);
-      const orderTotal = Number(order.total) || 0;
-      const baseSales = orderTotal - (order.serviceFee || 0) - (order.deliveryFee || 0);
-      
-      // Se o serviceFee for 0 ou undefined, tenta calcular pela taxa se houver
-      const commValue = (order.serviceFee && Number(order.serviceFee) > 0) 
-        ? Number(order.serviceFee) 
-        : baseSales * (rate / 100);
-      
-      if (existing) {
-        existing.totalSales += baseSales;
-        existing.commissionValue += commValue;
-      } else {
-        comms.set(staffId, {
-          name: staffMember?.name || staffName,
-          totalSales: baseSales,
-          commissionValue: commValue,
-          rate: rate
-        });
+
+      if (order.deliveryDriverId) {
+        const driver = waitstaff.find(w => w.id === order.deliveryDriverId);
+        if (driver) {
+          const idStr = String(driver.id);
+          const driverCommValue = settings.waitstaffCommissions?.[idStr] || 0;
+          
+          if (driverCommValue > 0) {
+            const existing = comms.get(idStr);
+            if (existing) {
+              existing.commissionValue += driverCommValue;
+              // We do not add to totalSales because totalSales is mainly for POS/DigitalMenu attendants mapping.
+              // Wait, let's keep totalSales matching the delivery fee so it shows something.
+              existing.totalSales += (order.deliveryFee || 0);
+            } else {
+              comms.set(idStr, {
+                name: driver.name + ' (Entregador)',
+                totalSales: (order.deliveryFee || 0),
+                commissionValue: driverCommValue,
+                rate: 0 // fixed rate, not %
+              });
+            }
+          }
+        }
       }
     });
     
@@ -432,7 +452,7 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
                             {commissions.map((item, index) => (
                                 <tr key={index} className="hover:bg-gray-50/50 transition-colors">
                                     <td className="py-4 text-sm font-bold text-gray-800">{item.name}</td>
-                                    <td className="py-4 text-sm font-bold text-gray-500 text-right">{item.rate}%</td>
+                                    <td className="py-4 text-sm font-bold text-gray-500 text-right">{item.rate > 0 ? `${item.rate}%` : 'Taxa Fixa'}</td>
                                     <td className="py-4 text-sm font-black text-primary text-right">
                                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.totalSales)}
                                     </td>

@@ -253,21 +253,24 @@ const WaitstaffManagement: React.FC<Props> = ({ currentStore, settings, onUpdate
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    {(member.role === 'ATENDENTE' || member.role === 'GERENTE') && (
+                    {(member.role === 'ATENDENTE' || member.role === 'GERENTE' || member.role === 'ENTREGADOR') && (
                       <div className="flex items-center gap-2 mr-2">
-                        <span className="text-[10px] font-bold text-gray-400 uppercase hidden sm:inline">Comissão:</span>
-                        <div className="relative w-20">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase hidden sm:inline">
+                          {member.role === 'ENTREGADOR' ? 'Taxa Fixa:' : 'Comissão:'}
+                        </span>
+                        <div className="relative w-24">
+                          {member.role === 'ENTREGADOR' && <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">R$</span>}
                           <input 
                             type="number" 
                             min="0" 
-                            max="100" 
+                            max={member.role === 'ENTREGADOR' ? "1000" : "100"} 
                             step="0.1"
                             value={settings.waitstaffCommissions?.[member.id] || ''}
                             onChange={(e) => handleUpdateCommission(member.id, parseFloat(e.target.value) || 0)}
                             placeholder="0"
-                            className="w-full py-1.5 px-2 pr-6 text-sm font-bold text-right bg-white border border-gray-200 rounded-lg outline-none focus:border-orange-500"
+                            className={`w-full py-1.5 px-2 text-sm font-bold text-right bg-white border border-gray-200 rounded-lg outline-none focus:border-orange-500 ${member.role === 'ENTREGADOR' ? 'pl-7' : 'pr-6'}`}
                           />
-                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">%</span>
+                          {member.role !== 'ENTREGADOR' && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">%</span>}
                         </div>
                       </div>
                     )}

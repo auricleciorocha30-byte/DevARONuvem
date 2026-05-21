@@ -424,9 +424,16 @@ export default function DeliveryPanel({ storeId, user, settings, orders, storeSl
                     <div className="flex justify-between w-full items-center">
                         <div className="flex flex-col">
                             <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Taxa de Entrega</span>
-                            <span className="text-3xl font-black text-blue-600 leading-none">
-                                {Number(order.deliveryFee) > 0 ? formatCurrency(Number(order.deliveryFee)) : 'GRÁTIS'}
-                            </span>
+                            <div className="flex items-center gap-2">
+                                <span className="text-3xl font-black text-blue-600 leading-none">
+                                    {Number(order.deliveryFee) > 0 ? formatCurrency(Number(order.deliveryFee)) : 'GRÁTIS'}
+                                </span>
+                                {(settings.waitstaffCommissions?.[user.id] || 0) > 0 && (
+                                    <span className="bg-green-100 text-green-700 text-[10px] font-black px-2 py-1 rounded-lg border border-green-200">
+                                        Sua Comissão: {formatCurrency(settings.waitstaffCommissions?.[user.id] || 0)}
+                                    </span>
+                                )}
+                            </div>
                         </div>
                         <div className="flex flex-col items-end text-right">
                             <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Total do Pedido</span>
