@@ -97,6 +97,7 @@ export default function SuperAdminPanel() {
   };
 
   const [stores, setStores] = useState<StoreProfile[]>([]);
+  const [storeOrdersCount, setStoreOrdersCount] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
 
   // Backup & Restore
@@ -309,6 +310,22 @@ export default function SuperAdminPanel() {
           };
         });
         setStores(mapped);
+        
+        // Fetch order counts
+        const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+        const { data: ordersData, error: ordersError } = await supabase
+            .from('orders')
+            .select('store_id')
+            .gte('createdAt', startOfMonth);
+            
+        if (ordersData && !ordersError) {
+            const counts: Record<string, number> = {};
+            ordersData.forEach(o => {
+                const sid = o.store_id;
+                counts[sid] = (counts[sid] || 0) + 1;
+            });
+            setStoreOrdersCount(counts);
+        }
       }
     } catch (err) {
       console.error("Erro ao buscar lojas:", err);
@@ -1116,7 +1133,11 @@ export default function SuperAdminPanel() {
                   <img src={store.logoUrl || undefined} className={`w-20 h-20 rounded-[1.5rem] object-cover border-4 ${store.isActive ? 'border-secondary' : 'border-slate-200'} shadow-sm`} alt="Logo" />
                   <div className="min-w-0">
                     <h3 className="font-bold text-2xl text-slate-800 truncate">{store.name}</h3>
-                    <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest">/{store.slug}</div>
+                    <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">/{store.slug}</div>
+                    <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-blue-50 text-blue-600 rounded-lg border border-blue-100">
+                        <Package size={12} />
+                        <span className="text-[10px] font-bold">{storeOrdersCount[store.id] || 0} pedidos no mês</span>
+                    </div>
                   </div>
                 </div>
 
