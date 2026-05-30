@@ -273,10 +273,12 @@ async function startServer() {
       }
 
       // Clean token up
-      const cleanToken = token.trim().replace(/^Bearer\s+/i, '');
+      let cleanToken = token.replace(/[\r\n]/g, '').trim();
+      cleanToken = cleanToken.replace(/^Bearer\s+/i, '');
+      
       const resp = await fetch(`${baseUrl}/checkouts`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${cleanToken}`, 'Content-Type': 'application/json', 'Accept': '*/*' },
+        headers: { 'Authorization': `Bearer ${cleanToken}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify(body)
       });
       
@@ -304,15 +306,16 @@ async function startServer() {
     if (!token) return res.status(400).json({ error: 'Token não fornecido.' });
     
     // Normalize token (remove Bearer if user accidentally pasted it)
-    const cleanToken = token.trim().replace(/^Bearer\s+/i, '');
+    let cleanToken = token.replace(/[\r\n]/g, '').trim();
+    cleanToken = cleanToken.replace(/^Bearer\s+/i, '');
     const baseUrl = environment === 'production' ? 'https://api.pagseguro.com' : 'https://sandbox.api.pagseguro.com';
     try {
-      const resp = await fetch(`${baseUrl}/public-keys/`, { 
+      const resp = await fetch(`${baseUrl}/public-keys`, { 
         method: 'POST', 
         headers: { 
           'Authorization': `Bearer ${cleanToken}`, 
           'Content-Type': 'application/json',
-          'Accept': '*/*'
+          'Accept': 'application/json'
         }, 
         body: JSON.stringify({ type: 'card' }) 
       });
