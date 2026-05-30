@@ -313,19 +313,34 @@ export default function SuperAdminPanel() {
         
         // Fetch order counts
         const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
-        const { data: ordersData, error: ordersError } = await supabase
-            .from('orders')
-            .select('store_id')
-            .gte('createdAt', startOfMonth);
-            
-        if (ordersData && !ordersError) {
-            const counts: Record<string, number> = {};
-            ordersData.forEach(o => {
-                const sid = o.store_id;
-                counts[sid] = (counts[sid] || 0) + 1;
-            });
-            setStoreOrdersCount(counts);
+        const counts: Record<string, number> = {};
+        
+        // Fetch each store's orders connecting to its specific database if necessary
+        for (const store of mapped) {
+            try {
+                if (store.dbUrl && store.dbAuthToken) {
+                    (supabase as any).connectToStore(store.dbUrl, store.dbAuthToken);
+                } else {
+                    (supabase as any).disconnectStore();
+                }
+                
+                const { data: oData, error: oError } = await supabase
+                    .from('orders')
+                    .select('id')
+                    .eq('store_id', store.id)
+                    .gte('createdAt', startOfMonth);
+                    
+                if (oData && !oError) {
+                    counts[store.id] = oData.length;
+                }
+            } catch (err) {
+                console.error("Error fetching orders for store", store.slug, err);
+            }
         }
+        
+        // Reset to master DB connection
+        (supabase as any).disconnectStore();
+        setStoreOrdersCount(counts);
       }
     } catch (err) {
       console.error("Erro ao buscar lojas:", err);
