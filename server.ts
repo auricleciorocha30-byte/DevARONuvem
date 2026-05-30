@@ -237,6 +237,10 @@ async function startServer() {
   apiRouter.post(['/pbank/checkout', '/v1/process-payment'], async (req, res) => {
     const { token, environment, orderData, storeUrl } = req.body;
     if (!token) return res.status(400).json({ error: 'Token não fornecido.' });
+    
+    // Trim space from tokens to avoid header parsing issues
+    const cleanToken = token.replace(/[\r\n\t ]/g, '').trim();
+    
     const baseUrl = environment === 'production' ? 'https://api.pagseguro.com' : 'https://sandbox.api.pagseguro.com';
     try {
       // Use quantity: 1 trick for PagBank as well to avoid float quantity issues
@@ -274,7 +278,7 @@ async function startServer() {
 
       const resp = await fetch(`${baseUrl}/checkouts`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        headers: { 'Authorization': `Bearer ${cleanToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
       
@@ -300,9 +304,13 @@ async function startServer() {
   apiRouter.post('/pagbank/public-key', async (req, res) => {
     const { token, environment } = req.body;
     if (!token) return res.status(400).json({ error: 'Token não fornecido.' });
+    
+    // Trim space from tokens to avoid header parsing issues
+    const cleanToken = token.replace(/[\r\n\t ]/g, '').trim();
+    
     const baseUrl = environment === 'production' ? 'https://api.pagseguro.com' : 'https://sandbox.api.pagseguro.com';
     try {
-      const resp = await fetch(`${baseUrl}/public-keys`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'card' }) });
+      const resp = await fetch(`${baseUrl}/public-keys`, { method: 'POST', headers: { 'Authorization': `Bearer ${cleanToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'card' }) });
       
       const responseText = await resp.text();
       let data;
