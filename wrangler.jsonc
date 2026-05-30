@@ -2,6 +2,9 @@
   "name": "devaronuvem",
   "main": "worker.js",
   "compatibility_date": "2026-03-10",
+  "build": {
+    "command": "npm run build"
+  },
   "assets": {
     "directory": "./dist"
   }
