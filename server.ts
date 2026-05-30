@@ -291,7 +291,18 @@ async function startServer() {
         throw new Error(`PagBank retornou resposta inválida (${resp.status}): ${responseText.substring(0, 100)}`);
       }
 
-      if (!resp.ok) throw new Error(data.message || (data.error_messages ? data.error_messages.map((m: any) => m.description).join(', ') : 'Erro no PagBank'));
+      if (!resp.ok) {
+        console.error('PagBank Checkout Error:', data, 'Status:', resp.status);
+        let errDetail = data.error_messages ? data.error_messages.map((m: any) => m.description || m.parameter_name).join(', ') : (data.message || JSON.stringify(data));
+        
+        const isAuthError = resp.status === 401 || resp.status === 403 || resp.status === 400 && (errDetail.includes('Authorization') || errDetail.includes('credential') || errDetail === '{}');
+        
+        if (isAuthError) {
+            errDetail = "Acesso Negado/Credencial Inválida. ATENÇÃO: Para o PagBank (API V4) você NÃO deve usar o token antigo (PagSeguro). Você precisa gerar um NOVO 'Token Pessoal' no painel do PagBank em: Vendas > Integração > Token. Verifique também se a conta é de PRODUÇÃO.";
+        }
+        
+        throw new Error(errDetail || 'Erro interno no PagBank');
+      }
       const checkoutLink = data.links?.find((l: any) => l.rel === 'PAY')?.href;
       if (!checkoutLink) throw new Error('Link PAY não encontrado na resposta do PagBank.');
       res.json({ checkout_url: checkoutLink, id: data.id });
@@ -330,11 +341,15 @@ async function startServer() {
       }
 
       if (!resp.ok) {
-        console.error('PagBank Key Error:', data);
-        let errDetail = data.error_messages ? data.error_messages.map((m: any) => m.description || m.parameter_name).join(', ') : (data.message || 'Erro desconhecido');
-        if (resp.status === 401 || resp.status === 403) {
-            errDetail = "Acesso Negado (401/403). Verifique se o Token é de PRODUÇÃO, se pertence ao PagBank (não PagSeguro V2) e se tem permissão para esta operação.";
+        console.error('PagBank Key Error:', data, 'Status:', resp.status);
+        let errDetail = data.error_messages ? data.error_messages.map((m: any) => m.description || m.parameter_name).join(', ') : (data.message || JSON.stringify(data));
+        
+        const isAuthError = resp.status === 401 || resp.status === 403 || resp.status === 400 && (errDetail.includes('Authorization') || errDetail.includes('credential') || errDetail === '{}');
+        
+        if (isAuthError) {
+            errDetail = "Acesso Negado/Credencial Inválida. ATENÇÃO: Para o PagBank (API V4) você NÃO deve usar o token antigo (PagSeguro). Você precisa gerar um NOVO 'Token Pessoal' no painel do PagBank em: Vendas > Integração > Token. Verifique também se a conta é de PRODUÇÃO.";
         }
+        
         return res.status(resp.status).json({ error: errDetail });
       }
       res.json(data);
