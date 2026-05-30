@@ -68,7 +68,7 @@ export default function IntegrationsPage({ settings, onSave }: Props) {
         alert('Chave Pública gerada e preenchida com sucesso!');
       } else {
         const errorMessage = data.error || (data.message) || (data.error_messages ? data.error_messages.map((m: any) => m.description).join(', ') : null);
-        alert('Erro ao gerar chave pública: ' + (errorMessage || `Status: ${response.status}`));
+        alert(`Erro ao gerar chave pública PagBank:\n\n${errorMessage || `Status: ${response.status}\n\nNota: Certifique-se de usar o token correto de PRODUÇÃO do PagBank (e não o do PagSeguro antigo).`}`);
       }
     } catch (error: any) {
       console.error(error);

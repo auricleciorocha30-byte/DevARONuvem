@@ -238,8 +238,8 @@ async function startServer() {
     const { token, environment, orderData, storeUrl } = req.body;
     if (!token) return res.status(400).json({ error: 'Token não fornecido.' });
     
-    // Trim space from tokens to avoid header parsing issues
-    const cleanToken = token.replace(/[\r\n\t ]/g, '').trim();
+    // Remove potential 'Bearer ' prefix and trim whitespace
+    const cleanToken = token.trim().replace(/^Bearer\s+/i, '');
     
     const baseUrl = environment === 'production' ? 'https://api.pagseguro.com' : 'https://sandbox.api.pagseguro.com';
     try {
@@ -305,12 +305,20 @@ async function startServer() {
     const { token, environment } = req.body;
     if (!token) return res.status(400).json({ error: 'Token não fornecido.' });
     
-    // Trim space from tokens to avoid header parsing issues
-    const cleanToken = token.replace(/[\r\n\t ]/g, '').trim();
+    // Remove potential 'Bearer ' prefix and trim whitespace
+    const cleanToken = token.trim().replace(/^Bearer\s+/i, '');
     
     const baseUrl = environment === 'production' ? 'https://api.pagseguro.com' : 'https://sandbox.api.pagseguro.com';
     try {
-      const resp = await fetch(`${baseUrl}/public-keys`, { method: 'POST', headers: { 'Authorization': `Bearer ${cleanToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'card' }) });
+      const resp = await fetch(`${baseUrl}/public-keys`, { 
+        method: 'POST', 
+        headers: { 
+          'Authorization': `Bearer ${cleanToken}`, 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }, 
+        body: JSON.stringify({ type: 'card' }) 
+      });
       
       const responseText = await resp.text();
       let data;
@@ -318,18 +326,21 @@ async function startServer() {
         data = responseText ? JSON.parse(responseText) : {};
       } catch (e) {
         console.error('PagBank Key Non-JSON:', responseText);
-        throw new Error(`PagBank retornou resposta inválida (${resp.status}): ${responseText.substring(0, 100)}`);
+        return res.status(resp.status).json({ error: `PagBank retornou resposta inválida (${resp.status})`, raw: responseText.substring(0, 200) });
       }
 
       if (!resp.ok) {
         console.error('PagBank Key Error:', data);
-        const errDetail = data.error_messages ? data.error_messages.map((m: any) => m.description).join(', ') : (data.message || JSON.stringify(data));
-        throw new Error(errDetail || 'Erro ao gerar chave no PagBank');
+        let errDetail = data.error_messages ? data.error_messages.map((m: any) => m.description || m.parameter_name).join(', ') : (data.message || 'Erro desconhecido');
+        if (resp.status === 401 || resp.status === 403) {
+            errDetail = "Acesso Negado (401/403). Verifique se o Token é de PRODUÇÃO, se pertence ao PagBank (não PagSeguro V2) e se tem permissão para esta operação.";
+        }
+        return res.status(resp.status).json({ error: errDetail });
       }
       res.json(data);
     } catch (error: any) { 
       console.error('PagBank generate-key catch:', error);
-      res.status(500).json({ error: error.message }); 
+      res.status(500).json({ error: error.message || 'Erro interno no servidor' }); 
     }
   });
 
