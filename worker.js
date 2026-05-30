@@ -256,14 +256,10 @@ export default {
           }
         }
 
-        // Remove Bearer se o usuário colar junto, e limpa espaços/quebras de linha
-        let cleanToken = token.replace(/[\r\n]/g, '').trim();
-        cleanToken = cleanToken.replace(/^Bearer\s+/i, '');
-
         const resp = await fetch(`${baseUrl}/checkouts`, {
           method: 'POST',
           headers: { 
-            'Authorization': `Bearer ${cleanToken}`, 
+            'Authorization': `Bearer ${token}`, 
             'Content-Type': 'application/json',
             'Accept': 'application/json'
           },
@@ -383,15 +379,11 @@ export default {
         const body = await request.json();
         const { token, environment } = body;
         if (!token) return new Response(JSON.stringify({ error: 'Token não fornecido.' }), { status: 400, headers: corsHeaders });
-        
-        // Remove Bearer se o usuário colar junto e espaços em branco/quebras
-        let cleanToken = token.replace(/[\r\n]/g, '').trim();
-        cleanToken = cleanToken.replace(/^Bearer\s+/i, '');
         const baseUrl = environment === 'production' ? 'https://api.pagseguro.com' : 'https://sandbox.api.pagseguro.com';
         
         const resp = await fetch(`${baseUrl}/public-keys`, { 
           method: 'POST', 
-          headers: { 'Authorization': `Bearer ${cleanToken}`, 'Content-Type': 'application/json', 'Accept': 'application/json' }, 
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Accept': 'application/json' }, 
           body: JSON.stringify({ type: 'card' }) 
         });
         
