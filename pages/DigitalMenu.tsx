@@ -229,13 +229,6 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const [customerPoints, setCustomerPoints] = useState<number>(0);
   const [useCashback, setUseCashback] = useState(false);
   const [deliveryAddress, setDeliveryAddress] = useState('');
-  const [addrCep, setAddrCep] = useState('');
-  const [addrStreet, setAddrStreet] = useState('');
-  const [addrNumber, setAddrNumber] = useState('');
-  const [addrNeighborhood, setAddrNeighborhood] = useState('');
-  const [addrComplement, setAddrComplement] = useState('');
-  const [addrCity, setAddrCity] = useState('');
-  const [isCepLoading, setIsCepLoading] = useState(false);
   const [referencePoint, setReferencePoint] = useState('');
   const [isConsulting, setIsConsulting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -252,57 +245,6 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   
   const [activeWaitstaff, setActiveWaitstaff] = useState<Waitstaff | null>(null);
 
-  useEffect(() => {
-    // Only update deliveryAddress if we actually have fields filled, to not overwrite customer.address on load if they don't edit
-    if (addrStreet || addrNumber || addrNeighborhood || addrCity) {
-      let parts = [];
-      if (addrStreet) parts.push(addrStreet);
-      if (addrNumber) parts.push(addrNumber);
-      if (addrNeighborhood) parts.push(addrNeighborhood);
-      if (addrCity) parts.push(addrCity);
-      
-      let full = parts.join(', ');
-      if (addrComplement) full += ` - ${addrComplement}`;
-      setDeliveryAddress(full);
-    }
-  }, [addrStreet, addrNumber, addrNeighborhood, addrCity, addrComplement]);
-
-  const fetchCep = async (cep: string) => {
-    const cleanCep = cep.replace(/\D/g, '');
-    setAddrCep(cep);
-    if (cleanCep.length === 8) {
-      setIsCepLoading(true);
-      try {
-        const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
-        const data = await res.json();
-        if (!data.erro) {
-            setAddrStreet(data.logradouro || '');
-            setAddrNeighborhood(data.bairro || '');
-            setAddrCity(data.localidade || '');
-            setIsFeeConfirmed(false);
-            setDeliveryFee(null);
-            // Auto focus number field could be done via ref, but let's keep it simple
-        }
-      } catch (err) {
-        console.error("Erro ao buscar CEP:", err);
-      } finally {
-        setIsCepLoading(false);
-      }
-    }
-  };
-
-  const handleSetAddressParts = (fullAddr: string) => {
-      setDeliveryAddress(fullAddr);
-      const parts = fullAddr.split(',');
-      if (parts.length >= 3) {
-          setAddrStreet(parts[0].trim());
-          setAddrNumber(parts[1].trim());
-          setAddrNeighborhood(parts[2].split('-')[0].trim());
-      } else {
-          setAddrStreet(fullAddr);
-      }
-  };
-
   const handleConsultCustomer = async () => {
       if (!customerPhone.trim() || !storeId) return;
       setIsConsulting(true);
@@ -316,7 +258,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
           if (data && data.length > 0) {
               const customer = data[0];
               setCustomerName(customer.name || '');
-              handleSetAddressParts(customer.address || '');
+              setDeliveryAddress(customer.address || '');
               setReferencePoint(customer.referencePoint || '');
               setCustomerId(customer.id);
               setCustomerPoints(customer.points || 0);
@@ -358,15 +300,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
       // Geocode Customer Address - Add context from store address to help Nominatim
       const storeParts = settings.address.split(',');
       const cityContext = storeParts.length > 1 ? storeParts[storeParts.length - 1].trim() : '';
-      
-      let customerQuery = cityContext ? `${targetAddress}, ${cityContext}` : targetAddress;
-      
-      // If we have separated Address fields in state and no override is passed, use them for a much better quality query
-      if (!addressOverride && addrStreet && addrNumber) {
-          const cCity = addrCity || cityContext;
-          // Nominatim structured format is much more assertive: street, city
-          customerQuery = `${addrStreet}, ${addrNumber}, ${addrNeighborhood}, ${cCity}`;
-      }
+      const customerQuery = cityContext ? `${targetAddress}, ${cityContext}` : targetAddress;
 
       const customerRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(customerQuery)}&countrycodes=br&limit=1`);
       const customerData = await customerRes.json();
@@ -470,7 +404,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                     setCustomerName(data.name);
                 }
                 if (data.address && !deliveryAddress) {
-                    handleSetAddressParts(data.address);
+                    setDeliveryAddress(data.address);
                     if (orderType === 'ENTREGA') {
                         calculateDeliveryFee(data.address);
                     }
@@ -1514,91 +1448,23 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
 
                         {orderType === 'ENTREGA' && (
                           <>
-                             <div className="space-y-3">
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Endereço de Entrega</label>
-                                
-                                {/* CEP */}
-                                <div className="flex gap-2">
-                                  <div className="relative w-1/3">
-                                      <input 
-                                        type="text" 
-                                        value={addrCep} 
-                                        onChange={e => fetchCep(e.target.value)}
-                                        maxLength={9}
-                                        className="w-full px-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-sm" 
-                                        placeholder="CEP" 
-                                      />
-                                      {isCepLoading && <Loader2 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 animate-spin" />}
-                                  </div>
-                                  <div className="relative flex-1">
-                                      <input 
-                                        type="text" 
-                                        value={addrCity} 
-                                        onChange={e => { setAddrCity(e.target.value); setIsFeeConfirmed(false); setDeliveryFee(null); }} 
-                                        className="w-full px-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-sm" 
-                                        placeholder="Cidade" 
-                                      />
-                                  </div>
-                                </div>
-
-                                {/* Rua e Número */}
-                                <div className="flex gap-2">
-                                  <div className="relative flex-[3]">
-                                      <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                                      <input 
-                                        type="text" 
-                                        value={addrStreet} 
-                                        onChange={e => { setAddrStreet(e.target.value); setIsFeeConfirmed(false); setDeliveryFee(null); }} 
-                                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-sm" 
-                                        placeholder="Rua / Avenida" 
-                                      />
-                                  </div>
-                                  <div className="relative flex-1">
-                                      <input 
-                                        type="text" 
-                                        value={addrNumber} 
-                                        onChange={e => { setAddrNumber(e.target.value); setIsFeeConfirmed(false); setDeliveryFee(null); }} 
-                                        className="w-full px-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-sm" 
-                                        placeholder="Nº" 
-                                      />
-                                  </div>
-                                </div>
-
-                                {/* Bairro e Complemento */}
+                             <div className="space-y-2">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Endereço Completo</label>
                                 <div className="flex gap-2">
                                   <div className="relative flex-1">
-                                      <input 
-                                        type="text" 
-                                        value={addrNeighborhood} 
-                                        onChange={e => { setAddrNeighborhood(e.target.value); setIsFeeConfirmed(false); setDeliveryFee(null); }} 
-                                        className="w-full px-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-sm" 
-                                        placeholder="Bairro" 
-                                      />
+                                     <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                                     <input type="text" value={deliveryAddress} onChange={e => { setDeliveryAddress(e.target.value); setIsFeeConfirmed(false); setDeliveryFee(null); }} className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold" placeholder="Rua, Número, Bairro..." />
                                   </div>
-                                  <div className="relative flex-1">
-                                      <input 
-                                        type="text" 
-                                        value={addrComplement} 
-                                        onChange={e => { setAddrComplement(e.target.value); setIsFeeConfirmed(false); setDeliveryFee(null); }} 
-                                        className="w-full px-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-sm" 
-                                        placeholder="Complemento" 
-                                      />
-                                  </div>
-                                </div>
-                                <input type="hidden" value={deliveryAddress} />
-                                
-                                {settings.isDeliveryFeeActive && (
-                                  <div className="flex gap-2 w-full pt-1">
+                                  {settings.isDeliveryFeeActive && (
                                     <button 
                                       onClick={() => calculateDeliveryFee()}
-                                      disabled={isCalculatingFee || !addrStreet.trim() || !addrNumber.trim()}
-                                      className="w-full py-4 bg-orange-50 text-orange-600 rounded-2xl font-bold text-sm uppercase tracking-widest border border-orange-100 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                                      disabled={isCalculatingFee || !deliveryAddress.trim()}
+                                      className="px-4 py-4 bg-orange-50 text-orange-600 rounded-2xl font-bold text-xs uppercase tracking-widest border border-orange-100 disabled:opacity-50 whitespace-nowrap"
                                     >
-                                      {isCalculatingFee ? <Loader2 className="animate-spin" size={18}/> : <MapPin size={18}/>}
-                                      {isCalculatingFee ? 'Calculando...' : 'Calcular Taxa de Entrega'}
+                                      {isCalculatingFee ? '...' : 'Consultar Taxa'}
                                     </button>
-                                  </div>
-                                )}
+                                  )}
+                                </div>
                                 {settings.isDeliveryFeeActive && deliveryFee !== null && (
                                   <div className="mt-2 p-3 bg-blue-50 rounded-xl border border-blue-100 flex items-center justify-between">
                                     <div>
