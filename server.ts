@@ -237,10 +237,6 @@ async function startServer() {
   apiRouter.post(['/pbank/checkout', '/v1/process-payment'], async (req, res) => {
     const { token, environment, orderData, storeUrl } = req.body;
     if (!token) return res.status(400).json({ error: 'Token não fornecido.' });
-    
-    // Remove potential 'Bearer ' prefix and trim whitespace
-    const cleanToken = token.trim().replace(/^Bearer\s+/i, '');
-    
     const baseUrl = environment === 'production' ? 'https://api.pagseguro.com' : 'https://sandbox.api.pagseguro.com';
     try {
       // Use quantity: 1 trick for PagBank as well to avoid float quantity issues
@@ -278,7 +274,7 @@ async function startServer() {
 
       const resp = await fetch(`${baseUrl}/checkouts`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${cleanToken}`, 'Content-Type': 'application/json' },
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
       
@@ -291,18 +287,7 @@ async function startServer() {
         throw new Error(`PagBank retornou resposta inválida (${resp.status}): ${responseText.substring(0, 100)}`);
       }
 
-      if (!resp.ok) {
-        console.error('PagBank Checkout Error:', data, 'Status:', resp.status);
-        let errDetail = data.error_messages ? data.error_messages.map((m: any) => m.description || m.parameter_name).join(', ') : (data.message || JSON.stringify(data));
-        
-        const isAuthError = resp.status === 401 || resp.status === 403 || resp.status === 400 && (errDetail.includes('Authorization') || errDetail.includes('credential') || errDetail === '{}');
-        
-        if (isAuthError) {
-            errDetail = "Acesso Negado/Credencial Inválida. ATENÇÃO: Para o PagBank (API V4) você NÃO deve usar o token antigo (PagSeguro). Você precisa gerar um NOVO 'Token Pessoal' no painel do PagBank em: Vendas > Integração > Token. Verifique também se a conta é de PRODUÇÃO.";
-        }
-        
-        throw new Error(errDetail || 'Erro interno no PagBank');
-      }
+      if (!resp.ok) throw new Error(data.message || (data.error_messages ? data.error_messages.map((m: any) => m.description).join(', ') : 'Erro no PagBank'));
       const checkoutLink = data.links?.find((l: any) => l.rel === 'PAY')?.href;
       if (!checkoutLink) throw new Error('Link PAY não encontrado na resposta do PagBank.');
       res.json({ checkout_url: checkoutLink, id: data.id });
@@ -315,21 +300,9 @@ async function startServer() {
   apiRouter.post('/pagbank/public-key', async (req, res) => {
     const { token, environment } = req.body;
     if (!token) return res.status(400).json({ error: 'Token não fornecido.' });
-    
-    // Remove potential 'Bearer ' prefix and trim whitespace
-    const cleanToken = token.trim().replace(/^Bearer\s+/i, '');
-    
     const baseUrl = environment === 'production' ? 'https://api.pagseguro.com' : 'https://sandbox.api.pagseguro.com';
     try {
-      const resp = await fetch(`${baseUrl}/public-keys`, { 
-        method: 'POST', 
-        headers: { 
-          'Authorization': `Bearer ${cleanToken}`, 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }, 
-        body: JSON.stringify({ type: 'card' }) 
-      });
+      const resp = await fetch(`${baseUrl}/public-keys`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'card' }) });
       
       const responseText = await resp.text();
       let data;
@@ -337,25 +310,18 @@ async function startServer() {
         data = responseText ? JSON.parse(responseText) : {};
       } catch (e) {
         console.error('PagBank Key Non-JSON:', responseText);
-        return res.status(resp.status).json({ error: `PagBank retornou resposta inválida (${resp.status})`, raw: responseText.substring(0, 200) });
+        throw new Error(`PagBank retornou resposta inválida (${resp.status}): ${responseText.substring(0, 100)}`);
       }
 
       if (!resp.ok) {
-        console.error('PagBank Key Error:', data, 'Status:', resp.status);
-        let errDetail = data.error_messages ? data.error_messages.map((m: any) => m.description || m.parameter_name).join(', ') : (data.message || JSON.stringify(data));
-        
-        const isAuthError = resp.status === 401 || resp.status === 403 || resp.status === 400 && (errDetail.includes('Authorization') || errDetail.includes('credential') || errDetail === '{}');
-        
-        if (isAuthError) {
-            errDetail = "Acesso Negado/Credencial Inválida. ATENÇÃO: Para o PagBank (API V4) você NÃO deve usar o token antigo (PagSeguro). Você precisa gerar um NOVO 'Token Pessoal' no painel do PagBank em: Vendas > Integração > Token. Verifique também se a conta é de PRODUÇÃO.";
-        }
-        
-        return res.status(resp.status).json({ error: errDetail });
+        console.error('PagBank Key Error:', data);
+        const errDetail = data.error_messages ? data.error_messages.map((m: any) => m.description).join(', ') : (data.message || JSON.stringify(data));
+        throw new Error(errDetail || 'Erro ao gerar chave no PagBank');
       }
       res.json(data);
     } catch (error: any) { 
       console.error('PagBank generate-key catch:', error);
-      res.status(500).json({ error: error.message || 'Erro interno no servidor' }); 
+      res.status(500).json({ error: error.message }); 
     }
   });
 
