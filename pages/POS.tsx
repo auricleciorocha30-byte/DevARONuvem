@@ -659,7 +659,7 @@ export default function POS({ storeId, user, settings, orders, onLogout, updateS
             .select('*')
             .eq('store_id', storeId)
             .eq('type', type)
-            .in('status', ['AGUARDANDO', 'AGUARDANDO_PAGAMENTO', 'PAGO', 'PREPARANDO', 'PRONTO', 'ENVIADO_PARA_ENTREGA', 'SAIU_PARA_ENTREGA', 'CHEGUEI_NA_ORIGEM'])
+            .in('status', ['AGUARDANDO', 'AGUARDANDO_PAGAMENTO', 'PENDENTE', 'PAGO', 'PREPARANDO', 'PRONTO', 'ENVIADO_PARA_ENTREGA', 'SAIU_PARA_ENTREGA', 'CHEGUEI_NA_ORIGEM'])
             .gte('createdAt', Date.now() - 24 * 60 * 60 * 1000);
 
         if (type === 'MESA' || type === 'COMANDA') {
@@ -875,7 +875,7 @@ export default function POS({ storeId, user, settings, orders, onLogout, updateS
     const counts = { ENTREGA: 0, BALCAO: 0, MESA: 0, COMANDA: 0 };
     orders.forEach(order => {
       if (
-        (order.status === 'AGUARDANDO' || order.status === 'AGUARDANDO_PAGAMENTO' || order.status === 'PAGO') &&
+        (order.status === 'AGUARDANDO' || order.status === 'AGUARDANDO_PAGAMENTO' || order.status === 'PENDENTE' || order.status === 'PAGO') &&
         order.type in counts
       ) {
         counts[order.type as keyof typeof counts]++;
@@ -888,7 +888,7 @@ export default function POS({ storeId, user, settings, orders, onLogout, updateS
     setIsLookingUpCommand(true);
     setLookupType(type);
     try {
-        const data = orders.filter(o => o.type === type && ['AGUARDANDO', 'AGUARDANDO_PAGAMENTO', 'PAGO', 'PREPARANDO', 'PRONTO', 'ENVIADO_PARA_ENTREGA', 'SAIU_PARA_ENTREGA', 'CHEGUEI_NA_ORIGEM'].includes(o.status));
+        const data = orders.filter(o => o.type === type && ['AGUARDANDO', 'AGUARDANDO_PAGAMENTO', 'PENDENTE', 'PAGO', 'PREPARANDO', 'PRONTO', 'ENVIADO_PARA_ENTREGA', 'SAIU_PARA_ENTREGA', 'CHEGUEI_NA_ORIGEM'].includes(o.status));
         data.sort((a, b) => b.createdAt - a.createdAt);
 
         if (data && data.length > 0) {

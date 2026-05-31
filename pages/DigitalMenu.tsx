@@ -144,13 +144,13 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
              setVerifiedPaymentStatus('failure');
           } else {
              const amount = currentOrder.total;
-             if (paymentStatus === 'success' && currentOrder.status === 'AGUARDANDO_PAGAMENTO') {
+             if (paymentStatus === 'success' && (currentOrder.status === 'AGUARDANDO_PAGAMENTO' || currentOrder.status === 'PENDENTE')) {
                await supabase.from('orders').eq('id', paymentOrderId).update({ 
                   status: 'PAGO',
                   paymentDetails: JSON.stringify([{ method: 'ONLINE', status: 'approved', amount }]) 
                });
                setVerifiedPaymentStatus('success');
-             } else if (paymentStatus === 'failure' && currentOrder.status === 'AGUARDANDO_PAGAMENTO') {
+             } else if (paymentStatus === 'failure' && (currentOrder.status === 'AGUARDANDO_PAGAMENTO' || currentOrder.status === 'PENDENTE')) {
                await supabase.from('orders').eq('id', paymentOrderId).update({ 
                   status: 'CANCELADO',
                   paymentDetails: JSON.stringify([{ method: 'ONLINE', status: 'rejected', amount }]) 

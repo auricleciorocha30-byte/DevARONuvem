@@ -80,7 +80,7 @@ export default {
               }
           }
           
-          let newStatus = 'PENDENTE';
+          let newStatus = 'AGUARDANDO_PAGAMENTO';
           if (status === 'PAID' || status === 'COMPLETED' || status === 'AUTHORIZED') {
             newStatus = 'PAGO';
           } else if (status === 'CANCELED' || status === 'DECLINED') {
@@ -173,7 +173,7 @@ export default {
                           external_reference = mpData.external_reference;
                           
                           if (external_reference) {
-                              let newStatus = 'PENDENTE';
+                              let newStatus = 'AGUARDANDO_PAGAMENTO';
                               if (status === 'approved') newStatus = 'PAGO';
                               else if (status === 'cancelled' || status === 'rejected') newStatus = 'CANCELADO';
                     
