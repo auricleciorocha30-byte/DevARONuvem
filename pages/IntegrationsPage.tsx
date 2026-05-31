@@ -295,6 +295,53 @@ export default function IntegrationsPage({ settings, onSave }: Props) {
                 </div>
               )}
 
+              {formData.onlinePaymentProvider === 'mercado_pago' && (
+                <div className="bg-blue-50/50 p-5 rounded-2xl border border-blue-100 space-y-4 transition-all">
+                  <h4 className="text-sm font-bold text-blue-900 border-b border-blue-100 pb-2">Passo a Passo: Integração Multi-lojas Mercado Pago</h4>
+                  <div className="space-y-4 mt-2">
+                    <div className="flex gap-3">
+                      <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 font-bold text-xs">1</div>
+                      <div className="space-y-1">
+                        <p className="text-xs font-bold text-blue-900">Acesse o Mercado Pago Developers</p>
+                        <p className="text-[10px] text-blue-800 leading-relaxed">
+                          Acesse o <a href="https://www.mercadopago.com.br/developers/panel" target="_blank" rel="noreferrer" className="underline font-bold">painel de desenvolvedor</a> logado com a <strong>conta do Mercado Pago desta respectiva loja</strong> (a conta para a qual os pagamentos irão). Crie uma nova aplicação no painel com um nome sugestivo (ex: Loja Centro Webhooks).
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 font-bold text-xs">2</div>
+                      <div className="space-y-1">
+                        <p className="text-xs font-bold text-blue-900">Copie as Credenciais</p>
+                        <p className="text-[10px] text-blue-800 leading-relaxed">
+                          No menu lateral esquerdo da sua aplicação no MP, clique em <strong>Credenciais de Produção</strong>. Copie o seu <strong>Access Token (Chave Privada)</strong> e a sua <strong>Public Key (Chave Pública)</strong> e cole nos devidos campos abaixo.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 font-bold text-xs">3</div>
+                      <div className="space-y-1">
+                        <p className="text-xs font-bold text-blue-900">Configure a URL de Webhook única desta Loja</p>
+                        <p className="text-[10px] text-blue-800 leading-relaxed">
+                          No menu lateral, acesse <strong>Notificações &gt; Webhooks</strong>. No campo de URL para envio, cole a <strong>Sua URL de Webhook</strong> gerada no final deste formulário. Essa URL é <strong className="text-blue-900 bg-blue-200/50 px-1 rounded">exclusiva e única para esta loja</strong> recebendo eventos de pagamentos dela. Marque o evento <strong>Pagamentos (payments)</strong>.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 font-bold text-xs">4</div>
+                      <div className="space-y-1">
+                        <p className="text-xs font-bold text-blue-900">Cole a Assinatura Secreta</p>
+                        <p className="text-[10px] text-blue-800 leading-relaxed">
+                          Após adicionar o webhook e salvar as alterações no Mercado Pago, irá aparecer na tela do MP uma <strong>Assinatura secreta</strong>. Copie esse código e cole logo no campo "Assinatura Secreta do Webhook" aqui embaixo e Salve!
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">
                   Access Token (Chave Privada)
