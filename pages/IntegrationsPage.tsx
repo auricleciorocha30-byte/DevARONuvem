@@ -19,9 +19,10 @@ import { StoreSettings } from '../types';
 interface Props {
   settings: StoreSettings;
   onSave: (settings: Partial<StoreSettings>) => Promise<void>;
+  storeId?: string;
 }
 
-export default function IntegrationsPage({ settings, onSave }: Props) {
+export default function IntegrationsPage({ settings, onSave, storeId }: Props) {
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<Partial<StoreSettings>>({
     focusNfeToken: settings.focusNfeToken || '',
@@ -437,11 +438,11 @@ export default function IntegrationsPage({ settings, onSave }: Props) {
                     </div>
                     <div className="flex items-center gap-2 bg-white p-2 rounded-lg border border-indigo-200">
                       <code className="text-[9px] font-mono break-all flex-1 text-indigo-800">
-                        {window.location.origin}/api/webhooks/mercadopago/{settings.id || 'ID_DA_LOJA'}
+                        {window.location.origin}/api/webhooks/mercadopago/{storeId || 'ID_DA_LOJA'}
                       </code>
                       <button 
                         onClick={() => {
-                          navigator.clipboard.writeText(`${window.location.origin}/api/webhooks/mercadopago/${settings.id || 'ID_DA_LOJA'}`);
+                          navigator.clipboard.writeText(`${window.location.origin}/api/webhooks/mercadopago/${storeId || 'ID_DA_LOJA'}`);
                           alert('URL copiada para a área de transferência!');
                         }}
                         className="p-1 hover:bg-indigo-50 text-indigo-600 rounded"

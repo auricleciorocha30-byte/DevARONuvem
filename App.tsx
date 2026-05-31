@@ -989,7 +989,7 @@ function StoreContext() {
         <Route path="pedidos" element={<OrdersList orders={orders} updateStatus={updateOrderStatus} products={products} addOrder={addOrder} settings={settings} updateOrder={updateOrder} />} />
         <Route path="equipe" element={<WaitstaffManagement ecosystemUsage={ecosystemUsage} refreshEcosystemUsage={loadEcosystemUsage} currentStore={currentStore!} settings={settings} onUpdateSettings={handleUpdateSettings} />} />
         <Route path="clientes" element={<CustomerManagement storeId={currentStore?.id} />} />
-        <Route path="integracoes" element={<IntegrationsPage settings={settings} onSave={handleUpdateSettings} />} />
+        <Route path="integracoes" element={<IntegrationsPage settings={settings} onSave={handleUpdateSettings} storeId={currentStore?.id} />} />
         <Route path="configuracoes" element={<StoreSettingsPage settings={settings} products={products} onSave={handleUpdateSettings} storeId={currentStore?.id} />} />
       </Route>
 
