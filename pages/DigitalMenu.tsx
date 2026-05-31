@@ -72,6 +72,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const storeSlug = searchParams.get('loja');
   const paymentStatus = searchParams.get('payment');
   const paymentOrderId = searchParams.get('orderId');
+  const [verifiedPaymentStatus, setVerifiedPaymentStatus] = useState<string | null>(paymentStatus);
   
   const [cart, setCart] = useState<OrderItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(!!paymentStatus);
@@ -120,8 +121,8 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
         // Clear params from URL if they exist
         if (paymentStatus || paymentOrderId) {
           const url = new URL(window.location.href);
-          url.searchParams.delete('status');
-          url.searchParams.delete('order_id');
+          url.searchParams.delete('payment');
+          url.searchParams.delete('orderId');
           window.history.replaceState({}, '', url.toString());
         }
       }, 60000);
@@ -130,31 +131,50 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   }, [checkoutStep, paymentStatus, paymentOrderId]);
 
   useEffect(() => {
-    if (paymentStatus && paymentOrderId) {
-      // Update order in database based on payment status
-      const updatePaymentStatus = async () => {
+    if (paymentOrderId) {
+      let isMounted = true;
+      const checkAndPollStatus = async () => {
         try {
           const { data: currentOrder } = await supabase.from('orders').select('total, status').eq('id', paymentOrderId).single();
-          if (!currentOrder) return;
+          if (!currentOrder || !isMounted) return;
           
-          const amount = currentOrder.total;
-
-          if (paymentStatus === 'success' && currentOrder.status === 'AGUARDANDO_PAGAMENTO') {
-            await supabase.from('orders').eq('id', paymentOrderId).update({ 
-               status: 'PAGO',
-               paymentDetails: JSON.stringify([{ method: 'ONLINE', status: 'approved', amount }]) 
-            });
-          } else if (paymentStatus === 'failure' && currentOrder.status === 'AGUARDANDO_PAGAMENTO') {
-            await supabase.from('orders').eq('id', paymentOrderId).update({ 
-               status: 'CANCELADO',
-               paymentDetails: JSON.stringify([{ method: 'ONLINE', status: 'rejected', amount }]) 
-            });
+          if (currentOrder.status === 'PAGO') {
+            setVerifiedPaymentStatus('success');
+          } else if (currentOrder.status === 'CANCELADO') {
+             setVerifiedPaymentStatus('failure');
+          } else {
+             const amount = currentOrder.total;
+             if (paymentStatus === 'success' && currentOrder.status === 'AGUARDANDO_PAGAMENTO') {
+               await supabase.from('orders').eq('id', paymentOrderId).update({ 
+                  status: 'PAGO',
+                  paymentDetails: JSON.stringify([{ method: 'ONLINE', status: 'approved', amount }]) 
+               });
+               setVerifiedPaymentStatus('success');
+             } else if (paymentStatus === 'failure' && currentOrder.status === 'AGUARDANDO_PAGAMENTO') {
+               await supabase.from('orders').eq('id', paymentOrderId).update({ 
+                  status: 'CANCELADO',
+                  paymentDetails: JSON.stringify([{ method: 'ONLINE', status: 'rejected', amount }]) 
+               });
+               setVerifiedPaymentStatus('failure');
+             } else {
+               setVerifiedPaymentStatus('pending');
+             }
           }
         } catch (error) {
-          console.error('Erro ao atualizar status do pagamento:', error);
+          console.error('Erro ao verificar status do pagamento:', error);
         }
       };
-      updatePaymentStatus();
+
+      checkAndPollStatus();
+      
+      const interval = setInterval(() => {
+         checkAndPollStatus();
+      }, 5000);
+
+      return () => {
+         isMounted = false;
+         clearInterval(interval);
+      };
     }
   }, [paymentStatus, paymentOrderId]);
 
@@ -1724,20 +1744,20 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                   </div>
                 ) : (
                   <div className="py-12 text-center animate-scale-up space-y-6">
-                     <div className={`w-24 h-24 ${paymentStatus === 'failure' ? 'bg-red-500' : paymentStatus === 'pending' ? 'bg-yellow-500' : 'bg-green-500'} text-white rounded-full flex items-center justify-center mx-auto shadow-2xl animate-bounce`}>
-                       {paymentStatus === 'failure' ? <X size={48} strokeWidth={4} /> : paymentStatus === 'pending' ? <Clock size={48} strokeWidth={4} /> : <Check size={48} strokeWidth={4} />}
+                     <div className={`w-24 h-24 ${verifiedPaymentStatus === 'failure' ? 'bg-red-500' : verifiedPaymentStatus === 'pending' ? 'bg-yellow-500' : 'bg-green-500'} text-white rounded-full flex items-center justify-center mx-auto shadow-2xl animate-bounce`}>
+                       {verifiedPaymentStatus === 'failure' ? <X size={48} strokeWidth={4} /> : verifiedPaymentStatus === 'pending' ? <Clock size={48} strokeWidth={4} /> : <Check size={48} strokeWidth={4} />}
                      </div>
                      <div>
                         <h3 className="text-3xl font-brand font-bold text-primary">
-                          {paymentStatus === 'success' ? 'Pagamento Aprovado!' : 
-                           paymentStatus === 'failure' ? 'Pagamento Recusado' : 
-                           paymentStatus === 'pending' ? 'Pagamento Pendente' : 
+                          {verifiedPaymentStatus === 'success' ? 'Pagamento Aprovado!' : 
+                           verifiedPaymentStatus === 'failure' ? 'Pagamento Recusado' : 
+                           verifiedPaymentStatus === 'pending' ? 'Pagamento Pendente' : 
                            'Pedido Enviado!'}
                         </h3>
                         <p className="text-gray-500 mt-2 font-medium">
-                          {paymentStatus === 'success' ? 'Recebemos seu pagamento e já estamos preparando seu pedido.' : 
-                           paymentStatus === 'failure' ? 'Houve um problema com seu pagamento. Por favor, pague no balcão ou na entrega.' :
-                           paymentStatus === 'pending' ? 'Estamos aguardando a confirmação do pagamento.' :
+                          {verifiedPaymentStatus === 'success' ? 'Recebemos seu pagamento e já estamos preparando seu pedido.' : 
+                           verifiedPaymentStatus === 'failure' ? 'Houve um problema com seu pagamento. Por favor, pague no balcão ou na entrega.' :
+                           verifiedPaymentStatus === 'pending' ? 'Estamos aguardando a confirmação do pagamento.' :
                            'Já estamos preparando seu pedido.'}
                         </p>
                      </div>
