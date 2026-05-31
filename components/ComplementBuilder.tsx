@@ -1,6 +1,6 @@
 import React from 'react';
 import { ComplementCategory, ComplementItem } from '../types';
-import { Plus, Trash2, GripVertical, Settings } from 'lucide-react';
+import { Plus, Trash2, GripVertical, Settings, Camera } from 'lucide-react';
 import { Switch } from './Switch';
 
 interface Props {
@@ -66,6 +66,45 @@ export const ComplementBuilder: React.FC<Props> = ({ complements, onChange }) =>
       }
       return c;
     }));
+  };
+
+  const handleItemImageUpload = (e: React.ChangeEvent<HTMLInputElement>, categoryId: string, itemId: string) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 400; // Smaller size for options
+          const MAX_HEIGHT = 400;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+          handleUpdateItem(categoryId, itemId, { imageUrl: dataUrl });
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   return (
@@ -145,43 +184,67 @@ export const ComplementBuilder: React.FC<Props> = ({ complements, onChange }) =>
 
             <div className="p-4 space-y-2">
               {category.items.map((item, iIndex) => (
-                <div key={item.id} className="flex flex-col md:flex-row gap-3 items-center bg-gray-50 p-2 rounded-xl border border-dashed border-gray-200">
-                   <div className="text-gray-300 cursor-grab px-2 md:block hidden">
+                <div key={item.id} className="flex flex-col md:flex-row gap-3 items-center bg-gray-50 p-2 rounded-xl border border-dashed border-gray-200 hover:bg-gray-100 transition-colors">
+                   <div className="text-gray-300 cursor-grab px-2 md:block hidden shrink-0">
                      <GripVertical size={16} />
                    </div>
                    
-                   <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-3 gap-2">
-                     <input 
-                       type="text" 
-                       value={item.name} 
-                       onChange={e => handleUpdateItem(category.id, item.id, { name: e.target.value })}
-                       placeholder="Nome da opção (Ex: Molho Especial)"
-                       className="w-full p-2 text-sm border rounded-lg outline-none"
-                     />
-                     <input 
-                       type="text" 
-                       value={item.description || ''} 
-                       onChange={e => handleUpdateItem(category.id, item.id, { description: e.target.value })}
-                       placeholder="Descrição (opcional)"
-                       className="w-full p-2 text-sm border rounded-lg outline-none"
-                     />
-                     <div className="flex items-center gap-2">
-                       <span className="text-gray-500 text-sm font-bold pl-2">R$</span>
+                   <div className="flex-1 w-full flex flex-col md:flex-row gap-3 items-start md:items-center">
+                     <div className="w-14 h-14 bg-white border border-gray-200 rounded-lg flex items-center justify-center relative overflow-hidden shrink-0 group shadow-sm transition-all hover:shadow-md">
+                       {item.imageUrl ? (
+                         <>
+                           <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                           <div className="absolute inset-0 bg-black/50 hidden group-hover:flex items-center justify-center backdrop-blur-sm transition-all">
+                             <Camera size={14} className="text-white" />
+                           </div>
+                         </>
+                       ) : (
+                         <div className="text-gray-400 flex flex-col items-center justify-center group-hover:text-blue-500 transition-colors">
+                            <Camera size={16} />
+                            <span className="text-[8px] uppercase font-bold mt-1">Foto</span>
+                         </div>
+                       )}
+                       <input 
+                           type="file" 
+                           accept="image/*" 
+                           className="absolute inset-0 opacity-0 cursor-pointer"
+                           onChange={e => handleItemImageUpload(e, category.id, item.id)}
+                       />
+                     </div>
+                     <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-3 gap-2">
                        <input 
                          type="text" 
-                         inputMode="decimal"
-                         value={item.price === 0 ? '' : item.price} 
-                         onFocus={(e) => e.target.select()}
-                         onChange={e => {
-                           const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                           if (!isNaN(val)) handleUpdateItem(category.id, item.id, { price: val });
-                         }}
-                         placeholder="0.00"
-                         className="flex-1 w-full p-2 text-sm border rounded-lg outline-none"
+                         value={item.name} 
+                         onChange={e => handleUpdateItem(category.id, item.id, { name: e.target.value })}
+                         placeholder="Nome (Ex: Ovo, Bacon)"
+                         className="w-full p-2 text-sm border rounded-lg outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all"
                        />
-                       <button type="button" onClick={() => handleDeleteItem(category.id, item.id)} className="p-2 text-red-400 hover:text-red-600">
-                         <Trash2 size={16} />
-                       </button>
+                       <input 
+                         type="text" 
+                         value={item.description || ''} 
+                         onChange={e => handleUpdateItem(category.id, item.id, { description: e.target.value })}
+                         placeholder="Descrição (opcional)"
+                         className="w-full p-2 text-sm border rounded-lg outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all"
+                       />
+                       <div className="flex items-center gap-2">
+                         <span className="text-gray-500 text-sm font-bold pl-2 shrink-0">R$</span>
+                         <input 
+                           type="number" 
+                           step="0.01"
+                           min="0"
+                           value={item.price ?? ''} 
+                           onFocus={(e) => e.target.select()}
+                           onChange={e => {
+                             const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                             handleUpdateItem(category.id, item.id, { price: isNaN(val) ? 0 : val });
+                           }}
+                           placeholder="0,00"
+                           className="flex-1 min-w-0 p-2 text-sm border rounded-lg outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all"
+                         />
+                         <button type="button" onClick={() => handleDeleteItem(category.id, item.id)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0">
+                           <Trash2 size={16} />
+                         </button>
+                       </div>
                      </div>
                    </div>
                 </div>
