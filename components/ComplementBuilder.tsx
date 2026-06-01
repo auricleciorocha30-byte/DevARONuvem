@@ -261,28 +261,28 @@ export const ComplementBuilder: React.FC<Props> = ({ complements, onChange }) =>
                            onChange={e => handleItemImageUpload(e, category.id, item.id)}
                        />
                      </div>
-                     <div className="flex-1 w-full flex flex-col xl:flex-row gap-2">
+                     <div className="flex-1 min-w-0 grid grid-cols-1 lg:grid-cols-[2fr_2fr_auto] gap-2 lg:items-center">
                        <input 
                          type="text" 
                          value={item.name} 
                          onChange={e => handleUpdateItem(category.id, item.id, { name: e.target.value })}
                          placeholder="Nome (Ex: Ovo, Bacon)"
-                         className="flex-1 p-2 text-sm border rounded-lg outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all"
+                         className="w-full p-2 text-sm border rounded-lg outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all"
                        />
                        <input 
                          type="text" 
                          value={item.description || ''} 
                          onChange={e => handleUpdateItem(category.id, item.id, { description: e.target.value })}
                          placeholder="Descrição (opcional)"
-                         className="flex-1 p-2 text-sm border rounded-lg outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all"
+                         className="w-full p-2 text-sm border rounded-lg outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all"
                        />
-                       <div className="flex items-center gap-2 xl:w-40 shrink-0">
-                         <span className="text-gray-500 text-sm font-bold pl-2 shrink-0">R$</span>
+                       <div className="flex items-center gap-2 shrink-0">
+                         <span className="text-gray-500 text-sm font-bold pl-1 shrink-0">R$</span>
                          <PriceInput
                            value={item.price ?? 0}
                            onChange={(val) => handleUpdateItem(category.id, item.id, { price: val })}
                            placeholder="0,00"
-                           className="flex-1 min-w-0 p-2 text-sm border rounded-lg outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all"
+                           className="w-24 p-2 text-sm border rounded-lg outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all"
                          />
                          <button type="button" onClick={() => handleDeleteItem(category.id, item.id)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0">
                            <Trash2 size={16} />
