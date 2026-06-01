@@ -8,13 +8,26 @@ import { supabase } from '../lib/supabase';
 import { Html5Qrcode } from 'html5-qrcode';
 
 const PriceInput = ({ value, onChange, placeholder, className }: { value: number, onChange: (val: number) => void, placeholder?: string, className?: string }) => {
-    const [localVal, setLocalVal] = useState(value === 0 ? '' : value.toString());
+    const [localVal, setLocalVal] = useState(
+        value === 0 ? '' : value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    );
+
+    const parseCurrency = (str: string) => {
+        if (!str) return 0;
+        let clean = str.replace(/[^0-9.,]/g, '');
+        if (clean.includes(',') && clean.includes('.')) {
+            clean = clean.replace(/\./g, '').replace(',', '.');
+        } else if (clean.includes(',')) {
+            clean = clean.replace(',', '.');
+        }
+        const val = parseFloat(clean);
+        return isNaN(val) ? 0 : val;
+    };
 
     useEffect(() => {
-        const parsed = parseFloat(localVal.replace(',', '.'));
-        if (isNaN(parsed) && value === 0) return;
-        if (parsed !== value) {
-            setLocalVal(value === 0 ? '' : value.toString());
+        const currentParsed = parseCurrency(localVal);
+        if (currentParsed !== value) {
+            setLocalVal(value === 0 && !localVal ? '' : value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
         }
     }, [value]);
 
@@ -27,26 +40,20 @@ const PriceInput = ({ value, onChange, placeholder, className }: { value: number
             className={className}
             onFocus={e => e.target.select()}
             onBlur={() => {
-                const parsed = parseFloat(localVal.replace(',', '.'));
-                if (!isNaN(parsed)) {
-                   setLocalVal(parsed.toFixed(2));
+                const parsed = parseCurrency(localVal);
+                if (parsed !== 0 || localVal !== '') {
+                   setLocalVal(parsed.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
                 }
             }}
             onChange={e => {
-                const valStr = e.target.value.replace(/[^0-9.,]/g, '').replace(/,/g, '.');
-                const parts = valStr.split('.');
-                const safeValStr = parts.length > 2 ? parts[0] + '.' + parts.slice(1).join('') : valStr;
-
-                setLocalVal(e.target.value); 
-                const cleanedForState = e.target.value.replace(/[^0-9.,]/g, '');
-                setLocalVal(cleanedForState);
-
-                const finalParsed = parseFloat(safeValStr);
-                onChange(isNaN(finalParsed) ? 0 : finalParsed);
+                const val = e.target.value;
+                const sanitized = val.replace(/[^0-9.,]/g, '');
+                setLocalVal(sanitized);
+                onChange(parseCurrency(sanitized));
             }}
         />
     );
-}
+};
 
 interface Props {
   products: Product[];
