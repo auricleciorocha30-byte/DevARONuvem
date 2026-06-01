@@ -1,7 +1,51 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ComplementCategory, ComplementItem } from '../types';
 import { Plus, Trash2, GripVertical, Settings, Camera } from 'lucide-react';
 import { Switch } from './Switch';
+
+const PriceInput = ({ value, onChange, placeholder, className }: { value: number, onChange: (val: number) => void, placeholder?: string, className?: string }) => {
+    const [localVal, setLocalVal] = useState(value === 0 ? '' : value.toString());
+
+    useEffect(() => {
+        const parsed = parseFloat(localVal.replace(',', '.'));
+        if (isNaN(parsed) && value === 0) return;
+        if (parsed !== value) {
+            setLocalVal(value === 0 ? '' : value.toString());
+        }
+    }, [value]);
+
+    return (
+        <input
+            type="text"
+            inputMode="decimal"
+            value={localVal}
+            placeholder={placeholder}
+            className={className}
+            onFocus={e => e.target.select()}
+            onBlur={() => {
+                const parsed = parseFloat(localVal.replace(',', '.'));
+                if (!isNaN(parsed)) {
+                   setLocalVal(parsed.toFixed(2));
+                }
+            }}
+            onChange={e => {
+                const valStr = e.target.value.replace(/[^0-9.,]/g, '').replace(/,/g, '.');
+                
+                // Allow only one decimal point
+                const parts = valStr.split('.');
+                const safeValStr = parts.length > 2 ? parts[0] + '.' + parts.slice(1).join('') : valStr;
+
+                setLocalVal(e.target.value); // keep what they typed but clean up? Let's just keep their typed value to not mess up cursor, just replace unwanted chars
+                
+                const cleanedForState = e.target.value.replace(/[^0-9.,]/g, '');
+                setLocalVal(cleanedForState);
+
+                const finalParsed = parseFloat(safeValStr);
+                onChange(isNaN(finalParsed) ? 0 : finalParsed);
+            }}
+        />
+    );
+}
 
 interface Props {
   complements: ComplementCategory[];
@@ -211,33 +255,26 @@ export const ComplementBuilder: React.FC<Props> = ({ complements, onChange }) =>
                            onChange={e => handleItemImageUpload(e, category.id, item.id)}
                        />
                      </div>
-                     <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-3 gap-2">
+                     <div className="flex-1 w-full flex flex-col xl:flex-row gap-2">
                        <input 
                          type="text" 
                          value={item.name} 
                          onChange={e => handleUpdateItem(category.id, item.id, { name: e.target.value })}
                          placeholder="Nome (Ex: Ovo, Bacon)"
-                         className="w-full p-2 text-sm border rounded-lg outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all"
+                         className="flex-1 p-2 text-sm border rounded-lg outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all"
                        />
                        <input 
                          type="text" 
                          value={item.description || ''} 
                          onChange={e => handleUpdateItem(category.id, item.id, { description: e.target.value })}
                          placeholder="Descrição (opcional)"
-                         className="w-full p-2 text-sm border rounded-lg outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all"
+                         className="flex-1 p-2 text-sm border rounded-lg outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all"
                        />
-                       <div className="flex items-center gap-2">
+                       <div className="flex items-center gap-2 xl:w-40 shrink-0">
                          <span className="text-gray-500 text-sm font-bold pl-2 shrink-0">R$</span>
-                         <input 
-                           type="number" 
-                           step="0.01"
-                           min="0"
-                           value={item.price ?? ''} 
-                           onFocus={(e) => e.target.select()}
-                           onChange={e => {
-                             const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                             handleUpdateItem(category.id, item.id, { price: isNaN(val) ? 0 : val });
-                           }}
+                         <PriceInput
+                           value={item.price ?? 0}
+                           onChange={(val) => handleUpdateItem(category.id, item.id, { price: val })}
                            placeholder="0,00"
                            className="flex-1 min-w-0 p-2 text-sm border rounded-lg outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all"
                          />

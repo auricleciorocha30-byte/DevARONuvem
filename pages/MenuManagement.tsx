@@ -7,6 +7,47 @@ import { ComplementBuilder } from '../components/ComplementBuilder';
 import { supabase } from '../lib/supabase';
 import { Html5Qrcode } from 'html5-qrcode';
 
+const PriceInput = ({ value, onChange, placeholder, className }: { value: number, onChange: (val: number) => void, placeholder?: string, className?: string }) => {
+    const [localVal, setLocalVal] = useState(value === 0 ? '' : value.toString());
+
+    useEffect(() => {
+        const parsed = parseFloat(localVal.replace(',', '.'));
+        if (isNaN(parsed) && value === 0) return;
+        if (parsed !== value) {
+            setLocalVal(value === 0 ? '' : value.toString());
+        }
+    }, [value]);
+
+    return (
+        <input
+            type="text"
+            inputMode="decimal"
+            value={localVal}
+            placeholder={placeholder}
+            className={className}
+            onFocus={e => e.target.select()}
+            onBlur={() => {
+                const parsed = parseFloat(localVal.replace(',', '.'));
+                if (!isNaN(parsed)) {
+                   setLocalVal(parsed.toFixed(2));
+                }
+            }}
+            onChange={e => {
+                const valStr = e.target.value.replace(/[^0-9.,]/g, '').replace(/,/g, '.');
+                const parts = valStr.split('.');
+                const safeValStr = parts.length > 2 ? parts[0] + '.' + parts.slice(1).join('') : valStr;
+
+                setLocalVal(e.target.value); 
+                const cleanedForState = e.target.value.replace(/[^0-9.,]/g, '');
+                setLocalVal(cleanedForState);
+
+                const finalParsed = parseFloat(safeValStr);
+                onChange(isNaN(finalParsed) ? 0 : finalParsed);
+            }}
+        />
+    );
+}
+
 interface Props {
   products: Product[];
   saveProduct: (p: Partial<Product>) => Promise<void>;
@@ -554,17 +595,9 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{editingProduct?.isByWeight ? 'Preço por KG (R$)' : 'Preço Unitário (R$)'}</label>
-                  <input 
-                    required 
-                    type="number" 
-                    step="0.01" 
-                    min="0"
-                    value={editingProduct?.price ?? ''} 
-                    onFocus={(e) => e.target.select()} 
-                    onChange={(e) => {
-                      const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                      setEditingProduct({...editingProduct, price: isNaN(val) ? 0 : val});
-                    }} 
+                  <PriceInput 
+                    value={editingProduct?.price ?? 0}
+                    onChange={(val) => setEditingProduct({...editingProduct, price: val})}
                     className="w-full p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500" 
                   />
                 </div>
