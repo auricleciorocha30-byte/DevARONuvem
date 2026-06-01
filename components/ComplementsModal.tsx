@@ -90,44 +90,47 @@ export const ComplementsModal: React.FC<Props> = ({
                      const isRadio = cat.maxQuantity === 1;
 
                      return (
-                       <div key={item.id} className={`flex items-center justify-between p-3 rounded-xl border transition-colors cursor-pointer ${itemQty > 0 ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'}`}
-                         onClick={() => {
-                           if (isRadio && itemQty === 0) onToggleComplement(cat, item, itemQty, cat.maxQuantity);
-                         }}
-                       >
-                         <div className="flex-1">
-                           <div className="flex items-center gap-2">
-                             {isRadio && (
-                               <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${itemQty > 0 ? 'border-primary' : 'border-gray-300'}`}>
-                                 {itemQty > 0 && <div className="w-2.5 h-2.5 bg-primary rounded-full" />}
-                               </div>
-                             )}
-                             <span className="font-bold text-gray-700">{item.name}</span>
-                           </div>
-                           {item.description && <p className="text-xs text-gray-500 pl-7">{item.description}</p>}
-                           {item.price > 0 && <p className="text-xs font-bold text-secondary pl-7">+ R$ {item.price.toFixed(2)}</p>}
-                         </div>
-                         
-                         {!isRadio && (
-                           <div className="flex items-center gap-3 bg-white border rounded-xl p-1 shadow-sm" onClick={e => e.stopPropagation()}>
-                             <button 
-                               onClick={() => onToggleComplement(cat, item, itemQty, cat.maxQuantity)} 
-                               disabled={itemQty === 0}
-                               className={`p-1.5 rounded-lg ${itemQty > 0 ? 'bg-red-50 text-red-500 hover:bg-red-100' : 'bg-gray-50 text-gray-300'}`}
-                             >
-                               <Minus size={14} />
-                             </button>
-                             <span className="font-bold text-sm w-4 text-center">{itemQty}</span>
-                             <button 
-                               onClick={() => onToggleComplement(cat, item, itemQty, cat.maxQuantity)} 
-                               className={`p-1.5 rounded-lg ${(catCount >= cat.maxQuantity) ? 'bg-gray-50 text-gray-300' : 'bg-green-50 text-green-500 hover:bg-green-100'}`}
-                               disabled={catCount >= cat.maxQuantity}
-                             >
-                               <Plus size={14} />
-                             </button>
-                           </div>
-                         )}
-                       </div>
+                        <div key={item.id} className={`flex items-center justify-between p-3 rounded-xl border transition-colors cursor-pointer ${itemQty > 0 ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'}`}
+                          onClick={() => {
+                            if (isRadio && itemQty === 0) onToggleComplement(cat, item, itemQty, cat.maxQuantity);
+                          }}
+                        >
+                          <div className="flex-1 flex gap-3 items-center">
+                            {isRadio && (
+                              <div className={`w-5 h-5 shrink-0 rounded-full border-2 flex items-center justify-center ${itemQty > 0 ? 'border-primary' : 'border-gray-300'}`}>
+                                {itemQty > 0 && <div className="w-2.5 h-2.5 bg-primary rounded-full" />}
+                              </div>
+                            )}
+                            {item.imageUrl && (
+                              <img src={item.imageUrl} alt={item.name} className="w-12 h-12 rounded-lg object-cover bg-white shadow-sm shrink-0 border border-gray-100" />
+                            )}
+                            <div className="flex-1">
+                              <span className="font-bold text-gray-700 block">{item.name}</span>
+                              {item.description && <p className="text-xs text-gray-500 mt-0.5 leading-tight">{item.description}</p>}
+                              {item.price > 0 && <p className="text-xs font-bold text-secondary mt-1">+ R$ {item.price.toFixed(2)}</p>}
+                            </div>
+                          </div>
+                          
+                          {!isRadio && (
+                            <div className="flex items-center gap-3 bg-white border rounded-xl p-1 shadow-sm" onClick={e => e.stopPropagation()}>
+                              <button 
+                                onClick={() => onToggleComplement(cat, item, itemQty, cat.maxQuantity)} 
+                                disabled={itemQty === 0}
+                                className={`p-1.5 rounded-lg ${itemQty > 0 ? 'bg-red-50 text-red-500 hover:bg-red-100' : 'bg-gray-50 text-gray-300'}`}
+                              >
+                                <Minus size={14} />
+                              </button>
+                              <span className="font-bold text-sm w-4 text-center">{itemQty}</span>
+                              <button 
+                                onClick={() => onToggleComplement(cat, item, itemQty, cat.maxQuantity)} 
+                                className={`p-1.5 rounded-lg ${(catCount >= cat.maxQuantity) ? 'bg-gray-50 text-gray-300' : 'bg-green-50 text-green-500 hover:bg-green-100'}`}
+                                disabled={catCount >= cat.maxQuantity}
+                              >
+                                <Plus size={14} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
                      );
                    })}
                  </div>

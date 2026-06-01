@@ -16,9 +16,14 @@ const PriceInput = ({ value, onChange, placeholder, className }: { value: number
         if (!str) return 0;
         let clean = str.replace(/[^0-9.,]/g, '');
         if (clean.includes(',') && clean.includes('.')) {
+            // e.g. 1.234,50 -> 1234.50
             clean = clean.replace(/\./g, '').replace(',', '.');
         } else if (clean.includes(',')) {
+            // e.g. 20,50 -> 20.50
             clean = clean.replace(',', '.');
+        } else if (clean.includes('.')) {
+            // e.g. 20.50 -> 20.50
+            // Keep unchanged, handles numpad dot
         }
         const val = parseFloat(clean);
         return isNaN(val) ? 0 : val;
