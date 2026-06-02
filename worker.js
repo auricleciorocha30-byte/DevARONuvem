@@ -405,6 +405,26 @@ export default {
       }
     }
 
+    
+    // MERCADO PAGO PIX CHECK STATUS
+    if (url.pathname.startsWith("/api/mercado-pago/payment-status/") && request.method === "GET") {
+      try {
+        const id = url.pathname.split("/").pop();
+        const accessToken = url.searchParams.get("accessToken");
+
+        if (!accessToken) return new Response(JSON.stringify({ error: 'Access Token não fornecido.' }), { status: 400, headers: corsHeaders });
+
+        const resp = await fetch(`https://api.mercadopago.com/v1/payments/${id}`, { 
+           headers: { 'Authorization': `Bearer ${accessToken}` } 
+        });
+        const data = await resp.json();
+        
+        return new Response(JSON.stringify(data), { status: resp.status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } catch (error) {
+        return new Response(JSON.stringify({ error: 'Erro ao consultar status.' }), { status: 500, headers: corsHeaders });
+      }
+    }
+
     // MERCADO PAGO CREATE PIX
     if (url.pathname === "/api/mercado-pago/create-pix" && request.method === "POST") {
       try {
