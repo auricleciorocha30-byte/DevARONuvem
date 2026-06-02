@@ -72,6 +72,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const storeSlug = searchParams.get('loja');
   const paymentStatus = searchParams.get('payment');
   const paymentOrderId = searchParams.get('orderId');
+  const [currentOrderId, setCurrentOrderId] = useState<string | null>(paymentOrderId || null);
   const [verifiedPaymentStatus, setVerifiedPaymentStatus] = useState<string | null>(paymentStatus);
   
   const [cart, setCart] = useState<OrderItem[]>([]);
@@ -115,27 +116,35 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
 
   useEffect(() => {
     if (checkoutStep === 'success') {
+      // Se tiver gerado PIX e ainda não pagou, espera até 5 minutos.
+      // Se já pagou (success), fecha em 10 segundos.
+      // Caso contrário, fecha em 1 minuto.
+      const delay = verifiedPaymentStatus === 'success' ? 10000 : (generatedPix ? 300000 : 60000);
+      
       const timer = setTimeout(() => {
         setIsCartOpen(false);
         setCheckoutStep('cart');
+        setGeneratedPix(null);
+        setVerifiedPaymentStatus(null);
+        setCurrentOrderId(null);
         // Clear params from URL if they exist
         if (paymentStatus || paymentOrderId) {
-          const url = new URL(window.location.href);
-          url.searchParams.delete('payment');
-          url.searchParams.delete('orderId');
-          window.history.replaceState({}, '', url.toString());
+           const url = new URL(window.location.href);
+           url.searchParams.delete('payment');
+           url.searchParams.delete('orderId');
+           window.history.replaceState({}, '', url.toString());
         }
-      }, 60000);
+      }, delay);
       return () => clearTimeout(timer);
     }
-  }, [checkoutStep, paymentStatus, paymentOrderId]);
+  }, [checkoutStep, paymentStatus, paymentOrderId, verifiedPaymentStatus, generatedPix]);
 
   useEffect(() => {
-    if (paymentOrderId) {
+    if (currentOrderId) {
       let isMounted = true;
       const checkAndPollStatus = async () => {
         try {
-          const { data: currentOrder } = await supabase.from('orders').select('total, status').eq('id', paymentOrderId).single();
+          const { data: currentOrder } = await supabase.from('orders').select('total, status').eq('id', currentOrderId).single();
           if (!currentOrder || !isMounted) return;
           
           if (currentOrder.status === 'PAGO') {
@@ -145,13 +154,13 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
           } else {
              const amount = currentOrder.total;
              if (paymentStatus === 'success' && (currentOrder.status === 'AGUARDANDO_PAGAMENTO' || currentOrder.status === 'PENDENTE')) {
-               await supabase.from('orders').eq('id', paymentOrderId).update({ 
+               await supabase.from('orders').eq('id', currentOrderId).update({ 
                   status: 'PAGO',
                   paymentDetails: JSON.stringify([{ method: 'ONLINE', status: 'approved', amount }]) 
                });
                setVerifiedPaymentStatus('success');
              } else if (paymentStatus === 'failure' && (currentOrder.status === 'AGUARDANDO_PAGAMENTO' || currentOrder.status === 'PENDENTE')) {
-               await supabase.from('orders').eq('id', paymentOrderId).update({ 
+               await supabase.from('orders').eq('id', currentOrderId).update({ 
                   status: 'CANCELADO',
                   paymentDetails: JSON.stringify([{ method: 'ONLINE', status: 'rejected', amount }]) 
                });
@@ -176,7 +185,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
          clearInterval(interval);
       };
     }
-  }, [paymentStatus, paymentOrderId]);
+  }, [paymentStatus, currentOrderId]);
 
   const effectiveTable = initialTable || urlTable || null;
   const isStoreClosed = settings.isStoreOpen === false;
@@ -545,6 +554,16 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
     observer.observe(loadMoreRef.current);
     return () => observer.disconnect();
   }, [filteredProducts, loadMoreRef.current]);
+
+  const handleCloseCart = () => {
+    setIsCartOpen(false);
+    if (checkoutStep === 'success') {
+      setCheckoutStep('cart');
+      setGeneratedPix(null);
+      setVerifiedPaymentStatus(null);
+      setCurrentOrderId(null);
+    }
+  };
 
   const handleBack = () => {
     if (onCloseMenu) {
@@ -1032,6 +1051,8 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
              const data = await response.json();
              if (data.qr_code) {
                setGeneratedPix({ qr_code: data.qr_code, qr_code_base64: data.qr_code_base64 });
+               setCurrentOrderId(finalOrder.id);
+               setVerifiedPaymentStatus('pending');
                setCheckoutStep('success'); // Show success component with QR code
              }
           } catch(err) {
@@ -1393,7 +1414,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                    <div className="p-2 bg-primary text-secondary rounded-xl shadow-sm"><ShoppingCart size={20} /></div>
                    <h2 className="text-xl font-brand font-bold text-primary">Minha Sacola</h2>
                 </div>
-                <button onClick={() => setIsCartOpen(false)} className="p-2 text-gray-400 hover:text-gray-600 bg-white rounded-full shadow-sm"><X size={24} /></button>
+                <button onClick={handleCloseCart} className="p-2 text-gray-400 hover:text-gray-600 bg-white rounded-full shadow-sm"><X size={24} /></button>
              </header>
 
              <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
@@ -1403,7 +1424,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                        <div className="py-20 text-center space-y-4">
                           <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto"><ShoppingBag size={40} className="text-gray-200" /></div>
                           <p className="text-gray-400 font-bold">Sua sacola está vazia.</p>
-                          <button onClick={() => setIsCartOpen(false)} className="text-secondary font-black text-xs uppercase tracking-widest">Voltar ao Menu</button>
+                          <button onClick={handleCloseCart} className="text-secondary font-black text-xs uppercase tracking-widest">Voltar ao Menu</button>
                        </div>
                      ) : (
                        <>
@@ -1766,7 +1787,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                         <p className="text-[10px] text-gray-400 leading-snug">Fique atento ao painel da loja ou aguarde nosso atendente chamar.</p>
                      </div>
 
-                     {generatedPix && (
+                     {generatedPix && verifiedPaymentStatus !== 'success' && (
                         <div className="bg-white p-6 rounded-3xl border border-gray-200 text-center space-y-4 shadow-xl">
                            <h4 className="font-bold text-gray-800 text-sm">Pague agora com Pix (Mercado Pago)</h4>
                            <img src={`data:image/jpeg;base64,${generatedPix.qr_code_base64}`} alt="QR Code Pix" className="mx-auto w-48 h-48" />
@@ -1793,7 +1814,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                      )}
                      
                      <div className="flex flex-col gap-3">
-                        <button onClick={() => { setIsCartOpen(false); setCheckoutStep('cart'); }} className="w-full py-5 bg-gray-100 text-gray-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-gray-200 transition-all">Lançar outro item na sacola</button>
+                        <button onClick={handleCloseCart} className="w-full py-5 bg-gray-100 text-gray-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-gray-200 transition-all">Lançar outro item na sacola</button>
                         
                         {isWaitstaff && (
                            <button 
@@ -1823,7 +1844,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
 
                  <div className="flex flex-col gap-3">
                    <button onClick={() => setCheckoutStep('details')} className="w-full py-5 bg-secondary text-primary rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all">Prosseguir para Identificação</button>
-                   <button onClick={() => setIsCartOpen(false)} className="w-full py-4 bg-gray-100 text-gray-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-gray-200 transition-all">
+                   <button onClick={handleCloseCart} className="w-full py-4 bg-gray-100 text-gray-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-gray-200 transition-all">
                      <div className="flex items-center justify-center gap-2">
                        <PlusIcon size={16} /> Adicionar mais itens
                      </div>
