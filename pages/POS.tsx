@@ -128,6 +128,9 @@ export default function POS({ storeId, user, settings, orders, onLogout, updateS
   const [pointStatus, setPointStatus] = useState<string | null>(null);
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
   const [isEmittingNfce, setIsEmittingNfce] = useState(false);
+  const [generatedPix, setGeneratedPix] = useState<{ qr_code: string; qr_code_base64: string; id: string } | null>(null);
+  const [isGeneratingPix, setIsGeneratingPix] = useState(false);
+  const [isPixApproved, setIsPixApproved] = useState(false);
   const [loadedCommandIds, setLoadedCommandIds] = useState<string[]>(() => {
     const saved = localStorage.getItem(`pos-loadedCommandIds-${storeId}`);
     return saved ? JSON.parse(saved) : [];
@@ -1544,7 +1547,7 @@ export default function POS({ storeId, user, settings, orders, onLogout, updateS
         try {
           data = JSON.parse(responseText);
         } catch (e: any) {
-      console.error('Failed to parse API response:', responseText);
+          console.error('Failed to parse API response:', responseText);
           throw new Error(`Resposta inválida do servidor. Verifique se o app está rodando como "estático" em vez de "full-stack".`);
         }
 
@@ -1564,6 +1567,71 @@ export default function POS({ storeId, user, settings, orders, onLogout, updateS
         setIsOnlineProcessing(false);
     }
   };
+
+  const handleCreatePixQrCode = async () => {
+    const amount = parseFloat(currentPaymentAmount);
+    if (isNaN(amount) || amount <= 0) return;
+    if (!settings.onlinePaymentAccessToken) {
+        alert("Token de Mercado Pago não configurado. Ative o Pagamento Online nas Integrações.");
+        return;
+    }
+
+    setIsGeneratingPix(true);
+    try {
+      const tempId = `pos_pix_${Date.now()}`;
+      const mockOrder = {
+        id: tempId,
+        displayId: 'PDV',
+        total: total,
+        paymentDetails: JSON.stringify([{ method: 'PIX', amount: amount }]),
+        customerName: selectedCustomer?.name || deliveryDetails.customerName || 'Cliente PDV'
+      };
+
+      const response = await fetch('/api/mercado-pago/create-pix', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accessToken: settings.onlinePaymentAccessToken,
+          orderData: mockOrder,
+          storeSlug: settings.slug
+        })
+      });
+
+      const data = await response.json();
+      if (data.qr_code) {
+        setGeneratedPix({ qr_code: data.qr_code, qr_code_base64: data.qr_code_base64, id: data.id });
+      } else {
+        throw new Error(data.error || 'Erro ao gerar QR Code');
+      }
+    } catch (error: any) {
+      console.error('Error generating PIX:', error);
+      alert('Erro ao gerar PIX: ' + error.message);
+    } finally {
+      setIsGeneratingPix(false);
+    }
+  };
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (generatedPix && !isPixApproved) {
+      interval = setInterval(async () => {
+        try {
+          const response = await fetch(`/api/mercado-pago/payment-status/${generatedPix.id}?accessToken=${settings.onlinePaymentAccessToken}`);
+          const data = await response.json();
+          if (data.status === 'approved') {
+            setIsPixApproved(true);
+            setPayments(prev => [...prev, { method: 'PIX', amount: parseFloat(currentPaymentAmount) }]);
+            setCurrentPaymentAmount('');
+            setGeneratedPix(null);
+            alert("Pagamento PIX Confirmado!");
+          }
+        } catch (error) {
+          console.error("Error polling PIX status:", error);
+        }
+      }, 3000);
+    }
+    return () => clearInterval(interval);
+  }, [generatedPix, isPixApproved, settings.onlinePaymentAccessToken, currentPaymentAmount]);
 
   const handlePointPayment = async () => {
     const amount = parseFloat(currentPaymentAmount);
@@ -3690,13 +3758,32 @@ export default function POS({ storeId, user, settings, orders, onLogout, updateS
                                           )}
                                       </select>
                                       <button 
-                                          onClick={currentPaymentMethod === 'MAQUININHA' ? handlePointPayment : (currentPaymentMethod === 'ONLINE' && !onlineCheckoutUrl ? handleOnlinePayment : handleAddPayment)}
-                                          disabled={isPointProcessing || isOnlineProcessing}
-                                          className={`p-3 text-white rounded-xl ${isPointProcessing || isOnlineProcessing ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`}
+                                          onClick={
+                                            currentPaymentMethod === 'MAQUININHA' ? handlePointPayment : 
+                                            (currentPaymentMethod === 'ONLINE' && !onlineCheckoutUrl ? handleOnlinePayment : 
+                                            (currentPaymentMethod === 'PIX' && settings.onlinePaymentAccessToken && !generatedPix ? handleCreatePixQrCode : handleAddPayment))
+                                          }
+                                          disabled={isPointProcessing || isOnlineProcessing || isGeneratingPix}
+                                          className={`p-3 text-white rounded-xl ${isPointProcessing || isOnlineProcessing || isGeneratingPix ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`}
                                       >
-                                          {isPointProcessing || isOnlineProcessing ? <Loader2 className="animate-spin" size={20} /> : (currentPaymentMethod === 'ONLINE' && !onlineCheckoutUrl ? <Zap size={20} /> : <Plus size={20} />)}
+                                          {isPointProcessing || isOnlineProcessing || isGeneratingPix ? (
+                                            <Loader2 className="animate-spin" size={20} />
+                                          ) : (
+                                            ((currentPaymentMethod === 'ONLINE' && !onlineCheckoutUrl) || (currentPaymentMethod === 'PIX' && settings.onlinePaymentAccessToken && !generatedPix)) ? (
+                                              <Zap size={20} />
+                                            ) : (
+                                              <Plus size={20} />
+                                            )
+                                          )}
                                       </button>
                                   </div>
+
+                                  {isGeneratingPix && (
+                                      <div className="p-3 bg-purple-50 rounded-xl border border-purple-100 flex items-center gap-3 animate-pulse">
+                                          <Loader2 className="animate-spin text-purple-600" size={20} />
+                                          <span className="text-sm font-bold text-purple-800">Gerando QR Code PIX...</span>
+                                      </div>
+                                  )}
 
                                   {isOnlineProcessing && (
                                       <div className="p-3 bg-green-50 rounded-xl border border-green-100 flex items-center gap-3 animate-pulse">
@@ -3755,15 +3842,70 @@ export default function POS({ storeId, user, settings, orders, onLogout, updateS
 
                       {currentPaymentMethod === 'PIX' && (!orderType || orderType !== 'ENTREGA' || !deliveryDetails.payOnDelivery) && (
                         <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex flex-col items-center gap-4 text-center">
-                          {settings.pixQrCodeUrl ? (
-                            <img src={settings.pixQrCodeUrl || undefined} alt="QR Pix" className="w-48 h-48 object-contain mix-blend-multiply bg-white p-2 rounded-xl shadow-sm" />
+                          {generatedPix ? (
+                            <div className="space-y-4 w-full">
+                                <div className="flex justify-between items-center px-2">
+                                    <span className="text-[10px] font-black uppercase text-purple-600 tracking-widest">PIX Dinâmico MP</span>
+                                    <button onClick={() => setGeneratedPix(null)} className="text-red-500 p-1 hover:bg-red-50 rounded-lg">
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                                <img src={`data:image/png;base64,${generatedPix.qr_code_base64}`} alt="QR Pix Dinâmico" className="w-48 h-48 object-contain bg-white p-2 rounded-xl shadow-sm mx-auto" />
+                                <div className="space-y-2">
+                                    <div className="bg-purple-50 p-2 rounded-lg border border-purple-100 animate-pulse text-center">
+                                        <p className="text-[10px] font-bold text-purple-700">Aguardando confirmação automática...</p>
+                                    </div>
+                                    <button 
+                                        onClick={async () => {
+                                            try {
+                                                const resp = await fetch(`/api/mercado-pago/payment-status/${generatedPix.id}?accessToken=${settings.onlinePaymentAccessToken}`);
+                                                const data = await resp.json();
+                                                if (data.status === 'approved') {
+                                                    setIsPixApproved(true);
+                                                    setPayments(prev => [...prev, { method: 'PIX', amount: parseFloat(currentPaymentAmount) }]);
+                                                    setCurrentPaymentAmount('');
+                                                    setGeneratedPix(null);
+                                                    alert("Pagamento PIX Confirmado!");
+                                                } else {
+                                                    alert("Pagamento ainda não aprovado. Status: " + (data.status || 'pendente'));
+                                                }
+                                            } catch (e) { alert("Erro ao consultar: " + e); }
+                                        }}
+                                        className="w-full py-2 bg-blue-50 text-blue-700 rounded-lg text-[10px] font-bold border border-blue-100 uppercase"
+                                    >
+                                        Verificar Pagamento Manualmente
+                                    </button>
+                                </div>
+                                <button 
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(generatedPix.qr_code);
+                                        alert("Código PIX Copia e Cola copiado!");
+                                    }}
+                                    className="text-xs font-bold text-blue-600 underline"
+                                >
+                                    Copiar Código PIX
+                                </button>
+                            </div>
+                          ) : settings.pixQrCodeUrl ? (
+                            <>
+                                <img src={settings.pixQrCodeUrl || undefined} alt="QR Pix" className="w-48 h-48 object-contain mix-blend-multiply bg-white p-2 rounded-xl shadow-sm" />
+                                <div className="flex-1">
+                                    <p className="text-sm font-bold text-gray-700">QR Code Pix Estático</p>
+                                    <p className="text-xs text-gray-500">Escaneie para pagar</p>
+                                </div>
+                                {settings.onlinePaymentAccessToken && (
+                                    <p className="text-[10px] text-purple-600 font-medium">Dica: Clique no raio (⚡) acima para gerar um PIX dinâmico com confirmação automática.</p>
+                                )}
+                            </>
                           ) : (
-                            <QrCode size={48} className="text-gray-400" />
+                            <>
+                                <QrCode size={48} className="text-gray-400" />
+                                <div className="flex-1">
+                                    <p className="text-sm font-bold text-gray-700">QR Code Pix</p>
+                                    <p className="text-xs text-gray-500">Configure um QR Code ou use Mercado Pago</p>
+                                </div>
+                            </>
                           )}
-                          <div className="flex-1">
-                              <p className="text-sm font-bold text-gray-700">QR Code Pix</p>
-                              <p className="text-xs text-gray-500">Escaneie para pagar</p>
-                          </div>
                         </div>
                       )}
                   </div>

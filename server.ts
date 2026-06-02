@@ -147,6 +147,75 @@ async function startServer() {
     } catch (error: any) { res.status(500).json({ error: 'Erro ao consultar status.' }); }
   });
 
+  // API Route for Mercado Pago PIX
+  apiRouter.post('/mercado-pago/create-pix', async (req, res) => {
+    const { accessToken, orderData, storeSlug } = req.body;
+    if (!accessToken) return res.status(400).json({ error: 'Access Token do Mercado Pago não fornecido.' });
+    
+    try {
+      let amountToCharge = Number(orderData.total);
+      if (orderData.paymentDetails) {
+        try {
+          const details = typeof orderData.paymentDetails === 'string' ? JSON.parse(orderData.paymentDetails) : orderData.paymentDetails;
+          const onlinePayment = details.find((d: any) => d.method === 'ONLINE' || d.method === 'PIX');
+          if (onlinePayment) amountToCharge = Number(onlinePayment.amount);
+        } catch (e) {}
+      }
+
+      const payload = {
+        transaction_amount: Number(amountToCharge.toFixed(2)),
+        description: `Pedido #${orderData.displayId || ''}`,
+        payment_method_id: "pix",
+        external_reference: String(orderData.id || `pos_${Date.now()}`),
+        notification_url: storeSlug ? `https://${req.get('host')}/api/webhooks/mercadopago?slug=${storeSlug}` : undefined,
+        payer: {
+          email: "cliente@email.com",
+          first_name: orderData.customerName ? orderData.customerName.split(' ')[0] : "Cliente"
+        }
+      };
+
+      const resp = await fetch('https://api.mercadopago.com/v1/payments', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'X-Idempotency-Key': `${orderData.id || 'pos'}-${Date.now()}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await resp.json();
+      if (!resp.ok) {
+         console.error("Mercado Pago Pix Error:", data);
+         throw new Error(data.message || JSON.stringify(data) || 'Erro ao gerar Pix no Mercado Pago');
+      }
+
+      res.json({ 
+        qr_code: data.point_of_interaction?.transaction_data?.qr_code,
+        qr_code_base64: data.point_of_interaction?.transaction_data?.qr_code_base64,
+        id: data.id 
+      });
+    } catch (error: any) {
+      console.error('Create Pix Error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  apiRouter.get('/mercado-pago/payment-status/:id', async (req, res) => {
+    const { id } = req.params;
+    const accessToken = req.query.accessToken as string;
+    if (!accessToken) return res.status(400).json({ error: 'Access Token não fornecido.' });
+    try {
+      const resp = await fetch(`https://api.mercadopago.com/v1/payments/${id}`, {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+      const data = await resp.json();
+      res.json(data);
+    } catch (error: any) {
+      res.status(500).json({ error: 'Erro ao consultar status do pagamento.' });
+    }
+  });
+
   // API Route for Barcode Lookup
   apiRouter.get('/barcode-lookup/:code', async (req, res) => {
     try {
