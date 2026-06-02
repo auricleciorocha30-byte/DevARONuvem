@@ -507,6 +507,8 @@ function StoreContext() {
       if (location.pathname.includes('/cozinha')) intervalSec = syncs?.kitchen || 20;
       else if (location.pathname.includes('/tv')) intervalSec = syncs?.tv || 20;
       else if (location.pathname.includes('/atendimento')) intervalSec = syncs?.waitress || 20;
+      else if (location.pathname.includes('/pdv')) intervalSec = syncs?.pos || 20;
+      else if (location.pathname.includes('/entregas')) intervalSec = syncs?.delivery || 20;
       else if (location.pathname === '/' || location.pathname.includes('/pedidos')) intervalSec = syncs?.admin || 20;
       
       const intervalMs = intervalSec * 1000;
