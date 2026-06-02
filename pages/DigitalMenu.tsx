@@ -81,8 +81,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const [activeCategory, setActiveCategory] = useState('Todos');
   const [searchTerm, setSearchTerm] = useState('');
   const [generatedDisplayId, setGeneratedDisplayId] = useState<string | null>(null);
-  const [generatedPix, setGeneratedPix] = useState<{qr_code: string, qr_code_base64: string, id: string} | null>(null);
-  const [isPixApproved, setIsPixApproved] = useState(false);
+  const [generatedPix, setGeneratedPix] = useState<{qr_code: string, qr_code_base64: string} | null>(null);
   
   const [weightProduct, setWeightProduct] = useState<Product | null>(null);
   const [selectedWeightGrams, setSelectedWeightGrams] = useState<string>("");
@@ -130,39 +129,6 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
       return () => clearTimeout(timer);
     }
   }, [checkoutStep, paymentStatus, paymentOrderId]);
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (generatedPix && !isPixApproved && settings?.onlinePaymentAccessToken) {
-      interval = setInterval(async () => {
-        try {
-          const response = await fetch(`/api/mercado-pago/payment-status/${generatedPix.id}?accessToken=${settings.onlinePaymentAccessToken}`);
-          const data = await response.json();
-          if (data.status === 'approved') {
-            setIsPixApproved(true);
-            setVerifiedPaymentStatus('success');
-            setGeneratedPix(null);
-            
-            if (generatedDisplayId) {
-                const matchingOrder = orders.find(o => o.displayId === generatedDisplayId);
-                if (matchingOrder && matchingOrder.id) {
-                    await supabase.from('orders').update({ status: 'PAGO', paymentMethod: 'PIX' }).eq('id', matchingOrder.id);
-                } else {
-                    // Se o sync ainda não trouxe o pedido, tenta buscar direto do banco
-                    const { data: dbOrders } = await supabase.from('orders').select('id').eq('displayId', generatedDisplayId).order('createdAt', { ascending: false }).limit(1);
-                    if (dbOrders && dbOrders.length > 0) {
-                        await supabase.from('orders').update({ status: 'PAGO', paymentMethod: 'PIX' }).eq('id', dbOrders[0].id);
-                    }
-                }
-            }
-          }
-        } catch (error) {
-          console.error("Error polling PIX status:", error);
-        }
-      }, 3000);
-    }
-    return () => clearInterval(interval);
-  }, [generatedPix, isPixApproved, settings?.onlinePaymentAccessToken, generatedDisplayId, orders]);
 
   useEffect(() => {
     if (paymentOrderId) {
@@ -1065,7 +1031,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
              });
              const data = await response.json();
              if (data.qr_code) {
-               setGeneratedPix({ qr_code: data.qr_code, qr_code_base64: data.qr_code_base64, id: data.id });
+               setGeneratedPix({ qr_code: data.qr_code, qr_code_base64: data.qr_code_base64 });
                setCheckoutStep('success'); // Show success component with QR code
              }
           } catch(err) {
@@ -1804,47 +1770,14 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                         <div className="bg-white p-6 rounded-3xl border border-gray-200 text-center space-y-4 shadow-xl">
                            <h4 className="font-bold text-gray-800 text-sm">Pague agora com Pix (Mercado Pago)</h4>
                            <img src={`data:image/jpeg;base64,${generatedPix.qr_code_base64}`} alt="QR Code Pix" className="mx-auto w-48 h-48" />
-                           <div className="bg-purple-50 p-2 rounded-lg border border-purple-100 animate-pulse text-center">
-                              <p className="text-[10px] font-bold text-purple-700">Aguardando confirmação automática...</p>
-                           </div>
                            <div className="bg-gray-50 p-3 rounded-xl">
                               <p className="text-[9px] text-gray-500 break-all select-all font-mono">{generatedPix.qr_code}</p>
                            </div>
                            <button onClick={() => {
                               navigator.clipboard.writeText(generatedPix.qr_code);
                               alert("Código Copia e Cola copiado!");
-                           }} className="w-full py-4 bg-purple-100 text-purple-700 font-bold rounded-xl text-sm flex items-center justify-center gap-2 mb-2">
+                           }} className="w-full py-4 bg-purple-100 text-purple-700 font-bold rounded-xl text-sm mt-2 flex items-center justify-center gap-2">
                               <QrCode size={16}/> Copiar Código Pix
-                           </button>
-                           <button 
-                                onClick={async () => {
-                                    if (!settings?.onlinePaymentAccessToken) return;
-                                    try {
-                                        const resp = await fetch(`/api/mercado-pago/payment-status/${generatedPix.id}?accessToken=${settings.onlinePaymentAccessToken}`);
-                                        const data = await resp.json();
-                                        if (data.status === 'approved') {
-                                            setIsPixApproved(true);
-                                            setVerifiedPaymentStatus('success');
-                                            setGeneratedPix(null);
-                                            if (generatedDisplayId) {
-                                                const matchingOrder = orders.find(o => o.displayId === generatedDisplayId);
-                                                if (matchingOrder && matchingOrder.id) {
-                                                    await supabase.from('orders').update({ status: 'PAGO', paymentMethod: 'PIX' }).eq('id', matchingOrder.id);
-                                                } else {
-                                                    const { data: dbOrders } = await supabase.from('orders').select('id').eq('displayId', generatedDisplayId).order('createdAt', { ascending: false }).limit(1);
-                                                    if (dbOrders && dbOrders.length > 0) {
-                                                        await supabase.from('orders').update({ status: 'PAGO', paymentMethod: 'PIX' }).eq('id', dbOrders[0].id);
-                                                    }
-                                                }
-                                            }
-                                        } else {
-                                            alert("Pagamento ainda não aprovado. Status: " + (data.status || 'pendente'));
-                                        }
-                                    } catch (e) { alert("Erro ao consultar: " + e); }
-                                }}
-                                className="w-full py-2 bg-blue-50 text-blue-700 rounded-lg text-[10px] font-bold border border-blue-100 uppercase"
-                           >
-                                Verificar Pagamento Manualmente
                            </button>
                         </div>
                      )}
