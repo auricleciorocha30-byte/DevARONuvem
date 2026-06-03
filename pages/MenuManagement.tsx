@@ -235,6 +235,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
             isActive: editingProduct.isActive !== false,
             showInMenu: editingProduct.showInMenu !== false,
             featuredDay: (editingProduct.featuredDay === -1 || editingProduct.featuredDay === undefined) ? undefined : Number(editingProduct.featuredDay),
+            featuredDays: editingProduct.featuredDays || [],
             isByWeight: !!editingProduct.isByWeight,
             barcode: editingProduct.barcode || undefined,
             stock: (editingProduct.stock != null && !isNaN(Number(editingProduct.stock))) ? Number(editingProduct.stock) : null,
@@ -449,7 +450,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                   <span className="text-[10px] font-bold uppercase tracking-wider text-orange-600 bg-orange-50 px-2 py-1 rounded">
                     {product.category}
                   </span>
-                  {product.featuredDay !== null && product.featuredDay !== undefined && product.featuredDay !== -1 && <Star size={14} className="text-yellow-500 fill-current" />}
+                  {((product.featuredDay !== null && product.featuredDay !== undefined && product.featuredDay !== -1) || (product.featuredDays && product.featuredDays.length > 0)) && <Star size={14} className="text-yellow-500 fill-current" />}
               </div>
               <h3 className="font-bold text-sm text-gray-800 mt-2">{product.name}</h3>
               <p className="text-xs text-gray-400 line-clamp-1 mb-1">{product.description}</p>
@@ -683,15 +684,40 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
               </div>
 
               <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Oferta do Dia (Exibir em Destaque)</label>
-                  <select 
-                    value={editingProduct?.featuredDay ?? -1} 
-                    onChange={(e) => setEditingProduct({...editingProduct, featuredDay: parseInt(e.target.value)})} 
-                    className="w-full p-2 border border-gray-200 rounded-lg bg-white outline-none"
-                  >
-                      <option value="-1">Nenhum dia</option>
-                      {days.map((day) => <option key={day.id} value={day.id}>{day.name}</option>)}
-                  </select>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Dias em Destaque (Exibir em Ofertas)</label>
+                  <div className="flex flex-wrap gap-2">
+                    {days.map((day) => {
+                      const isActive = editingProduct?.featuredDays?.includes(day.id) || editingProduct?.featuredDay === day.id;
+                      return (
+                        <button
+                          key={day.id}
+                          type="button"
+                          onClick={() => {
+                            let newDays = editingProduct?.featuredDays ? [...editingProduct.featuredDays] : [];
+                            
+                            // If it was the old featuredDay, migrate it
+                            if (editingProduct?.featuredDay === day.id && !newDays.includes(day.id)) {
+                                newDays.push(day.id);
+                            }
+
+                            if (newDays.includes(day.id)) {
+                              newDays = newDays.filter(d => d !== day.id);
+                            } else {
+                              newDays.push(day.id);
+                            }
+                            setEditingProduct({...editingProduct, featuredDays: newDays, featuredDay: -1});
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${
+                            isActive 
+                            ? 'bg-orange-500 text-white border-orange-600 shadow-sm' 
+                            : 'bg-white text-gray-500 border-gray-100 hover:border-gray-200'
+                          }`}
+                        >
+                          {day.name}
+                        </button>
+                      )
+                    })}
+                  </div>
               </div>
 
               <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-100 space-y-4">

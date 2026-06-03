@@ -21,31 +21,38 @@ const WeeklyOffers: React.FC<Props> = ({ products, saveProduct }) => {
     { id: 6, name: "Sábado" },
   ];
 
-  const getProductForDay = (dayId: number) => {
-    return products.find(p => p.featuredDay === dayId);
+  const getProductsForDay = (dayId: number) => {
+    return products.filter(p => p.featuredDays?.includes(dayId) || p.featuredDay === dayId);
   };
 
   const handleSetOffer = async (productId: string, dayId: number) => {
-    // 1. Remove existing offer for this day if any
-    const existing = getProductForDay(dayId);
-    if (existing) {
-        await saveProduct({ ...existing, featuredDay: undefined });
-    }
-
-    // 2. Set new offer
     const product = products.find(p => p.id === productId);
     if (product) {
-        // Also remove this product from any OTHER day it might be assigned to
-        await saveProduct({ ...product, featuredDay: dayId });
+        let newDays = product.featuredDays ? [...product.featuredDays] : [];
+        // Migrate old featuredDay if it exists
+        if (product.featuredDay !== undefined && product.featuredDay !== -1 && !newDays.includes(product.featuredDay)) {
+            newDays.push(product.featuredDay);
+        }
+
+        if (!newDays.includes(dayId)) {
+            newDays.push(dayId);
+        }
+        await saveProduct({ ...product, featuredDays: newDays, featuredDay: -1 });
     }
     
     setSelectedDay(null);
   };
 
-  const removeOffer = async (dayId: number) => {
-    const product = getProductForDay(dayId);
+  const removeOffer = async (productId: string, dayId: number) => {
+    const product = products.find(p => p.id === productId);
     if (product) {
-        await saveProduct({ ...product, featuredDay: undefined });
+        let newDays = product.featuredDays ? product.featuredDays.filter(d => d !== dayId) : [];
+        if (product.featuredDay === dayId) {
+            // If it was the old featuredDay, just clear it
+            await saveProduct({ ...product, featuredDay: -1, featuredDays: newDays });
+        } else {
+            await saveProduct({ ...product, featuredDays: newDays });
+        }
     }
   };
 
@@ -63,38 +70,42 @@ const WeeklyOffers: React.FC<Props> = ({ products, saveProduct }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {days.map((day) => {
-          const product = getProductForDay(day.id);
+          const dayProducts = getProductsForDay(day.id);
           return (
-            <div key={day.id} className={`bg-white rounded-[2.5rem] p-6 shadow-sm border transition-all ${product ? 'border-orange-200 bg-orange-50/20' : 'border-gray-100'}`}>
+            <div key={day.id} className={`bg-white rounded-[2.5rem] p-6 shadow-sm border transition-all ${dayProducts.length > 0 ? 'border-orange-200 bg-orange-50/20' : 'border-gray-100'}`}>
               <h3 className="text-lg font-bold text-gray-800 mb-4">{day.name}</h3>
               
-              {product ? (
-                <div className="space-y-4">
-                  <div className="relative aspect-video rounded-2xl overflow-hidden shadow-md">
-                    <img src={product.imageUrl || undefined} alt={product.name} className="w-full h-full object-cover" />
-                    <div className="absolute top-2 right-2 p-2 bg-yellow-400 rounded-full text-white shadow-lg">
-                      <Star size={16} fill="currentColor" />
+              {dayProducts.length > 0 ? (
+                <div className="space-y-6">
+                  {dayProducts.map(product => (
+                    <div key={product.id} className="space-y-4 border-b border-orange-100 pb-4 last:border-0 last:pb-0">
+                      <div className="relative aspect-video rounded-2xl overflow-hidden shadow-md">
+                        <img src={product.imageUrl || undefined} alt={product.name} className="w-full h-full object-cover" />
+                        <div className="absolute top-2 right-2 p-2 bg-yellow-400 rounded-full text-white shadow-lg">
+                          <Star size={16} fill="currentColor" />
+                        </div>
+                      </div>
+                      <div>
+                        <p className="font-bold text-gray-900 truncate">{product.name}</p>
+                        <p className="text-xs text-gray-500">{product.category}</p>
+                        {product.price > 0 && <p className="text-sm font-bold text-orange-600 mt-1">R$ {product.price.toFixed(2)}</p>}
+                      </div>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => removeOffer(product.id, day.id)}
+                          className="flex-1 py-2 bg-red-50 text-red-500 rounded-xl text-xs font-bold hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
+                        >
+                          <X size={16} /> Remover
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <p className="font-bold text-gray-900 truncate">{product.name}</p>
-                    <p className="text-xs text-gray-500">{product.category}</p>
-                    {product.price > 0 && <p className="text-sm font-bold text-orange-600 mt-1">R$ {product.price.toFixed(2)}</p>}
-                  </div>
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={() => setSelectedDay(day.id)}
-                      className="flex-1 py-2 bg-gray-100 text-gray-600 rounded-xl text-xs font-bold hover:bg-gray-200 transition-colors"
-                    >
-                      Alterar
-                    </button>
-                    <button 
-                      onClick={() => removeOffer(day.id)}
-                      className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
-                    >
-                      <X size={20} />
-                    </button>
-                  </div>
+                  ))}
+                  <button 
+                    onClick={() => setSelectedDay(day.id)}
+                    className="w-full py-3 border-2 border-dashed border-orange-200 rounded-xl flex items-center justify-center gap-2 text-orange-400 hover:bg-orange-50 text-xs font-bold uppercase tracking-widest transition-all"
+                  >
+                    <Plus size={18} /> Adicionar mais um
+                  </button>
                 </div>
               ) : (
                 <button 

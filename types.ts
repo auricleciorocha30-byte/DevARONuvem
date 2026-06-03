@@ -1,5 +1,5 @@
 
-export type OrderStatus = 'AGUARDANDO' | 'AGUARDANDO_PAGAMENTO' | 'PAGO' | 'PREPARANDO' | 'PRONTO' | 'ENVIADO_PARA_ENTREGA' | 'CHEGUEI_NA_ORIGEM' | 'SAIU_PARA_ENTREGA' | 'ENTREGUE' | 'CANCELADO';
+export type OrderStatus = 'AGUARDANDO' | 'AGUARDANDO_PAGAMENTO' | 'PAGO' | 'PENDENTE' | 'PREPARANDO' | 'PRONTO' | 'ENVIADO_PARA_ENTREGA' | 'CHEGUEI_NA_ORIGEM' | 'SAIU_PARA_ENTREGA' | 'ENTREGUE' | 'CANCELADO';
 export type OrderType = 'MESA' | 'BALCAO' | 'ENTREGA' | 'COMANDA';
 export type PaymentMethod = 'PIX' | 'CARTAO' | 'DINHEIRO' | 'DEBITO' | 'VALES' | 'CASHBACK' | 'MISTO' | 'A_PAGAR' | 'ONLINE' | 'MAQUININHA';
 
@@ -61,6 +61,7 @@ export interface Product {
   isActive: boolean;
   showInMenu?: boolean;
   featuredDay?: number;
+  featuredDays?: number[];
   isByWeight?: boolean;
   store_id?: string;
   barcode?: string;

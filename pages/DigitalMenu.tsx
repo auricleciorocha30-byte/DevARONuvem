@@ -521,7 +521,10 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   
   const featuredProducts = useMemo(() => {
     const today = new Date().getDay();
-    return products.filter(p => p.featuredDay === today && p.isActive && p.showInMenu !== false);
+    return products.filter(p => {
+      const isFeatured = p.featuredDays?.includes(today) || p.featuredDay === today;
+      return isFeatured && p.isActive && p.showInMenu !== false;
+    });
   }, [products]);
 
   const filteredProducts = useMemo(() => {
