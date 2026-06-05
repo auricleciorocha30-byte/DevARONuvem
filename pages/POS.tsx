@@ -131,6 +131,7 @@ export default function POS({ storeId, user, settings, orders, onLogout, updateS
   const [generatedPix, setGeneratedPix] = useState<{ qr_code: string; qr_code_base64: string; id: string } | null>(null);
   const [isGeneratingPix, setIsGeneratingPix] = useState(false);
   const [isPixApproved, setIsPixApproved] = useState(false);
+  const [isPixCopied, setIsPixCopied] = useState(false);
   const [loadedCommandIds, setLoadedCommandIds] = useState<string[]>(() => {
     const saved = localStorage.getItem(`pos-loadedCommandIds-${storeId}`);
     return saved ? JSON.parse(saved) : [];
@@ -3879,11 +3880,16 @@ export default function POS({ storeId, user, settings, orders, onLogout, updateS
                                 <button 
                                     onClick={() => {
                                         navigator.clipboard.writeText(generatedPix.qr_code);
-                                        alert("Código PIX Copia e Cola copiado!");
+                                        setIsPixCopied(true);
+                                        setTimeout(() => setIsPixCopied(false), 3000);
                                     }}
-                                    className="text-xs font-bold text-blue-600 underline"
+                                    className="text-xs font-bold text-blue-600 underline flex items-center justify-center gap-1 mx-auto transition-all"
                                 >
-                                    Copiar Código PIX
+                                    {isPixCopied ? (
+                                        <><CheckCircle2 size={14}/> Copiado!</>
+                                    ) : (
+                                        <>Copiar Código PIX</>
+                                    )}
                                 </button>
                             </div>
                           ) : settings.pixQrCodeUrl ? (

@@ -83,6 +83,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const [searchTerm, setSearchTerm] = useState('');
   const [generatedDisplayId, setGeneratedDisplayId] = useState<string | null>(null);
   const [generatedPix, setGeneratedPix] = useState<{qr_code: string, qr_code_base64: string} | null>(null);
+  const [isPixCopied, setIsPixCopied] = useState(false);
   
   const [weightProduct, setWeightProduct] = useState<Product | null>(null);
   const [selectedWeightGrams, setSelectedWeightGrams] = useState<string>("");
@@ -1799,9 +1800,10 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                            </div>
                            <button onClick={() => {
                               navigator.clipboard.writeText(generatedPix.qr_code);
-                              alert("Código Copia e Cola copiado!");
-                           }} className="w-full py-4 bg-purple-100 text-purple-700 font-bold rounded-xl text-sm mt-2 flex items-center justify-center gap-2">
-                              <QrCode size={16}/> Copiar Código Pix
+                              setIsPixCopied(true);
+                              setTimeout(() => setIsPixCopied(false), 3000);
+                           }} className="w-full py-4 bg-purple-100 text-purple-700 font-bold rounded-xl text-sm mt-2 flex items-center justify-center gap-2 transition-all">
+                              {isPixCopied ? <><Check size={16}/> Copiado!</> : <><QrCode size={16}/> Copiar Código Pix</>}
                            </button>
                         </div>
                      )}
