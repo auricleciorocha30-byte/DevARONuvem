@@ -692,20 +692,24 @@ function StoreContext() {
           let updatePayload: any = { status, stockDeducted: 1 };
           
           if ((status === 'ENTREGUE') && !id.startsWith('local_')) {
-              let hasOpenSession = false;
               if (currentStore?.id) {
                   const { data: openSessions } = await supabase
                       .from('register_sessions')
-                      .select('id')
+                      .select('id, waitstaff_id')
                       .eq('store_id', currentStore.id)
                       .eq('status', 'OPEN')
-                      .gte('opened_at', Date.now() - 16 * 60 * 60 * 1000)
-                      .limit(1);
-                  hasOpenSession = openSessions && openSessions.length > 0;
-              }
+                      .gte('opened_at', Date.now() - 16 * 60 * 60 * 1000);
                   
-              if (!hasOpenSession) {
-                  updatePayload.session_id = 'FECHADO';
+                  if (openSessions && openSessions.length > 0) {
+                      const userSession = openSessions.find(s => s.waitstaff_id === adminUser?.id);
+                      if (userSession) {
+                          updatePayload.session_id = userSession.id;
+                      } else {
+                          updatePayload.session_id = openSessions[0].id;
+                      }
+                  } else {
+                      updatePayload.session_id = 'FECHADO';
+                  }
               }
           }
 
@@ -765,22 +769,27 @@ function StoreContext() {
           let updatePayload: any = { status };
           
           if ((status === 'ENTREGUE') && !id.startsWith('local_')) {
-              // Check if there's an open POS session
-              let hasOpenSession = false;
               if (currentStore?.id) {
                   const { data: openSessions } = await supabase
                       .from('register_sessions')
-                      .select('id')
+                      .select('id, waitstaff_id')
                       .eq('store_id', currentStore.id)
                       .eq('status', 'OPEN')
-                      .gte('opened_at', Date.now() - 16 * 60 * 60 * 1000)
-                      .limit(1);
-                  hasOpenSession = openSessions && openSessions.length > 0;
-              }
+                      .gte('opened_at', Date.now() - 16 * 60 * 60 * 1000);
                   
-              if (!hasOpenSession) {
-                  // No open session. Set session_id to 'FECHADO' so it doesn't show as pending in POS.
-                  updatePayload.session_id = 'FECHADO';
+                  if (openSessions && openSessions.length > 0) {
+                      // Try to match the current user's session first
+                      const userSession = openSessions.find(s => s.waitstaff_id === adminUser?.id);
+                      if (userSession) {
+                          updatePayload.session_id = userSession.id;
+                      } else {
+                          // Otherwise pick the first available open session
+                          updatePayload.session_id = openSessions[0].id;
+                      }
+                  } else {
+                      // No open session. Set session_id to 'FECHADO' so it doesn't show as pending in POS.
+                      updatePayload.session_id = 'FECHADO';
+                  }
               }
           }
 
