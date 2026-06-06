@@ -55,6 +55,7 @@ interface Props {
   settings: StoreSettings;
   orders: Order[];
   addOrder: (order: Order) => Promise<void | boolean>;
+  updateOrder?: (id: string, updates: Partial<Order>) => Promise<boolean | void>;
   tableNumber: string | null;
   onLogout: () => void;
   onCloseMenu?: () => void;
@@ -63,7 +64,7 @@ interface Props {
   refreshEcosystemUsage?: () => Promise<void>;
 }
 
-const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalCategories, settings, addOrder, tableNumber: initialTable, onLogout, onCloseMenu, isWaitstaff: initialIsWaitstaff = false, ecosystemUsage, refreshEcosystemUsage }) => {
+const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalCategories, settings, orders, addOrder, updateOrder, tableNumber: initialTable, onLogout, onCloseMenu, isWaitstaff: initialIsWaitstaff = false, ecosystemUsage, refreshEcosystemUsage }) => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const urlTable = searchParams.get('mesa');
@@ -999,37 +1000,74 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
             }
         }
 
-        const finalOrder: Order = {
-          id: Date.now().toString(), 
-          displayId: displayId,
-          type: orderType, 
-          items: cart, 
-          status: (payment === 'ONLINE' || combinedPayment === 'ONLINE') ? 'AGUARDANDO_PAGAMENTO' : 'AGUARDANDO', 
-          total: finalTotal, 
-          serviceFee: serviceFee,
-          createdAt: Date.now(), 
-          paymentMethod: paymentDetailsArray.length > 1 ? 'MISTO' : (paymentDetailsArray.length === 1 ? paymentDetailsArray[0].method : undefined),
-          paymentDetails: paymentDetailsArray.length > 0 ? JSON.stringify(paymentDetailsArray) : undefined,
-          changeFor: orderChangeFor,
-          notes: notes.trim() || undefined, 
-          tableNumber: (orderType === 'MESA' || orderType === 'COMANDA') ? manualTable : undefined,
-          customerName: customerName.trim() || (isWaitstaff ? `Atend: ${activeWaitstaff?.name}` : undefined), 
-          customerPhone: customerPhone.trim() || undefined,
-          customerId: finalCustomerId || undefined,
-          deliveryAddress: orderType === 'ENTREGA' ? deliveryAddress.trim() : undefined,
-          referencePoint: orderType === 'ENTREGA' ? referencePoint.trim() : undefined,
-          deliveryFee: orderType === 'ENTREGA' && deliveryFee !== null ? deliveryFee : undefined,
-          waitstaffName: activeWaitstaff?.name || undefined,
-          couponApplied: undefined,
-          discountAmount: undefined,
-          stockDeducted: true
-        };
+        const isOnlinePayment = payment === 'ONLINE' || combinedPayment === 'ONLINE';
+        const newStatus = isOnlinePayment ? 'AGUARDANDO_PAGAMENTO' : 'AGUARDANDO';
 
-        const success = await addOrder(finalOrder); 
-        if (success === false) {
-           return;
+        let existingOrderToMerge: Order | undefined = undefined;
+
+        if (isOnlinePayment && orders) {
+           existingOrderToMerge = orders.find(o => 
+              o.status === 'AGUARDANDO_PAGAMENTO' && 
+              o.type === orderType && 
+              o.paymentMethod === 'ONLINE' &&
+              ((orderType === 'MESA' || orderType === 'COMANDA') ? o.tableNumber === manualTable : o.customerPhone === customerPhone.trim())
+           );
         }
-        setGeneratedDisplayId(displayId);
+
+        let submittedDisplayId = displayId;
+
+        let generatedOrderData: any = {};
+
+        if (existingOrderToMerge && updateOrder) {
+           // Merge items
+           const mergedItems = [...(typeof existingOrderToMerge.items === 'string' ? JSON.parse(existingOrderToMerge.items) : existingOrderToMerge.items), ...cart];
+           const mergedTotal = existingOrderToMerge.total + finalTotal;
+           
+           const success = await updateOrder(existingOrderToMerge.id, {
+               items: mergedItems,
+               total: mergedTotal
+           });
+           
+           if (success === false) return;
+           submittedDisplayId = existingOrderToMerge.displayId;
+           setCurrentOrderId(existingOrderToMerge.id);
+           generatedOrderData = { ...existingOrderToMerge, items: mergedItems, total: mergedTotal };
+        } else {
+            const finalOrder: Order = {
+              id: Date.now().toString(), 
+              displayId: displayId,
+              type: orderType, 
+              items: cart, 
+              status: newStatus, 
+              total: finalTotal, 
+              serviceFee: serviceFee,
+              createdAt: Date.now(), 
+              paymentMethod: paymentDetailsArray.length > 1 ? 'MISTO' : (paymentDetailsArray.length === 1 ? paymentDetailsArray[0].method : undefined),
+              paymentDetails: paymentDetailsArray.length > 0 ? JSON.stringify(paymentDetailsArray) : undefined,
+              changeFor: orderChangeFor,
+              notes: notes.trim() || undefined, 
+              tableNumber: (orderType === 'MESA' || orderType === 'COMANDA') ? manualTable : undefined,
+              customerName: customerName.trim() || (isWaitstaff ? `Atend: ${activeWaitstaff?.name}` : undefined), 
+              customerPhone: customerPhone.trim() || undefined,
+              customerId: finalCustomerId || undefined,
+              deliveryAddress: orderType === 'ENTREGA' ? deliveryAddress.trim() : undefined,
+              referencePoint: orderType === 'ENTREGA' ? referencePoint.trim() : undefined,
+              deliveryFee: orderType === 'ENTREGA' && deliveryFee !== null ? deliveryFee : undefined,
+              waitstaffName: activeWaitstaff?.name || undefined,
+              couponApplied: undefined,
+              discountAmount: undefined,
+              stockDeducted: true
+            };
+
+            const success = await addOrder(finalOrder); 
+            if (success === false) {
+               return;
+            }
+            setCurrentOrderId(finalOrder.id);
+            generatedOrderData = finalOrder;
+        }
+
+        setGeneratedDisplayId(submittedDisplayId);
         setCart([]); 
         setCustomerName('');
         setCustomerPhone('');
@@ -1048,14 +1086,14 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                headers: { 'Content-Type': 'application/json' },
                body: JSON.stringify({
                  accessToken: settings.onlinePaymentAccessToken,
-                 orderData: finalOrder,
+                 orderData: generatedOrderData,
                  storeSlug: settings.slug || storeSlug,
                })
              });
              const data = await response.json();
-             if (data.qr_code) {
+              if (data.qr_code) {
                setGeneratedPix({ qr_code: data.qr_code, qr_code_base64: data.qr_code_base64 });
-               setCurrentOrderId(finalOrder.id);
+               setCurrentOrderId(generatedOrderData.id);
                setVerifiedPaymentStatus('pending');
                setCheckoutStep('success'); // Show success component with QR code
              }
@@ -1072,7 +1110,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 accessToken: settings.onlinePaymentAccessToken,
-                orderData: finalOrder,
+                orderData: generatedOrderData,
                 storeUrl: redirectStoreUrl,
                 storeSlug: settings.slug || storeSlug,
               })
@@ -1099,7 +1137,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
               body: JSON.stringify({
                 token: settings.onlinePaymentAccessToken,
                 environment: settings.pagbankEnvironment || 'sandbox',
-                orderData: finalOrder,
+                orderData: generatedOrderData,
                 storeUrl: redirectStoreUrl,
                 storeSlug: settings.slug || storeSlug,
                 storeId: storeId

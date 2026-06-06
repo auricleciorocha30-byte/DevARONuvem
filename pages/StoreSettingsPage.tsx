@@ -296,12 +296,27 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
 
             <div className="w-full mt-6 space-y-3 pt-6 border-t border-gray-100">
                 <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest text-center mb-2">Módulos do Sistema</p>
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                    <div className="flex items-center gap-2">
-                        <Utensils size={16} className="text-orange-500" />
-                        <span className="text-xs font-bold text-gray-600">Módulo Mesas</span>
+                <div className="flex flex-col gap-2 p-3 bg-gray-50 rounded-xl">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Utensils size={16} className="text-orange-500" />
+                            <span className="text-xs font-bold text-gray-600">Módulo Mesas</span>
+                        </div>
+                        <Switch checked={localSettings.isTableOrderActive} onChange={(v) => setLocalSettings({...localSettings, isTableOrderActive: v})} />
                     </div>
-                    <Switch checked={localSettings.isTableOrderActive} onChange={(v) => setLocalSettings({...localSettings, isTableOrderActive: v})} />
+                    {localSettings.isTableOrderActive && (
+                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-200">
+                            <span className="text-xs text-gray-500">Quantidade de Mesas</span>
+                            <input
+                                type="number"
+                                min="1"
+                                max="1000"
+                                value={localSettings.tableCount || 30}
+                                onChange={(e) => setLocalSettings({...localSettings, tableCount: Number(e.target.value)})}
+                                className="w-20 px-3 py-1 bg-white border border-gray-200 rounded-lg text-xs font-bold text-center outline-none focus:border-orange-500"
+                            />
+                        </div>
+                    )}
                 </div>
                 <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
                     <div className="flex items-center gap-2">

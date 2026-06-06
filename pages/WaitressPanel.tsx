@@ -38,7 +38,7 @@ const WaitressPanel: React.FC<Props> = ({ onSelectTable, orders, settings }) => 
   const [activeTab, setActiveTab] = useState<'MAPA' | 'PEDIDOS'>('MAPA');
   const [printOrder, setPrintOrder] = useState<any | null>(null);
   
-  const tables = Array.from({ length: 12 }, (_, i) => (i + 1).toString());
+  const tables = Array.from({ length: settings?.tableCount || 30 }, (_, i) => (i + 1).toString());
 
   useEffect(() => {
     const saved = localStorage.getItem('vovo-guta-waitstaff');

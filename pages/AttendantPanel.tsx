@@ -46,7 +46,7 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
   const [currentSession, setCurrentSession] = useState<any | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   
-  const tables = Array.from({ length: 12 }, (_, i) => (i + 1).toString());
+  const tables = Array.from({ length: settings.tableCount || 30 }, (_, i) => (i + 1).toString());
 
   useEffect(() => {
     if (adminUser) {

@@ -184,6 +184,8 @@ export interface StoreSettings {
   logoUrl: string;
   primaryColor: string;
   secondaryColor: string;
+  tableCount?: number;
+  commandCount?: number;
   canWaitstaffFinishOrder: boolean;
   canWaitstaffCancelItems: boolean;
   thermalPrinterWidth: '80mm' | '58mm';

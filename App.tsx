@@ -889,7 +889,7 @@ function StoreContext() {
           <Navigate to={loginRedirect} replace />
         )
       } />
-      <Route path="/cardapio/*" element={<DigitalMenu storeId={currentStore?.id} products={products} categories={categories} settings={settings} orders={orders} addOrder={addOrder} tableNumber={activeTable} onLogout={() => setActiveTable(null)} isWaitstaff={!!adminUser} ecosystemUsage={ecosystemUsage} refreshEcosystemUsage={loadEcosystemUsage} />} />
+      <Route path="/cardapio/*" element={<DigitalMenu storeId={currentStore?.id} products={products} categories={categories} settings={settings} orders={orders} addOrder={addOrder} updateOrder={updateOrder} tableNumber={activeTable} onLogout={() => setActiveTable(null)} isWaitstaff={!!adminUser} ecosystemUsage={ecosystemUsage} refreshEcosystemUsage={loadEcosystemUsage} />} />
       <Route path="/master" element={<SuperAdminPanel />} />
       <Route path="/login" element={<LoginPage onLoginSuccess={handleSetUser} />} />
 
