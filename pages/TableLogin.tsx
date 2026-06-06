@@ -3,11 +3,14 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Hash, ChevronRight, AlertCircle, Check, Utensils } from 'lucide-react';
 
+import { StoreSettings } from '../types';
+
 interface Props {
   onLogin: (table: string) => void;
+  settings: StoreSettings;
 }
 
-const TableLogin: React.FC<Props> = ({ onLogin }) => {
+const TableLogin: React.FC<Props> = ({ onLogin, settings }) => {
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const navigate = useNavigate();
 
@@ -18,7 +21,7 @@ const TableLogin: React.FC<Props> = ({ onLogin }) => {
     navigate('/cardapio');
   };
 
-  const tables = Array.from({ length: 12 }, (_, i) => (i + 1).toString());
+  const tables = Array.from({ length: settings.tableCount || 30 }, (_, i) => (i + 1).toString());
 
   return (
     <div className="min-h-screen bg-[#3d251e] flex items-center justify-center p-6">

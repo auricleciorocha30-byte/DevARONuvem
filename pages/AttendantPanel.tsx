@@ -20,7 +20,8 @@ import {
   Tag,
   MoreVertical,
   MessageCircle,
-  WifiOff
+  WifiOff,
+  QrCode
 } from 'lucide-react';
 import { Order, OrderStatus, Waitstaff, StoreSettings } from '../types';
 import { supabase } from '../lib/supabase';
@@ -45,6 +46,10 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const [currentSession, setCurrentSession] = useState<any | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [generatedPix, setGeneratedPix] = useState<{ qr_code: string; qr_code_base64: string; id: string, amount: number, tableNum: string } | null>(null);
+  const [isGeneratingPix, setIsGeneratingPix] = useState(false);
+  const [isPixCopied, setIsPixCopied] = useState(false);
+  const [isPixApproved, setIsPixApproved] = useState(false);
   
   const tables = Array.from({ length: settings.tableCount || 30 }, (_, i) => (i + 1).toString());
 
@@ -223,6 +228,72 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
         setIsUpdating(null);
     }
   };
+
+  const generatePixForTable = async (tableNum: string, type: 'MESA' | 'COMANDA') => {
+    const totalAmount = ((type === 'MESA' ? occupiedTables.get(tableNum) : activeCommands.get(tableNum))?.total ?? 0);
+    if (totalAmount <= 0) return;
+    
+    setIsGeneratingPix(true);
+    setIsPixApproved(false);
+    try {
+      const orderData = {
+        id: `MESA_${tableNum}_PIX_${Date.now()}`,
+        displayId: `M${tableNum}`,
+        total: totalAmount,
+        type: type,
+        customerName: `MESA ${tableNum}`,
+        items: []
+      };
+      
+      const response = await fetch('/api/mercado-pago/create-pix', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accessToken: settings.onlinePaymentAccessToken,
+          orderData: orderData,
+          storeSlug: searchParams.get('loja') || '',
+        })
+      });
+      const data = await response.json();
+      if (data.qr_code) {
+        setGeneratedPix({ qr_code: data.qr_code, qr_code_base64: data.qr_code_base64, id: data.id, amount: totalAmount, tableNum });
+      } else {
+        alert('Erro ao gerar PIX.');
+      }
+    } catch(err) {
+      console.error(err);
+      alert('Erro ao gerar PIX.');
+    } finally {
+      setIsGeneratingPix(false);
+    }
+  };
+
+  useEffect(() => {
+    let intervalId: number;
+    
+    if (generatedPix && !isPixApproved && settings.onlinePaymentAccessToken) {
+      intervalId = window.setInterval(async () => {
+        try {
+          const response = await fetch(`/api/mercado-pago/payment-status/${generatedPix.id}?accessToken=${settings.onlinePaymentAccessToken}`);
+          const data = await response.json();
+          if (data.status === 'approved') {
+            setIsPixApproved(true);
+            alert("Pagamento PIX Confirmado com Sucesso!");
+            // Se confirmado, vamos finalizar os pedidos automaticamente
+            if (activeOrders.length > 0) {
+               updateTableOrders(generatedPix.tableNum, 'ENTREGUE');
+            }
+          }
+        } catch (error) {
+          console.error("Error polling PIX status:", error);
+        }
+      }, 5000);
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [generatedPix, isPixApproved, settings.onlinePaymentAccessToken, activeOrders]);
 
   const handleGroupStatusUpdate = async (ids: string[], status: OrderStatus) => {
     setIsUpdating(ids[0]);
@@ -611,10 +682,42 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
                 <Printer className="text-gray-400" size={20} /> Imprimir Conferência
               </button>
 
+              {settings.isOnlinePaymentActive && settings.onlinePaymentProvider === 'mercado_pago' && settings.onlinePaymentAccessToken && (
+                generatedPix?.tableNum === selectedTableModal.id ? (
+                    <div className="bg-white p-6 rounded-3xl border border-gray-200 text-center space-y-4 shadow-xl mb-4">
+                       <h4 className="font-bold text-gray-800 text-sm">Escaneie para Pagar</h4>
+                       <img src={`data:image/jpeg;base64,${generatedPix.qr_code_base64}`} alt="QR Code Pix" className="mx-auto w-48 h-48" />
+                       <div className="bg-gray-50 p-3 rounded-xl">
+                          <p className="text-[9px] text-gray-500 break-all select-all font-mono">{generatedPix.qr_code}</p>
+                       </div>
+                       <div className="flex gap-2">
+                           <button onClick={() => {
+                              navigator.clipboard.writeText(generatedPix.qr_code);
+                              setIsPixCopied(true);
+                              setTimeout(() => setIsPixCopied(false), 3000);
+                           }} className="flex-1 py-3 bg-purple-100 text-purple-700 font-bold rounded-xl text-xs transition-all">
+                              {isPixCopied ? 'Copiado!' : 'Copiar Pix'}
+                           </button>
+                           <button onClick={() => setGeneratedPix(null)} className="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl text-xs transition-all">
+                              Fechar
+                           </button>
+                       </div>
+                    </div>
+                ) : (
+                  <button 
+                    disabled={isGeneratingPix}
+                    onClick={() => generatePixForTable(selectedTableModal.id, selectedTableModal.type)} 
+                    className="w-full flex items-center gap-4 p-5 bg-purple-50 rounded-2xl border border-purple-100 font-black text-[11px] uppercase tracking-wider text-purple-700 hover:bg-purple-100 transition-all active:scale-95 disabled:opacity-50"
+                  >
+                    {isGeneratingPix ? <Loader2 className="animate-spin text-purple-400" size={20} /> : <QrCode className="text-purple-500" size={20} />} Gerar QR Code PIX
+                  </button>
+                )
+              )}
+
               <button 
-                disabled={isUpdating === `table-${selectedTableModal.id}`}
+                disabled={isUpdating === `table-${selectedTableModal.id}` || isGeneratingPix}
                 onClick={() => updateTableOrders(selectedTableModal.id, 'PRONTO', selectedTableModal.type)} 
-                className="w-full flex items-center gap-4 p-5 bg-blue-50 rounded-2xl border border-blue-100 font-black text-[11px] uppercase tracking-wider text-blue-700 hover:bg-blue-100 transition-all active:scale-95"
+                className="w-full flex items-center gap-4 p-5 bg-blue-50 rounded-2xl border border-blue-100 font-black text-[11px] uppercase tracking-wider text-blue-700 hover:bg-blue-100 transition-all active:scale-95 disabled:opacity-50"
               >
                 {isUpdating === `table-${selectedTableModal.id}` ? <Loader2 className="animate-spin" size={20} /> : <CheckCircle2 className="text-blue-500" size={20} />} Marcar Tudo Pronto
               </button>

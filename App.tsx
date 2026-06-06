@@ -1017,7 +1017,7 @@ function AdminLayout({ settings, onLogout }: { settings: StoreSettings, onLogout
   ];
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-gray-50 pb-20 md:pb-0 text-zinc-900">
+    <div className="flex flex-col md:flex-row h-screen overflow-hidden bg-gray-50 text-zinc-900 pb-20 md:pb-0">
       {/* Mobile Header */}
       <header className="md:hidden bg-primary text-white p-4 flex items-center justify-between sticky top-0 z-50 shadow-md no-print">
         <div className="flex items-center gap-3">
@@ -1050,7 +1050,7 @@ function AdminLayout({ settings, onLogout }: { settings: StoreSettings, onLogout
         </nav>
         <div className="p-4 border-t border-white/10"><button onClick={onLogout} className="w-full flex items-center gap-3 p-3 text-red-400 font-bold"><LogOut size={18} /> Sair</button></div>
       </aside>
-      <main className="flex-1 overflow-auto md:p-8 p-4 bg-gray-50"><Outlet /></main>
+      <main className="flex-1 overflow-y-auto overflow-x-hidden md:p-8 p-4 bg-gray-50"><Outlet /></main>
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t h-20 md:hidden flex items-center overflow-x-auto no-scrollbar z-50 no-print px-2">
         {menuItems.map(item => (
           <Link key={item.to} to={item.to} className={`flex flex-col items-center justify-center gap-1 flex-shrink-0 min-w-[72px] h-full ${location.pathname + location.search === item.to ? 'text-secondary' : 'text-gray-400'}`}>

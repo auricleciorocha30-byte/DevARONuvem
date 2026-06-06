@@ -1009,7 +1009,6 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
            existingOrderToMerge = orders.find(o => 
               o.status === 'AGUARDANDO_PAGAMENTO' && 
               o.type === orderType && 
-              o.paymentMethod === 'ONLINE' &&
               ((orderType === 'MESA' || orderType === 'COMANDA') ? o.tableNumber === manualTable : o.customerPhone === customerPhone.trim())
            );
         }
