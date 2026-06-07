@@ -3,6 +3,20 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Order, OrderStatus } from '../types';
 import { ChefHat, Clock, Utensils, ShoppingBag, Truck, CheckCircle, Hash, DollarSign, MapPin, Scale } from 'lucide-react';
 
+const getComboItems = (comboItems: any): any[] => {
+  if (!comboItems) return [];
+  if (Array.isArray(comboItems)) return comboItems;
+  if (typeof comboItems === 'string') {
+    try {
+      return JSON.parse(comboItems);
+    } catch (e) {
+      console.warn("Error parsing comboItems:", e);
+      return [];
+    }
+  }
+  return [];
+};
+
 interface Props {
   orders: Order[];
   updateStatus: (id: string, status: OrderStatus) => Promise<void>;
@@ -163,6 +177,17 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onReady, elapsed }) => {
             <div className="flex-1">
                 <p className="text-zinc-800 font-bold text-lg leading-tight">{item.name}</p>
                 {item.description && <p className="text-xs text-zinc-500 italic mt-0.5">{item.description}</p>}
+                {item.isCombo && getComboItems(item.comboItems).length > 0 && (
+                   <div className="mt-1.5 space-y-0.5">
+                     {getComboItems(item.comboItems).map((comp: any, idx: number) => (
+                        <div key={idx} className="inline-block mr-2 mb-1">
+                          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 font-bold px-2 py-0.5 rounded-md">
+                             ★ {comp.quantity * item.quantity}x {comp.name}
+                          </p>
+                        </div>
+                     ))}
+                   </div>
+                )}
                 
                 {item.complements && item.complements.length > 0 && (
                   <div className="mt-1.5 space-y-0.5">

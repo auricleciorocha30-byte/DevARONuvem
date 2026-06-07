@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Product } from '../types';
-import { Plus, Search, Edit2, Trash2, Camera, Star, Tag, X, Loader2, Weight, Power, ListTree, ScanLine, FileText, Printer } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Camera, Star, Tag, X, Loader2, Weight, Power, ListTree, ScanLine, FileText, Printer, Layers } from 'lucide-react';
 import { Switch } from '../components/Switch';
 import { ComplementBuilder } from '../components/ComplementBuilder';
 import { supabase } from '../lib/supabase';
@@ -78,6 +78,44 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
   const [showProductModal, setShowProductModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
+  const [selectedComboProductId, setSelectedComboProductId] = useState('');
+  const [selectedComboQtyCount, setSelectedComboQtyCount] = useState(1);
+
+  const addComboItem = () => {
+    if (!selectedComboProductId) return;
+    const prodObj = products.find(p => p.id === selectedComboProductId);
+    if (!prodObj) return;
+
+    const currentItems = editingProduct?.comboItems || [];
+    const exists = currentItems.find(item => item.productId === selectedComboProductId);
+    let updatedItems;
+    if (exists) {
+      updatedItems = currentItems.map(item => 
+        item.productId === selectedComboProductId 
+          ? { ...item, quantity: item.quantity + selectedComboQtyCount }
+          : item
+      );
+    } else {
+      updatedItems = [
+        ...currentItems,
+        {
+          productId: selectedComboProductId,
+          name: prodObj.name,
+          quantity: selectedComboQtyCount
+        }
+      ];
+    }
+
+    setEditingProduct(prev => prev ? { ...prev, comboItems: updatedItems } : prev);
+    setSelectedComboProductId('');
+    setSelectedComboQtyCount(1);
+  };
+
+  const removeComboItem = (productId: string) => {
+    const currentItems = editingProduct?.comboItems || [];
+    const updatedItems = currentItems.filter(item => item.productId !== productId);
+    setEditingProduct(prev => prev ? { ...prev, comboItems: updatedItems } : prev);
+  };
   const [isSaving, setIsSaving] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [isSavingCategory, setIsSavingCategory] = useState(false);
@@ -243,7 +281,9 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
             ncm: editingProduct.ncm || undefined,
             cfop: editingProduct.cfop || undefined,
             icms_situacao_tributaria: editingProduct.icms_situacao_tributaria || undefined,
-            complements: editingProduct.complements || []
+            complements: editingProduct.complements || [],
+            isCombo: !!editingProduct.isCombo,
+            comboItems: editingProduct.comboItems || []
         };
 
         await saveProduct(productData);
@@ -442,6 +482,11 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                         <Weight size={10} /> Balança (KG)
                     </span>
                 )}
+                {product.isCombo && (
+                    <span className="bg-amber-500 text-white text-[8px] font-black px-2 py-1 rounded shadow-lg flex items-center gap-1 uppercase">
+                        <Layers size={10} /> Combo ({product.comboItems?.length || 0} itens)
+                    </span>
+                )}
             </div>
 
             <img src={product.imageUrl || undefined} className="w-full h-40 object-cover" alt={product.name} loading="lazy" />
@@ -567,13 +612,32 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                       </div>
                   </div>
 
-              <div className="grid grid-cols-1 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="bg-blue-50 p-3 rounded-xl flex items-center justify-between border border-blue-100">
                     <div className="flex items-center gap-2">
                         <Weight size={14} className={editingProduct?.isByWeight ? 'text-blue-600' : 'text-gray-400'} />
                         <span className="text-[10px] font-bold uppercase text-gray-500">Venda por KG</span>
                     </div>
-                    <Switch checked={editingProduct?.isByWeight ?? false} onChange={(v) => setEditingProduct({...editingProduct, isByWeight: v})} />
+                    <Switch checked={editingProduct?.isByWeight ?? false} onChange={(v) => {
+                      if (v) {
+                        setEditingProduct({...editingProduct, isByWeight: true, isCombo: false, comboItems: []});
+                      } else {
+                        setEditingProduct({...editingProduct, isByWeight: false});
+                      }
+                    }} />
+                  </div>
+                  <div className="bg-amber-50 p-3 rounded-xl flex items-center justify-between border border-amber-100">
+                    <div className="flex items-center gap-2">
+                        <Layers size={14} className={editingProduct?.isCombo ? 'text-amber-600' : 'text-gray-400'} />
+                        <span className="text-[10px] font-bold uppercase text-gray-500">Produto é um Combo</span>
+                    </div>
+                    <Switch checked={editingProduct?.isCombo ?? false} onChange={(v) => {
+                      if (v) {
+                        setEditingProduct({...editingProduct, isCombo: true, isByWeight: false, comboItems: editingProduct.comboItems || []});
+                      } else {
+                        setEditingProduct({...editingProduct, isCombo: false, comboItems: []});
+                      }
+                    }} />
                   </div>
               </div>
 
@@ -628,6 +692,80 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                       {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                   </select>
               </div>
+
+              {editingProduct?.isCombo && (
+                <div className="bg-amber-50/50 px-3 py-4 border border-amber-200 rounded-2xl space-y-3">
+                  <div className="flex items-center gap-2 border-b border-amber-200 pb-2">
+                    <Layers className="text-amber-600" size={16} />
+                    <h3 className="text-xs font-bold text-amber-800 uppercase tracking-wide">Produtos Inclusos no Combo</h3>
+                  </div>
+
+                  {/* Add item Controls */}
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
+                    <div className="sm:col-span-7">
+                      <label className="block text-[10px] font-bold uppercase text-gray-500 mb-1">Selecionar Produto</label>
+                      <select 
+                        value={selectedComboProductId} 
+                        onChange={(e) => setSelectedComboProductId(e.target.value)}
+                        className="w-full p-2 border border-gray-200 rounded-lg bg-white outline-none text-xs"
+                      >
+                        <option value="">Selecione um produto...</option>
+                        {products
+                          .filter(p => !p.isCombo && p.id !== editingProduct?.id)
+                          .map(p => (
+                            <option key={p.id} value={p.id}>{p.name} - R$ {p.price.toFixed(2)}</option>
+                          ))
+                        }
+                      </select>
+                    </div>
+
+                    <div className="sm:col-span-3">
+                      <label className="block text-[10px] font-bold uppercase text-gray-500 mb-1">Qtd</label>
+                      <input 
+                        type="number" 
+                        min="1" 
+                        value={selectedComboQtyCount} 
+                        onChange={(e) => setSelectedComboQtyCount(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-full p-2 border border-gray-200 rounded-lg outline-none text-xs" 
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <button 
+                        type="button" 
+                        onClick={addComboItem}
+                        disabled={!selectedComboProductId}
+                        className="w-full p-2 bg-amber-600 text-white font-bold rounded-lg hover:bg-amber-700 transition-colors flex items-center justify-center text-xs disabled:opacity-50"
+                      >
+                        Incluir
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Table / List of added items */}
+                  {(!editingProduct.comboItems || editingProduct.comboItems.length === 0) ? (
+                    <p className="text-xs text-center text-gray-400 py-2">Nenhum produto incluído neste combo ainda.</p>
+                  ) : (
+                    <div className="space-y-1.5 max-h-[160px] overflow-y-auto">
+                      {editingProduct.comboItems.map((item) => (
+                        <div key={item.productId} className="flex items-center justify-between bg-white px-3 py-2 rounded-xl border border-amber-100 text-xs shadow-sm">
+                          <div>
+                            <span className="font-semibold text-gray-700">{item.name}</span>
+                            <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded">x{item.quantity}</span>
+                          </div>
+                          <button 
+                            type="button" 
+                            onClick={() => removeComboItem(item.productId)}
+                            className="text-red-500 hover:text-red-700 p-1 rounded transition-colors"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Código de Barras (Opcional)</label>

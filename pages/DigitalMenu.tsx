@@ -48,6 +48,20 @@ import { Product, StoreSettings, Order, OrderItem, OrderType, PaymentMethod, Wai
 import InstallPrompt from '../components/InstallPrompt';
 import { ComplementsModal } from '../components/ComplementsModal';
 
+const getComboItems = (comboItems: any): any[] => {
+  if (!comboItems) return [];
+  if (Array.isArray(comboItems)) return comboItems;
+  if (typeof comboItems === 'string') {
+    try {
+      return JSON.parse(comboItems);
+    } catch (e) {
+      console.warn("Error parsing comboItems:", e);
+      return [];
+    }
+  }
+  return [];
+};
+
 interface Props {
   storeId?: string;
   products: Product[];
@@ -722,7 +736,9 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
         isByWeight: false,
         isFractional: false,
         originalProductId: product.id,
-        complements: complementsToAdd
+        complements: complementsToAdd,
+        isCombo: product.isCombo,
+        comboItems: product.comboItems
       }];
     });
   };
@@ -977,8 +993,21 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
         const stockUpdates = new Map<string, number>();
         for (const newItem of cart) {
             const targetProductId = newItem.originalProductId || newItem.productId;
-            const current = stockUpdates.get(targetProductId) || 0;
-            stockUpdates.set(targetProductId, current - Number(newItem.quantity || 0));
+            const prodObj = products.find(p => p.id === targetProductId);
+            const qtyToDeduct = Number(newItem.quantity || 0);
+
+            if (prodObj && prodObj.isCombo && prodObj.comboItems) {
+                const subItems = getComboItems(prodObj.comboItems);
+                for (const comboOf of subItems) {
+                    const subProductId = comboOf.productId;
+                    const subCurrent = stockUpdates.get(subProductId) || 0;
+                    const qtyToSub = Number(comboOf.quantity || 1) * qtyToDeduct;
+                    stockUpdates.set(subProductId, subCurrent - qtyToSub);
+                }
+            } else {
+                const current = stockUpdates.get(targetProductId) || 0;
+                stockUpdates.set(targetProductId, current - qtyToDeduct);
+            }
         }
 
         for (const [productId, diff] of stockUpdates.entries()) {
@@ -1381,6 +1410,15 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                   {settings?.isCashbackActive && <div className="mb-1.5"><span className="bg-green-100 text-green-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center w-fit gap-1"><DollarSign size={10}/> Cashback Ativo</span></div>}
                   <h3 className="font-bold text-sm md:text-base leading-tight text-slate-800 mb-1">{product.name}</h3>
                   <p className="text-[11px] text-slate-500 whitespace-normal line-clamp-2 leading-relaxed">{product.description}</p>
+                  {product.isCombo && getComboItems(product.comboItems).length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {getComboItems(product.comboItems).map((item, idx) => (
+                        <span key={idx} className="bg-amber-50 text-amber-800 text-[9px] font-medium px-1.5 py-0.5 rounded border border-amber-200 flex items-center gap-0.5 shadow-sm">
+                          {item.quantity}x {item.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center justify-between mt-3 gap-2">
                   {(() => {
@@ -1484,6 +1522,15 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                              </li>
                                           ))}
                                        </ul>
+                                    )}
+                                    {item.isCombo && getComboItems(item.comboItems).length > 0 && (
+                                       <div className="mt-1 flex flex-wrap gap-1 mb-2">
+                                          {getComboItems(item.comboItems).map((comp, idx) => (
+                                             <span key={idx} className="bg-amber-50 text-amber-800 text-[9px] font-medium px-1.5 py-0.5 rounded border border-amber-200">
+                                                {comp.quantity * item.quantity}x {comp.name}
+                                             </span>
+                                          ))}
+                                       </div>
                                     )}
                                     {item.price > 0 && <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">R$ {item.price.toFixed(2)} {item.isByWeight ? '/kg' : 'un'}</p>}
                                  </div>

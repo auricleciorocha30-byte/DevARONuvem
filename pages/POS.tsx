@@ -44,6 +44,20 @@ import { ComplementsModal } from '../components/ComplementsModal';
 
 import InstallPrompt from '../components/InstallPrompt';
 
+const getComboItems = (comboItems: any): any[] => {
+  if (!comboItems) return [];
+  if (Array.isArray(comboItems)) return comboItems;
+  if (typeof comboItems === 'string') {
+    try {
+      return JSON.parse(comboItems);
+    } catch (e) {
+      console.warn("Error parsing comboItems:", e);
+      return [];
+    }
+  }
+  return [];
+};
+
 interface POSProps {
   storeId: string;
   user: Waitstaff;
@@ -605,14 +619,27 @@ export default function POS({ storeId, user, settings, orders, onLogout, updateS
         const stockUpdates = new Map<string, number>();
         for (const newItem of order.items) {
             const targetProductId = newItem.originalProductId || newItem.productId;
-            const current = stockUpdates.get(targetProductId) || 0;
-            stockUpdates.set(targetProductId, current - Number(newItem.quantity || 0));
+            const prodObj = products.find(p => p.id === targetProductId);
+            const qtyToDeduct = Number(newItem.quantity || 0);
+
+            if (prodObj && prodObj.isCombo && prodObj.comboItems) {
+                const subItems = getComboItems(prodObj.comboItems);
+                for (const comboOf of subItems) {
+                    const subProductId = comboOf.productId;
+                    const subCurrent = stockUpdates.get(subProductId) || 0;
+                    const qtyToSub = Number(comboOf.quantity || 1) * qtyToDeduct;
+                    stockUpdates.set(subProductId, subCurrent - qtyToSub);
+                }
+            } else {
+                const current = stockUpdates.get(targetProductId) || 0;
+                stockUpdates.set(targetProductId, current - qtyToDeduct);
+            }
             
             // Deduct complements stock
             if (newItem.complements && newItem.complements.length > 0) {
                 for (const cp of newItem.complements) {
                     const cpCurrent = stockUpdates.get(cp.itemId) || 0;
-                    stockUpdates.set(cp.itemId, cpCurrent - (Number(cp.quantity || 0) * Number(newItem.quantity || 0)));
+                    stockUpdates.set(cp.itemId, cpCurrent - (Number(cp.quantity || 0) * qtyToDeduct));
                 }
             }
         }
@@ -1382,7 +1409,9 @@ export default function POS({ storeId, user, settings, orders, onLogout, updateS
         isByWeight: product.isByWeight,
         isFractional: false,
         originalProductId: product.id,
-        complements: complementsToAdd
+        complements: complementsToAdd,
+        isCombo: product.isCombo,
+        comboItems: product.comboItems
       }];
     });
     setWeightModal({ isOpen: false, product: null });
@@ -1775,27 +1804,53 @@ export default function POS({ storeId, user, settings, orders, onLogout, updateS
         const stockUpdates = new Map<string, number>();
         for (const oldItem of originalCart) {
             const targetProductId = oldItem.originalProductId || oldItem.productId;
-            const current = stockUpdates.get(targetProductId) || 0;
-            stockUpdates.set(targetProductId, current + Number(oldItem.originalQuantity || oldItem.quantity || 0));
+            const prodObj = products.find(p => p.id === targetProductId);
+            const qtyToRestore = Number(oldItem.originalQuantity || oldItem.quantity || 0);
+
+            if (prodObj && prodObj.isCombo && prodObj.comboItems) {
+                const subItems = getComboItems(prodObj.comboItems);
+                for (const comboOf of subItems) {
+                    const subProductId = comboOf.productId;
+                    const subCurrent = stockUpdates.get(subProductId) || 0;
+                    const qtyToAdd = Number(comboOf.quantity || 1) * qtyToRestore;
+                    stockUpdates.set(subProductId, subCurrent + qtyToAdd);
+                }
+            } else {
+                const current = stockUpdates.get(targetProductId) || 0;
+                stockUpdates.set(targetProductId, current + qtyToRestore);
+            }
             
             // Restore complements stock
             if (oldItem.complements && oldItem.complements.length > 0) {
                 for (const cp of oldItem.complements) {
                     const cpCurrent = stockUpdates.get(cp.itemId) || 0;
-                    stockUpdates.set(cp.itemId, cpCurrent + (Number(cp.quantity || 0) * Number(oldItem.originalQuantity || oldItem.quantity || 0)));
+                    stockUpdates.set(cp.itemId, cpCurrent + (Number(cp.quantity || 0) * qtyToRestore));
                 }
             }
         }
         for (const newItem of cart) {
             const targetProductId = newItem.originalProductId || newItem.productId;
-            const current = stockUpdates.get(targetProductId) || 0;
-            stockUpdates.set(targetProductId, current - Number(newItem.quantity || 0));
+            const prodObj = products.find(p => p.id === targetProductId);
+            const qtyToDeduct = Number(newItem.quantity || 0);
+
+            if (prodObj && prodObj.isCombo && prodObj.comboItems) {
+                const subItems = getComboItems(prodObj.comboItems);
+                for (const comboOf of subItems) {
+                    const subProductId = comboOf.productId;
+                    const subCurrent = stockUpdates.get(subProductId) || 0;
+                    const qtyToSub = Number(comboOf.quantity || 1) * qtyToDeduct;
+                    stockUpdates.set(subProductId, subCurrent - qtyToSub);
+                }
+            } else {
+                const current = stockUpdates.get(targetProductId) || 0;
+                stockUpdates.set(targetProductId, current - qtyToDeduct);
+            }
 
             // Deduct complements stock
             if (newItem.complements && newItem.complements.length > 0) {
                 for (const cp of newItem.complements) {
                     const cpCurrent = stockUpdates.get(cp.itemId) || 0;
-                    stockUpdates.set(cp.itemId, cpCurrent - (Number(cp.quantity || 0) * Number(newItem.quantity || 0)));
+                    stockUpdates.set(cp.itemId, cpCurrent - (Number(cp.quantity || 0) * qtyToDeduct));
                 }
             }
         }
@@ -2120,28 +2175,54 @@ export default function POS({ storeId, user, settings, orders, onLogout, updateS
 
       for (const oldItem of originalCart) {
           const targetProductId = oldItem.originalProductId || oldItem.productId;
-          const current = stockUpdates.get(targetProductId) || 0;
-          stockUpdates.set(targetProductId, current + Number(oldItem.originalQuantity || oldItem.quantity || 0));
+          const prodObj = products.find(p => p.id === targetProductId);
+          const qtyToRestore = Number(oldItem.originalQuantity || oldItem.quantity || 0);
+
+          if (prodObj && prodObj.isCombo && prodObj.comboItems) {
+              const subItems = getComboItems(prodObj.comboItems);
+              for (const comboOf of subItems) {
+                  const subProductId = comboOf.productId;
+                  const subCurrent = stockUpdates.get(subProductId) || 0;
+                  const qtyToAdd = Number(comboOf.quantity || 1) * qtyToRestore;
+                  stockUpdates.set(subProductId, subCurrent + qtyToAdd);
+              }
+          } else {
+              const current = stockUpdates.get(targetProductId) || 0;
+              stockUpdates.set(targetProductId, current + qtyToRestore);
+          }
 
           // Restore complements stock
           if (oldItem.complements && oldItem.complements.length > 0) {
               for (const cp of oldItem.complements) {
                   const cpCurrent = stockUpdates.get(cp.itemId) || 0;
-                  stockUpdates.set(cp.itemId, cpCurrent + (Number(cp.quantity || 0) * Number(oldItem.originalQuantity || oldItem.quantity || 0)));
+                  stockUpdates.set(cp.itemId, cpCurrent + (Number(cp.quantity || 0) * qtyToRestore));
               }
           }
       }
 
       for (const newItem of cart) {
           const targetProductId = newItem.originalProductId || newItem.productId;
-          const current = stockUpdates.get(targetProductId) || 0;
-          stockUpdates.set(targetProductId, current - Number(newItem.quantity || 0));
+          const prodObj = products.find(p => p.id === targetProductId);
+          const qtyToDeduct = Number(newItem.quantity || 0);
+
+          if (prodObj && prodObj.isCombo && prodObj.comboItems) {
+              const subItems = getComboItems(prodObj.comboItems);
+              for (const comboOf of subItems) {
+                  const subProductId = comboOf.productId;
+                  const subCurrent = stockUpdates.get(subProductId) || 0;
+                  const qtyToSub = Number(comboOf.quantity || 1) * qtyToDeduct;
+                  stockUpdates.set(subProductId, subCurrent - qtyToSub);
+              }
+          } else {
+              const current = stockUpdates.get(targetProductId) || 0;
+              stockUpdates.set(targetProductId, current - qtyToDeduct);
+          }
 
           // Deduct complements stock
           if (newItem.complements && newItem.complements.length > 0) {
               for (const cp of newItem.complements) {
                   const cpCurrent = stockUpdates.get(cp.itemId) || 0;
-                  stockUpdates.set(cp.itemId, cpCurrent - (Number(cp.quantity || 0) * Number(newItem.quantity || 0)));
+                  stockUpdates.set(cp.itemId, cpCurrent - (Number(cp.quantity || 0) * qtyToDeduct));
               }
           }
       }
@@ -2533,6 +2614,11 @@ export default function POS({ storeId, user, settings, orders, onLogout, updateS
             </div>
             ${comp.description ? `<div style="margin: 0; padding-left: 15px; font-style: italic; color: black !important; font-size: 11px;">- ${comp.description}</div>` : ''}
           `).join('') : ''}
+          ${item.isCombo && getComboItems(item.comboItems).length > 0 ? getComboItems(item.comboItems).map((comp: any) => `
+            <div style="margin: 0; padding-left: 10px; color: black !important; font-size: 13px; font-weight: bold;">
+              [Combo] ${comp.quantity * item.quantity}x ${comp.name}
+            </div>
+          `).join('') : ''}
         `).join('')}
         <div style="border-top: 2px dashed black; margin: 5px 0;"></div>
         ${order.serviceFee && order.serviceFee > 0 ? `
@@ -2628,7 +2714,14 @@ export default function POS({ storeId, user, settings, orders, onLogout, updateS
         ${cart.map(item => `
         <tr>
           <td style="vertical-align: top; color: black !important;">${item.isByWeight ? item.quantity.toFixed(3) + 'kg' : item.quantity}</td>
-          <td style="vertical-align: top; color: black !important;">${item.name}</td>
+          <td style="vertical-align: top; color: black !important;">
+            ${item.name}
+            ${item.isCombo && getComboItems(item.comboItems).length > 0 ? getComboItems(item.comboItems).map((comp: any) => `
+              <div style="font-size: 11px; padding-left: 10px; font-weight: bold;">
+                • ${comp.quantity * item.quantity}x ${comp.name}
+              </div>
+            `).join('') : ''}
+          </td>
           <td style="text-align: right; vertical-align: top; color: black !important;">${formatCurrency(item.price * item.quantity)}</td>
         </tr>
         `).join('')}
@@ -3201,6 +3294,15 @@ export default function POS({ storeId, user, settings, orders, onLogout, updateS
                            </li>
                         ))}
                      </ul>
+                  )}
+                  {item.isCombo && getComboItems(item.comboItems).length > 0 && (
+                     <div className="mt-1 flex flex-wrap gap-1 mb-1">
+                        {getComboItems(item.comboItems).map((comp, idx) => (
+                           <span key={idx} className="bg-amber-50 text-amber-800 text-[8px] font-medium px-1 py-0.5 rounded border border-amber-200">
+                              {comp.quantity * item.quantity}x {comp.name}
+                           </span>
+                        ))}
+                     </div>
                   )}
                   <p className="text-xs text-gray-500">{formatCurrency(item.price)} {item.isByWeight ? '/ kg' : 'un'}</p>
                 </div>
@@ -4110,8 +4212,15 @@ export default function POS({ storeId, user, settings, orders, onLogout, updateS
                                 <div className="mt-3 flex flex-wrap gap-2">
                                     {(order.items || []).slice(0, 3).map((item: any, idx: number) => (
                                         item ? (
-                                            <span key={idx} className="bg-gray-50 text-gray-600 px-2 py-1 rounded text-xs font-medium border border-gray-100">
-                                                {item.quantity}x {item.name}
+                                            <span key={idx} className="bg-gray-50 text-gray-600 px-2 py-1 rounded text-xs font-medium border border-gray-100 flex flex-col items-start">
+                                                <span>{item.quantity}x {item.name}</span>
+                                                {item.isCombo && getComboItems(item.comboItems).length > 0 && (
+                                                    <span className="text-[9px] text-amber-700 bg-amber-50/50 px-1 py-0.5 rounded flex flex-col gap-0.5 mt-1 border border-amber-100">
+                                                        {getComboItems(item.comboItems).map((c: any, cIdx: number) => (
+                                                            <span key={cIdx} className="leading-none">• {c.quantity * item.quantity}x {c.name}</span>
+                                                        ))}
+                                                    </span>
+                                                )}
                                             </span>
                                         ) : null
                                     ))}

@@ -51,6 +51,12 @@ export interface CartComplementItem {
   quantity: number;
 }
 
+export interface ComboItem {
+  productId: string;
+  name: string;
+  quantity: number;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -73,6 +79,8 @@ export interface Product {
   cfop?: string;
   icms_situacao_tributaria?: string;
   complements?: ComplementCategory[];
+  isCombo?: boolean;
+  comboItems?: ComboItem[];
 }
 
 export interface OrderItem {
@@ -87,6 +95,8 @@ export interface OrderItem {
   isFractional?: boolean;
   fractions?: number;
   originalProductId?: string;
+  isCombo?: boolean;
+  comboItems?: ComboItem[];
   fractionProducts?: {
     productId: string;
     name: string;

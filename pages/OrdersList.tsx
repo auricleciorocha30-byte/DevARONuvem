@@ -4,6 +4,20 @@ import { Order, OrderStatus, Product, OrderType, OrderItem, StoreSettings } from
 import { Clock, Printer, UserRound, CheckCircle2, DollarSign, AlertCircle, MapPin, Phone, MessageSquare, Ticket, Percent, Navigation, CreditCard, Wallet, Banknote, FileText, Loader2, Search, Trash2, User } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
+const getComboItems = (comboItems: any): any[] => {
+  if (!comboItems) return [];
+  if (Array.isArray(comboItems)) return comboItems;
+  if (typeof comboItems === 'string') {
+    try {
+      return JSON.parse(comboItems);
+    } catch (e) {
+      console.warn("Error parsing comboItems:", e);
+      return [];
+    }
+  }
+  return [];
+};
+
 interface Props {
   orders: Order[];
   updateStatus: (id: string, status: OrderStatus) => void;
@@ -541,6 +555,15 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                     </span>
                     <span className="font-mono font-bold text-xs text-gray-400">R$ {(item.price * item.quantity).toFixed(2)}</span>
                   </div>
+                  {item.isCombo && getComboItems(item.comboItems).length > 0 && (
+                    <div className="mt-1 pl-4 flex flex-col gap-0.5 border-l-2 border-amber-200">
+                      {getComboItems(item.comboItems).map((comp, cIdx) => (
+                        <p key={cIdx} className="text-[11px] text-amber-700 font-medium">
+                          ★ {comp.quantity * item.quantity}x {comp.name}
+                        </p>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
               {group.deliveryFee && group.deliveryFee > 0 ? (

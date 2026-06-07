@@ -354,6 +354,16 @@ function StoreContext() {
     ncm: p.ncm || undefined,
     cfop: p.cfop || undefined,
     icms_situacao_tributaria: p.icms_situacao_tributaria || p.icms_situacaotributaria || undefined,
+    isCombo: p.isCombo === 1 || p.isCombo === true || p.iscombo === 1 || p.iscombo === true,
+    comboItems: (() => {
+      const field = p.comboItems || p.comboitems || p.combo_items;
+      if (!field) return undefined;
+      try {
+        return typeof field === 'string' ? JSON.parse(field) : field;
+      } catch (e) {
+        return undefined;
+      }
+    })(),
     complements: (() => {
       if (!p.complements) return undefined;
       try {
@@ -631,8 +641,26 @@ function StoreContext() {
             const stockRestoration = new Map<string, number>();
             for (const item of order.items) {
                 const targetProductId = item.originalProductId || item.productId;
-                const current = stockRestoration.get(targetProductId) || 0;
-                stockRestoration.set(targetProductId, current + Number(item.quantity || 0));
+                const prodObj = products.find(p => p.id === targetProductId);
+                if (prodObj && prodObj.isCombo && prodObj.comboItems) {
+                    let subItems: any[] = [];
+                    try {
+                        subItems = typeof prodObj.comboItems === 'string' ? JSON.parse(prodObj.comboItems) : prodObj.comboItems;
+                    } catch (e) {
+                        console.error("Error parsing comboItems:", e);
+                    }
+                    if (Array.isArray(subItems)) {
+                        for (const comboOf of subItems) {
+                            const subProductId = comboOf.productId;
+                            const subCurrent = stockRestoration.get(subProductId) || 0;
+                            const qtyToAdd = Number(comboOf.quantity || 1) * Number(item.quantity || 1);
+                            stockRestoration.set(subProductId, subCurrent + qtyToAdd);
+                        }
+                    }
+                } else {
+                    const current = stockRestoration.get(targetProductId) || 0;
+                    stockRestoration.set(targetProductId, current + Number(item.quantity || 0));
+                }
 
                 // Restore complements stock
                 if (item.complements && item.complements.length > 0) {
@@ -741,8 +769,26 @@ function StoreContext() {
           const stockDeduction = new Map<string, number>();
           for (const item of order.items) {
               const targetProductId = item.originalProductId || item.productId;
-              const current = stockDeduction.get(targetProductId) || 0;
-              stockDeduction.set(targetProductId, current + Number(item.quantity || 0));
+              const prodObj = products.find(p => p.id === targetProductId);
+              if (prodObj && prodObj.isCombo && prodObj.comboItems) {
+                  let subItems: any[] = [];
+                  try {
+                      subItems = typeof prodObj.comboItems === 'string' ? JSON.parse(prodObj.comboItems) : prodObj.comboItems;
+                  } catch (e) {
+                      console.error("Error parsing comboItems:", e);
+                  }
+                  if (Array.isArray(subItems)) {
+                      for (const comboOf of subItems) {
+                          const subProductId = comboOf.productId;
+                          const subCurrent = stockDeduction.get(subProductId) || 0;
+                          const qtyToSub = Number(comboOf.quantity || 1) * Number(item.quantity || 1);
+                          stockDeduction.set(subProductId, subCurrent + qtyToSub);
+                      }
+                  }
+              } else {
+                  const current = stockDeduction.get(targetProductId) || 0;
+                  stockDeduction.set(targetProductId, current + Number(item.quantity || 0));
+              }
 
               // Deduct complements stock if they exist as products
               if (item.complements && item.complements.length > 0) {
@@ -983,6 +1029,12 @@ function StoreContext() {
           const payload: any = { ...p, store_id: currentStore?.id };
           if (payload.complements !== undefined) {
              payload.complements = payload.complements ? JSON.stringify(payload.complements) : null;
+          }
+          if (payload.comboItems !== undefined) {
+             payload.comboItems = payload.comboItems ? JSON.stringify(payload.comboItems) : null;
+          }
+          if (payload.isCombo !== undefined) {
+             payload.isCombo = payload.isCombo ? 1 : 0;
           }
           if (!payload.id) delete payload.id;
 

@@ -154,7 +154,9 @@ const SCHEMA_STATEMENTS = [
     ncm TEXT,
     cfop TEXT,
     icms_situacao_tributaria TEXT,
-    complements TEXT
+    complements TEXT,
+    isCombo INTEGER DEFAULT 0,
+    comboItems TEXT
   )`,
   `CREATE TABLE IF NOT EXISTS waitstaff (
     id TEXT PRIMARY KEY,
@@ -254,7 +256,8 @@ const TABLE_COLUMNS: { [key: string]: string[] } = {
   products: [
     'id', 'store_id', 'name', 'description', 'price', 'category', 'imageUrl',
     'isActive', 'featuredDay', 'isByWeight', 'barcode', 'stock', 'showInMenu',
-    'fractions', 'units', 'fractionPrice', 'ncm', 'cfop', 'icms_situacao_tributaria', 'complements'
+    'fractions', 'units', 'fractionPrice', 'ncm', 'cfop', 'icms_situacao_tributaria', 'complements',
+    'isCombo', 'comboItems'
   ],
   waitstaff: [
     'id', 'store_id', 'name', 'password', 'role', 'phone'
@@ -279,7 +282,7 @@ const TABLE_COLUMNS: { [key: string]: string[] } = {
 };
 
 let schemaInitializedVersion = '';
-const CURRENT_SCHEMA_VERSION = 'v4';
+const CURRENT_SCHEMA_VERSION = 'v5';
 let initializationPromise: Promise<void> | null = null;
 
 async function ensureSchema() {
@@ -383,6 +386,12 @@ async function ensureSchema() {
           }
           if (!productColumns.includes('complements')) {
               try { await client.execute(`ALTER TABLE products ADD COLUMN complements TEXT`); } catch (e) { console.warn(e); }
+          }
+          if (!productColumns.includes('isCombo')) {
+              try { await client.execute(`ALTER TABLE products ADD COLUMN isCombo INTEGER DEFAULT 0`); } catch (e) { console.warn(e); }
+          }
+          if (!productColumns.includes('comboItems')) {
+              try { await client.execute(`ALTER TABLE products ADD COLUMN comboItems TEXT`); } catch (e) { console.warn(e); }
           }
 
           const cashMovementsTableInfo = await client.execute(`PRAGMA table_info(cash_movements)`);
@@ -556,6 +565,12 @@ class TursoBridge {
             }
             if (!productColumns.includes('icms_situacao_tributaria')) {
                 try { await this.executeSqlCustom(url, token, `ALTER TABLE products ADD COLUMN icms_situacao_tributaria TEXT`); } catch (e) { console.warn(e); }
+            }
+            if (!productColumns.includes('isCombo')) {
+                try { await this.executeSqlCustom(url, token, `ALTER TABLE products ADD COLUMN isCombo INTEGER DEFAULT 0`); } catch (e) { console.warn(e); }
+            }
+            if (!productColumns.includes('comboItems')) {
+                try { await this.executeSqlCustom(url, token, `ALTER TABLE products ADD COLUMN comboItems TEXT`); } catch (e) { console.warn(e); }
             }
 
             const cashMovementsTableInfo = await this.executeSqlCustom(url, token, `PRAGMA table_info(cash_movements)`);
@@ -918,6 +933,15 @@ class TursoBridge {
         if (this.tableName === 'orders' && valCopy.items && typeof valCopy.items === 'object') {
              valCopy.items = JSON.stringify(valCopy.items);
         }
+        if (this.tableName === 'products' && valCopy.complements && typeof valCopy.complements === 'object') {
+             valCopy.complements = JSON.stringify(valCopy.complements);
+        }
+        if (this.tableName === 'products' && valCopy.comboItems && typeof valCopy.comboItems === 'object') {
+             valCopy.comboItems = JSON.stringify(valCopy.comboItems);
+        }
+        if (this.tableName === 'products' && typeof valCopy.isCombo === 'boolean') {
+             valCopy.isCombo = valCopy.isCombo ? 1 : 0;
+        }
 
         if (typeof valCopy.isActive === 'boolean') valCopy.isActive = valCopy.isActive ? 1 : 0;
         if (typeof valCopy.isByWeight === 'boolean') valCopy.isByWeight = valCopy.isByWeight ? 1 : 0;
@@ -1022,6 +1046,15 @@ class TursoBridge {
       }
       if (this.tableName === 'orders' && valCopy.items && typeof valCopy.items === 'object') {
            valCopy.items = JSON.stringify(valCopy.items);
+      }
+      if (this.tableName === 'products' && valCopy.complements && typeof valCopy.complements === 'object') {
+           valCopy.complements = JSON.stringify(valCopy.complements);
+      }
+      if (this.tableName === 'products' && valCopy.comboItems && typeof valCopy.comboItems === 'object') {
+           valCopy.comboItems = JSON.stringify(valCopy.comboItems);
+      }
+      if (this.tableName === 'products' && typeof valCopy.isCombo === 'boolean') {
+           valCopy.isCombo = valCopy.isCombo ? 1 : 0;
       }
 
       if (typeof valCopy.isActive === 'boolean') valCopy.isActive = valCopy.isActive ? 1 : 0;
