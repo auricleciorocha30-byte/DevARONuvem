@@ -242,6 +242,42 @@ const INDEX_STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS idx_cash_movements_store_id ON cash_movements(store_id)`
 ];
 
+
+const TABLE_COLUMNS: { [key: string]: string[] } = {
+  store_profiles: [
+    'id', 'slug', 'name', 'logoUrl', 'address', 'whatsapp', 
+    'isActive', 'createdAt', 'settings', 'dbUrl', 'dbAuthToken', 'mercadopago_webhook_secret'
+  ],
+  categories: [
+    'id', 'store_id', 'name'
+  ],
+  products: [
+    'id', 'store_id', 'name', 'description', 'price', 'category', 'imageUrl',
+    'isActive', 'featuredDay', 'isByWeight', 'barcode', 'stock', 'showInMenu',
+    'fractions', 'units', 'fractionPrice', 'ncm', 'cfop', 'icms_situacao_tributaria', 'complements'
+  ],
+  waitstaff: [
+    'id', 'store_id', 'name', 'password', 'role', 'phone'
+  ],
+  orders: [
+    'id', 'store_id', 'displayId', 'type', 'tableNumber', 'customerName', 'customerPhone',
+    'customerId', 'items', 'status', 'total', 'deliveryFee', 'createdAt', 'paymentMethod',
+    'deliveryAddress', 'referencePoint', 'notes', 'changeFor', 'waitstaffName', 'couponApplied',
+    'discountAmount', 'deliveryDriverId', 'paymentDetails', 'isSynced', 'originAddress',
+    'session_id', 'serviceFee', 'stockDeducted', 'customerCpf', 'updatedAt'
+  ],
+  cash_movements: [
+    'id', 'store_id', 'type', 'amount', 'description', 'waitstaffName', 'createdAt', 'session_id'
+  ],
+  register_sessions: [
+    'id', 'store_id', 'waitstaff_id', 'waitstaff_name', 'opened_at', 'closed_at',
+    'initial_amount', 'closed_amount', 'status'
+  ],
+  customers: [
+    'id', 'store_id', 'name', 'phone', 'cpf', 'address', 'points', 'isLoyaltyParticipant', 'createdAt'
+  ]
+};
+
 let schemaInitializedVersion = '';
 const CURRENT_SCHEMA_VERSION = 'v4';
 let initializationPromise: Promise<void> | null = null;
@@ -866,6 +902,16 @@ class TursoBridge {
              valCopy.id = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9);
         }
 
+        // Filter and sanitize object keys based on allowed columns in the table definition
+        const allowedColumns = TABLE_COLUMNS[this.tableName];
+        if (allowedColumns) {
+          for (const key of Object.keys(valCopy)) {
+            if (!allowedColumns.includes(key)) {
+              delete valCopy[key];
+            }
+          }
+        }
+
         if (this.tableName === 'store_profiles' && valCopy.settings && typeof valCopy.settings === 'object') {
              valCopy.settings = JSON.stringify(valCopy.settings);
         }
@@ -961,6 +1007,16 @@ class TursoBridge {
       const valCopy = { ...values };
       if (this.tableName === 'orders') valCopy.updatedAt = Date.now();
       
+      // Filter and sanitize object keys based on allowed columns in the table definition
+      const allowedColumns = TABLE_COLUMNS[this.tableName];
+      if (allowedColumns) {
+        for (const key of Object.keys(valCopy)) {
+          if (!allowedColumns.includes(key)) {
+            delete valCopy[key];
+          }
+        }
+      }
+
       if (this.tableName === 'store_profiles' && valCopy.settings && typeof valCopy.settings === 'object') {
            valCopy.settings = JSON.stringify(valCopy.settings);
       }
