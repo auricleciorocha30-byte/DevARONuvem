@@ -56,6 +56,15 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
     tableNum?: string;
     onSuccess: (method: string, details: string) => Promise<void>;
   } | null>(null);
+  const [isSplitMode, setIsSplitMode] = useState(false);
+  const [splitPayments, setSplitPayments] = useState<{ method: string; amount: string }[]>([]);
+
+  useEffect(() => {
+    if (!paymentModalData) {
+      setIsSplitMode(false);
+      setSplitPayments([]);
+    }
+  }, [paymentModalData]);
   
   const tables = Array.from({ length: settings.tableCount || 30 }, (_, i) => (i + 1).toString());
 
@@ -830,9 +839,11 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
 
       {paymentModalData && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
-          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-sm p-6 overflow-hidden flex flex-col max-h-[90vh]">
+          <div className={`bg-white rounded-[2rem] shadow-2xl w-full ${isSplitMode ? 'max-w-md' : 'max-w-sm'} p-6 overflow-hidden flex flex-col max-h-[95vh] transition-all duration-300`}>
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-black text-gray-800 uppercase tracking-wide">Finalizar e Receber</h3>
+              <h3 className="text-lg font-black text-gray-800 uppercase tracking-wide">
+                {isSplitMode ? 'Combinar Pagamentos' : 'Finalizar e Receber'}
+              </h3>
               <button 
                 onClick={() => setPaymentModalData(null)} 
                 className="p-1 px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-extrabold rounded-lg transition-all text-xs uppercase"
@@ -851,34 +862,240 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
               )}
             </div>
 
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 text-center">Forma de Pagamento Obrigatória</p>
-            
-            <div className="grid grid-cols-2 gap-3 mb-6">
-              {[
-                { id: 'DINHEIRO', label: 'Dinheiro', desc: '💵 Notas/Moedas', color: 'border-green-200 hover:bg-green-50 text-green-700 hover:border-green-400 font-black' },
-                { id: 'PIX', label: 'PIX', desc: '📱 QR Code/Chave', color: 'border-cyan-200 hover:bg-cyan-50 text-cyan-700 hover:border-cyan-400 font-black' },
-                { id: 'CARTAO', label: 'Cartão Crd', desc: '💳 Maquininha', color: 'border-indigo-200 hover:bg-indigo-50 text-indigo-700 hover:border-indigo-400 font-black' },
-                { id: 'DEBITO', label: 'Cartão Deb', desc: '💳 Débito', color: 'border-teal-200 hover:bg-teal-50 text-teal-700 hover:border-teal-400 font-black' },
-                { id: 'VALES', label: 'Vale Ref.', desc: '🎟️ Ticket/Alim.', color: 'border-orange-200 hover:bg-orange-50 text-orange-700 hover:border-orange-400 font-black' },
-                { id: 'A_PAGAR', label: 'A Pagar', desc: '⌛ Marcar Fiado', color: 'border-amber-200 hover:bg-amber-50 text-amber-700 hover:border-amber-400 font-black' },
-              ].map(method => (
-                <button
-                  key={method.id}
-                  onClick={() => {
-                    const detailsStr = JSON.stringify([{ method: method.id, amount: paymentModalData.totalAmount }]);
-                    paymentModalData.onSuccess(method.id, detailsStr);
-                  }}
-                  className={`flex flex-col items-center justify-center p-4 border rounded-2xl transition-all active:scale-95 text-center ${method.color}`}
-                >
-                  <span className="font-extrabold text-xs tracking-tight uppercase">{method.label}</span>
-                  <span className="text-[9px] font-medium opacity-80 mt-1">{method.desc}</span>
-                </button>
-              ))}
-            </div>
+            {isSplitMode ? (
+              <div className="flex flex-col flex-1 overflow-hidden">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 text-center">
+                  Combinar Diferentes Meios
+                </p>
 
-            <div className="text-center text-[9px] text-gray-400 uppercase font-black tracking-wide leading-relaxed">
-              ⚠️ ATENÇÃO: Registrar o pagamento é necessário para somar este valor no fluxo de caixa do PDV.
-            </div>
+                {/* List of current split payments */}
+                <div className="flex-1 overflow-y-auto min-h-[140px] max-h-[250px] mb-4 space-y-2 pr-1">
+                  {splitPayments.length === 0 ? (
+                    <div className="text-center py-6 text-xs text-gray-400 font-bold uppercase">
+                      Nenhum meio adicionado.<br />Escolha abaixo para iniciar.
+                    </div>
+                  ) : (
+                    splitPayments.map((p, index) => {
+                      const details = {
+                        DINHEIRO: { label: 'Dinheiro', icon: '💵' },
+                        PIX: { label: 'PIX', icon: '📱' },
+                        CARTAO: { label: 'Crédito', icon: '💳' },
+                        DEBITO: { label: 'Débito', icon: '💳' },
+                        VALES: { label: 'Refeição', icon: '🎟️' },
+                        A_PAGAR: { label: 'Fiado', icon: '⌛' },
+                      }[p.method] || { label: p.method, icon: '💰' };
+
+                      const otherPaymentsSum = splitPayments.reduce((acc, sp, i) => acc + (i === index ? 0 : (parseFloat(sp.amount) || 0)), 0);
+                      const targetRemaining = Math.max(0, paymentModalData.totalAmount - otherPaymentsSum);
+
+                      return (
+                        <div key={index} className="flex items-center gap-2 p-2.5 bg-gray-50 rounded-xl border border-gray-100">
+                          <span className="text-lg">{details.icon}</span>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs font-black text-gray-700 uppercase tracking-wide block truncate">{details.label}</span>
+                          </div>
+                          
+                          {/* Auto-complete (Fulfill remaining) button */}
+                          {targetRemaining > 0 && Math.abs((parseFloat(p.amount) || 0) - targetRemaining) > 0.01 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSplitPayments(prev => prev.map((sp, i) => i === index ? { ...sp, amount: targetRemaining.toFixed(2) } : sp));
+                              }}
+                              className="px-2 py-1 text-[9px] font-black uppercase text-blue-600 bg-blue-50 border border-blue-100 rounded-lg hover:bg-blue-100 transition-colors"
+                            >
+                              Resto
+                            </button>
+                          )}
+
+                          {/* Amount Input */}
+                          <div className="relative flex items-center max-w-[110px]">
+                            <span className="absolute left-2.5 text-[10px] font-bold text-gray-400">R$</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={p.amount}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setSplitPayments(prev => prev.map((sp, i) => i === index ? { ...sp, amount: val } : sp));
+                              }}
+                              className="w-full bg-white text-gray-800 font-extrabold text-xs pl-7 pr-2 py-1.5 border border-gray-200 rounded-xl text-right focus:outline-none focus:border-blue-400"
+                              placeholder="0,00"
+                            />
+                          </div>
+
+                          {/* Delete from splits */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSplitPayments(prev => prev.filter((_, i) => i !== index));
+                            }}
+                            className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 border border-red-100 rounded-xl transition-colors"
+                          >
+                            <X size={14} className="stroke-[3]" />
+                          </button>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Summary Box with Totals and Change */}
+                {(() => {
+                  const splitTotal = splitPayments.reduce((acc, p) => acc + (parseFloat(p.amount) || 0), 0);
+                  const remainingAmount = Math.max(0, paymentModalData.totalAmount - splitTotal);
+                  const hasDinheiro = splitPayments.some(p => p.method === 'DINHEIRO');
+                  const changeAmount = splitTotal > paymentModalData.totalAmount && hasDinheiro
+                    ? splitTotal - paymentModalData.totalAmount
+                    : 0;
+
+                  return (
+                    <>
+                      <div className="p-3 bg-gray-50 border border-gray-100 rounded-2xl mb-4 text-[10px] font-black uppercase tracking-wider space-y-1">
+                        <div className="flex justify-between text-gray-500">
+                          <span>Total do Pedido:</span>
+                          <span>R$ {paymentModalData.totalAmount.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-blue-600">
+                          <span>Valor Lançado:</span>
+                          <span>R$ {splitTotal.toFixed(2)}</span>
+                        </div>
+                        
+                        {remainingAmount > 0 ? (
+                          <div className="flex justify-between text-red-600 pt-1 border-t border-dashed border-gray-250">
+                            <span>Faltando pagar:</span>
+                            <span className="text-xs bg-red-50 px-2 py-0.5 rounded-lg">R$ {remainingAmount.toFixed(2)}</span>
+                          </div>
+                        ) : (
+                          <div className="flex justify-between text-emerald-600 pt-1 border-t border-dashed border-gray-250">
+                            <span>Status:</span>
+                            <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-lg">VALOR COBERTO</span>
+                          </div>
+                        )}
+
+                        {changeAmount > 0 && (
+                          <div className="flex justify-between text-amber-600 pt-1 border-t border-dashed border-gray-250">
+                            <span>Troco a devolver:</span>
+                            <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-lg">R$ {changeAmount.toFixed(2)}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Row/Grid of available payment methods to add */}
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Adicionar Forma:</p>
+                      <div className="grid grid-cols-3 gap-2 mb-5">
+                        {[
+                          { id: 'DINHEIRO', label: 'Dinheiro', icon: '💵' },
+                          { id: 'PIX', label: 'PIX', icon: '📱' },
+                          { id: 'CARTAO', label: 'Crédito', icon: '💳' },
+                          { id: 'DEBITO', label: 'Débito', icon: '💳' },
+                          { id: 'VALES', label: 'Vale', icon: '🎟️' },
+                          { id: 'A_PAGAR', label: 'Fiado', icon: '⌛' },
+                        ].map(method => {
+                          const exists = splitPayments.some(sp => sp.method === method.id);
+                          return (
+                            <button
+                              key={method.id}
+                              type="button"
+                              disabled={exists}
+                              onClick={() => {
+                                setSplitPayments(prev => [...prev, { method: method.id, amount: remainingAmount > 0 ? remainingAmount.toFixed(2) : '0' }]);
+                              }}
+                              className={`flex items-center gap-1 justify-center p-2.5 border rounded-xl font-extrabold text-[10px] active:scale-95 transition-all uppercase ${
+                                exists 
+                                  ? 'bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed'
+                                  : 'bg-white border-gray-200 hover:border-gray-400 text-gray-700'
+                              }`}
+                            >
+                              <span className="text-xs">{method.icon}</span> {method.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Finalize split selection */}
+                      <div className="flex gap-2.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsSplitMode(false);
+                            setSplitPayments([]);
+                          }}
+                          className="flex-1 py-3 border border-gray-250 text-gray-600 hover:bg-gray-100 font-extrabold rounded-2xl text-xs uppercase transition-all tracking-wider text-center"
+                        >
+                          Individual
+                        </button>
+                        <button
+                          type="button"
+                          disabled={splitTotal < paymentModalData.totalAmount - 0.01 || splitPayments.length === 0}
+                          onClick={() => {
+                            const finalDetails = splitPayments
+                              .map(sp => ({ method: sp.method, amount: parseFloat(sp.amount) || 0 }))
+                              .filter(sp => sp.amount > 0);
+                            
+                            let resolvedMethod = 'MISTO';
+                            if (finalDetails.length === 1) {
+                              resolvedMethod = finalDetails[0].method;
+                            }
+
+                            paymentModalData.onSuccess(resolvedMethod, JSON.stringify(finalDetails));
+                          }}
+                          className={`flex-[2] py-3 text-xs font-black rounded-2xl uppercase tracking-wider transition-all shadow-md active:scale-95 ${
+                            splitTotal >= paymentModalData.totalAmount - 0.01 && splitPayments.length > 0
+                              ? 'bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800'
+                              : 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
+                          }`}
+                        >
+                          Confirmar R$ {splitTotal.toFixed(2)}
+                        </button>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            ) : (
+              <div className="flex flex-col flex-1">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 text-center">Forma de Pagamento Obrigatória</p>
+                
+                <div className="grid grid-cols-2 gap-3 mb-6">
+                  {[
+                    { id: 'DINHEIRO', label: 'Dinheiro', desc: '💵 Notas/Moedas', color: 'border-green-200 hover:bg-green-50 text-green-700 hover:border-green-400 font-black' },
+                    { id: 'PIX', label: 'PIX', desc: '📱 QR Code/Chave', color: 'border-cyan-200 hover:bg-cyan-50 text-cyan-700 hover:border-cyan-400 font-black' },
+                    { id: 'CARTAO', label: 'Cartão Crd', desc: '💳 Maquininha', color: 'border-indigo-200 hover:bg-indigo-50 text-indigo-700 hover:border-indigo-400 font-black' },
+                    { id: 'DEBITO', label: 'Cartão Deb', desc: '💳 Débito', color: 'border-teal-200 hover:bg-teal-50 text-teal-700 hover:border-teal-400 font-black' },
+                    { id: 'VALES', label: 'Vale Ref.', desc: '🎟️ Ticket/Alim.', color: 'border-orange-200 hover:bg-orange-50 text-orange-700 hover:border-orange-400 font-black' },
+                    { id: 'A_PAGAR', label: 'A Pagar', desc: '⌛ Marcar Fiado', color: 'border-amber-200 hover:bg-amber-50 text-amber-700 hover:border-amber-400 font-black' },
+                  ].map(method => (
+                    <button
+                      key={method.id}
+                      onClick={() => {
+                        const detailsStr = JSON.stringify([{ method: method.id, amount: paymentModalData.totalAmount }]);
+                        paymentModalData.onSuccess(method.id, detailsStr);
+                      }}
+                      className={`flex flex-col items-center justify-center p-4 border rounded-2xl transition-all active:scale-95 text-center ${method.color}`}
+                    >
+                      <span className="font-extrabold text-xs tracking-tight uppercase">{method.label}</span>
+                      <span className="text-[9px] font-medium opacity-80 mt-1">{method.desc}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSplitMode(true);
+                    setSplitPayments([{ method: 'DINHEIRO', amount: paymentModalData.totalAmount.toFixed(2) }]);
+                  }}
+                  className="w-full py-4 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 hover:border-blue-300 font-black rounded-2xl text-xs uppercase transition-all tracking-wider flex items-center justify-center gap-2 mb-4 shadow-sm"
+                >
+                  🧩 Combinar Pagamentos (Misto)
+                </button>
+
+                <div className="text-center text-[9px] text-gray-400 uppercase font-black tracking-wide leading-relaxed">
+                  ⚠️ ATENÇÃO: Registrar o pagamento é necessário para somar este valor no fluxo de caixa do PDV.
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
