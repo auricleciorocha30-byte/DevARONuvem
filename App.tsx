@@ -583,7 +583,7 @@ function StoreContext() {
   };
 
   const pendingStatusUpdates = useRef(new Set<string>());
-  const updateOrderStatus = async (id: string, status: OrderStatus) => {
+  const updateOrderStatus = async (id: string, status: OrderStatus, paymentMethod?: string) => {
     if (pendingStatusUpdates.current.has(id + status)) return;
     pendingStatusUpdates.current.add(id + status);
 
@@ -767,6 +767,11 @@ function StoreContext() {
       } else {
           // For other statuses, just update normally
           let updatePayload: any = { status };
+          
+          if (paymentMethod) {
+              updatePayload.paymentMethod = paymentMethod;
+              updatePayload.paymentDetails = JSON.stringify([{ method: paymentMethod, amount: order?.total || 0 }]);
+          }
           
           if ((status === 'ENTREGUE') && !id.startsWith('local_')) {
               if (currentStore?.id) {
