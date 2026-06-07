@@ -161,7 +161,7 @@ export default function LoginPage({ onLoginSuccess }: Props) {
 
   const handlePortalAction = (target: string, requiresAuth: boolean) => {
     if (requiresAuth) {
-      const session = localStorage.getItem('gc-conveniencia-session-v1');
+      const session = localStorage.getItem('gc-conveniencia-session-v2');
       if (session) {
         try {
             const user = JSON.parse(session);
@@ -200,7 +200,7 @@ export default function LoginPage({ onLoginSuccess }: Props) {
 
             navigate(`${target}${lojaParam}`);
         } catch (e) {
-            localStorage.removeItem('gc-conveniencia-session-v1');
+            localStorage.removeItem('gc-conveniencia-session-v2');
             setIntendedDestination(target);
             setView('login');
         }

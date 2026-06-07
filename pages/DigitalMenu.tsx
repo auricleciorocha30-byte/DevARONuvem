@@ -74,11 +74,12 @@ interface Props {
   onLogout: () => void;
   onCloseMenu?: () => void;
   isWaitstaff?: boolean;
+  user?: Waitstaff;
   ecosystemUsage?: { ordersThisMonth: number; productsCount: number; usersCount: number; };
   refreshEcosystemUsage?: () => Promise<void>;
 }
 
-const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalCategories, settings, orders, addOrder, updateOrder, tableNumber: initialTable, onLogout, onCloseMenu, isWaitstaff: initialIsWaitstaff = false, ecosystemUsage, refreshEcosystemUsage }) => {
+const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalCategories, settings, orders, addOrder, updateOrder, tableNumber: initialTable, onLogout, onCloseMenu, isWaitstaff: initialIsWaitstaff = false, user, ecosystemUsage, refreshEcosystemUsage }) => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const urlTable = searchParams.get('mesa');
@@ -206,7 +207,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const effectiveTable = initialTable || urlTable || null;
   const isStoreClosed = settings.isStoreOpen === false;
 
-  const [isWaitstaff, setIsWaitstaff] = useState(initialIsWaitstaff || !!localStorage.getItem('gc-conveniencia-session-v1'));
+  const [isWaitstaff, setIsWaitstaff] = useState(initialIsWaitstaff || !!localStorage.getItem('gc-conveniencia-session-v2'));
 
   const [hasSelectedMode, setHasSelectedMode] = useState(() => {
     if (urlType && ['BALCAO', 'ENTREGA', 'MESA', 'COMANDA'].includes(urlType)) return true;
@@ -480,17 +481,23 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   };
 
   useEffect(() => {
-    const saved = localStorage.getItem('gc-conveniencia-session-v1');
-    if (saved) {
-        try {
-            const parsed = JSON.parse(saved);
-            setActiveWaitstaff(parsed);
-            setIsWaitstaff(true);
-        } catch (e) {
-            console.error("Error parsing session in DigitalMenu:", e);
+    // Priority: user prop > localStorage
+    if (user) {
+        setActiveWaitstaff(user);
+        setIsWaitstaff(true);
+    } else {
+        const saved = localStorage.getItem('gc-conveniencia-session-v2');
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                setActiveWaitstaff(parsed);
+                setIsWaitstaff(true);
+            } catch (e) {
+                console.error("Error parsing session in DigitalMenu:", e);
+            }
         }
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (!customerPhone || customerPhone.length < 8 || !settings.isCashbackActive || !storeId) {

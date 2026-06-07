@@ -593,7 +593,8 @@ function StoreContext() {
   };
 
   const pendingStatusUpdates = useRef(new Set<string>());
-  const updateOrderStatus = async (id: string, status: OrderStatus, paymentMethod?: string, paymentDetails?: string) => {
+  const updateOrderStatus = async (rawId: string, status: OrderStatus, paymentMethod?: string, paymentDetails?: string) => {
+    const id = String(rawId);
     if (pendingStatusUpdates.current.has(id + status)) return;
     pendingStatusUpdates.current.add(id + status);
 
@@ -610,7 +611,7 @@ function StoreContext() {
           return;
       }
 
-      let order = latestOrderData ? mapOrderFromDb(latestOrderData) : orders.find(o => o.id === id);
+      let order = latestOrderData ? mapOrderFromDb(latestOrderData) : orders.find(o => String(o.id) === id);
 
       if (order && status === 'CANCELADO' && order.status !== 'CANCELADO') {
         // Prevent race conditions by updating the DB first and checking if it was actually updated
@@ -959,7 +960,7 @@ function StoreContext() {
           <Navigate to={loginRedirect} replace />
         )
       } />
-      <Route path="/cardapio/*" element={<DigitalMenu storeId={currentStore?.id} products={products} categories={categories} settings={settings} orders={orders} addOrder={addOrder} updateOrder={updateOrder} tableNumber={activeTable} onLogout={() => setActiveTable(null)} isWaitstaff={!!adminUser} ecosystemUsage={ecosystemUsage} refreshEcosystemUsage={loadEcosystemUsage} />} />
+      <Route path="/cardapio/*" element={<DigitalMenu storeId={currentStore?.id} products={products} categories={categories} settings={settings} orders={orders} addOrder={addOrder} updateOrder={updateOrder} tableNumber={activeTable} onLogout={() => setActiveTable(null)} isWaitstaff={!!adminUser} user={adminUser || undefined} ecosystemUsage={ecosystemUsage} refreshEcosystemUsage={loadEcosystemUsage} />} />
       <Route path="/master" element={<SuperAdminPanel />} />
       <Route path="/login" element={<LoginPage onLoginSuccess={handleSetUser} />} />
 
