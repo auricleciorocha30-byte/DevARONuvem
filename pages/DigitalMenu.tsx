@@ -1732,14 +1732,8 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                 if (m.id === 'CASHBACK' && (!settings.isCashbackActive || customerPoints <= 0 || customerPoints < (settings.minCashbackToUse || 0))) return false;
                                 
                                 // Filter based on admin settings
-                                if (isWaitstaff) {
-                                   if (settings.attendantPaymentMethods && settings.attendantPaymentMethods.length > 0 && m.id !== 'CASHBACK') {
-                                     return settings.attendantPaymentMethods.includes(m.id as any);
-                                   }
-                                } else {
-                                   if (settings.digitalMenuPaymentMethods && settings.digitalMenuPaymentMethods.length > 0 && m.id !== 'CASHBACK') {
-                                     return settings.digitalMenuPaymentMethods.includes(m.id as any);
-                                   }
+                                if (settings.digitalMenuPaymentMethods && settings.digitalMenuPaymentMethods.length > 0 && m.id !== 'CASHBACK') {
+                                  return settings.digitalMenuPaymentMethods.includes(m.id as any);
                                 }
                                 
                                 // Default hide DEBITO as it's redundant with CARTAO usually
@@ -1778,14 +1772,8 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                   ].filter(m => {
                                     if (m.id === 'ONLINE' && (!settings.isOnlinePaymentActive || !settings.onlinePaymentProvider || settings.lockedFeatures?.includes('ONLINE_PAYMENT'))) return false;
                                     if (m.id === 'A_PAGAR' && orderType !== 'ENTREGA') return false;
-                                    if (isWaitstaff) {
-                                       if (settings.attendantPaymentMethods && settings.attendantPaymentMethods.length > 0) {
-                                         return settings.attendantPaymentMethods.includes(m.id as any);
-                                       }
-                                    } else {
-                                       if (settings.digitalMenuPaymentMethods && settings.digitalMenuPaymentMethods.length > 0) {
-                                         return settings.digitalMenuPaymentMethods.includes(m.id as any);
-                                       }
+                                    if (settings.digitalMenuPaymentMethods && settings.digitalMenuPaymentMethods.length > 0) {
+                                      return settings.digitalMenuPaymentMethods.includes(m.id as any);
                                     }
                                     if (m.id === 'DEBITO') return false;
                                     return true;

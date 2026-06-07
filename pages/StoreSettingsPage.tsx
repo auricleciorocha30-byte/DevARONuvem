@@ -366,9 +366,8 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
               <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 flex items-center justify-center gap-2">
                   <CreditCard size={18} /> Meios de Pagamento
               </h2>
-              
-              <p className="text-[10px] font-black uppercase text-gray-500 mb-2">No Menu Digital (Cliente)</p>
-              <div className="flex flex-col gap-2 mb-6">
+              <p className="text-[10px] uppercase text-gray-400 text-center mb-4">No Menu Digital</p>
+              <div className="flex flex-col gap-2">
                   {allPaymentMethods.map(method => (
                       <div key={method.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
                           <span className="text-xs font-bold text-gray-600">{method.label}</span>
@@ -383,28 +382,6 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                                       next = current.filter(m => m !== method.id);
                                   }
                                   setLocalSettings({...localSettings, digitalMenuPaymentMethods: next as any});
-                              }} 
-                          />
-                      </div>
-                  ))}
-              </div>
-
-              <p className="text-[10px] font-black uppercase text-gray-500 mb-2">No Painel Atendente</p>
-              <div className="flex flex-col gap-2">
-                  {allPaymentMethods.map(method => (
-                      <div key={method.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
-                          <span className="text-xs font-bold text-gray-600">{method.label}</span>
-                          <Switch 
-                              checked={localSettings.attendantPaymentMethods ? localSettings.attendantPaymentMethods.includes(method.id as any) : true} 
-                              onChange={(checked) => {
-                                  const current = localSettings.attendantPaymentMethods || ['PIX', 'CARTAO', 'DINHEIRO', 'ONLINE', 'A_PAGAR', 'DEBITO'];
-                                  let next;
-                                  if (checked) {
-                                      next = [...current, method.id];
-                                  } else {
-                                      next = current.filter(m => m !== method.id);
-                                  }
-                                  setLocalSettings({...localSettings, attendantPaymentMethods: next as any});
                               }} 
                           />
                       </div>

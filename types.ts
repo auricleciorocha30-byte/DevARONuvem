@@ -209,7 +209,6 @@ export interface StoreSettings {
   freeDeliveryToleranceKm?: number;
   deliveryFeeRules?: { upToKm: number; fee: number }[];
   digitalMenuPaymentMethods?: PaymentMethod[];
-  attendantPaymentMethods?: PaymentMethod[];
   
   // Integrações
   focusNfeToken?: string;

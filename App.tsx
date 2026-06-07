@@ -583,7 +583,7 @@ function StoreContext() {
   };
 
   const pendingStatusUpdates = useRef(new Set<string>());
-  const updateOrderStatus = async (id: string, status: OrderStatus, paymentMethod?: string) => {
+  const updateOrderStatus = async (id: string, status: OrderStatus) => {
     if (pendingStatusUpdates.current.has(id + status)) return;
     pendingStatusUpdates.current.add(id + status);
 
@@ -692,24 +692,26 @@ function StoreContext() {
           let updatePayload: any = { status, stockDeducted: 1 };
           
           if ((status === 'ENTREGUE') && !id.startsWith('local_')) {
+              let hasOpenSession = false;
+              let openSessionId = null;
               if (currentStore?.id) {
                   const { data: openSessions } = await supabase
                       .from('register_sessions')
-                      .select('id, waitstaff_id')
+                      .select('id')
                       .eq('store_id', currentStore.id)
                       .eq('status', 'OPEN')
-                      .gte('opened_at', Date.now() - 16 * 60 * 60 * 1000);
-                  
+                      .order('opened_at', { ascending: false })
+                      .limit(1);
                   if (openSessions && openSessions.length > 0) {
-                      const userSession = openSessions.find(s => s.waitstaff_id === adminUser?.id);
-                      if (userSession) {
-                          updatePayload.session_id = userSession.id;
-                      } else {
-                          updatePayload.session_id = openSessions[0].id;
-                      }
-                  } else {
-                      updatePayload.session_id = 'FECHADO';
+                      hasOpenSession = true;
+                      openSessionId = openSessions[0].id;
                   }
+              }
+                  
+              if (!hasOpenSession) {
+                  updatePayload.session_id = 'FECHADO';
+              } else {
+                  updatePayload.session_id = openSessionId;
               }
           }
 
@@ -768,33 +770,29 @@ function StoreContext() {
           // For other statuses, just update normally
           let updatePayload: any = { status };
           
-          if (paymentMethod) {
-              updatePayload.paymentMethod = paymentMethod;
-              updatePayload.paymentDetails = JSON.stringify([{ method: paymentMethod, amount: order?.total || 0 }]);
-          }
-          
           if ((status === 'ENTREGUE') && !id.startsWith('local_')) {
+              // Check if there's an open POS session
+              let hasOpenSession = false;
+              let openSessionId = null;
               if (currentStore?.id) {
                   const { data: openSessions } = await supabase
                       .from('register_sessions')
-                      .select('id, waitstaff_id')
+                      .select('id')
                       .eq('store_id', currentStore.id)
                       .eq('status', 'OPEN')
-                      .gte('opened_at', Date.now() - 16 * 60 * 60 * 1000);
-                  
+                      .order('opened_at', { ascending: false })
+                      .limit(1);
                   if (openSessions && openSessions.length > 0) {
-                      // Try to match the current user's session first
-                      const userSession = openSessions.find(s => s.waitstaff_id === adminUser?.id);
-                      if (userSession) {
-                          updatePayload.session_id = userSession.id;
-                      } else {
-                          // Otherwise pick the first available open session
-                          updatePayload.session_id = openSessions[0].id;
-                      }
-                  } else {
-                      // No open session. Set session_id to 'FECHADO' so it doesn't show as pending in POS.
-                      updatePayload.session_id = 'FECHADO';
+                      hasOpenSession = true;
+                      openSessionId = openSessions[0].id;
                   }
+              }
+                  
+              if (!hasOpenSession) {
+                  // No open session. Set session_id to 'FECHADO' so it doesn't show as pending in POS.
+                  updatePayload.session_id = 'FECHADO';
+              } else {
+                  updatePayload.session_id = openSessionId;
               }
           }
 

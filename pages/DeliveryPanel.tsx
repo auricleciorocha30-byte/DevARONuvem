@@ -140,10 +140,27 @@ export default function DeliveryPanel({ storeId, user, settings, orders, storeSl
 
   const updateStatus = async (orderId: string, newStatus: string) => {
     if (!orderId) return;
+
+    let updatePayload: any = { status: newStatus };
+    if (newStatus === 'ENTREGUE') {
+      const { data: openSessions } = await supabase
+          .from('register_sessions')
+          .select('id')
+          .eq('store_id', storeId)
+          .eq('status', 'OPEN')
+          .order('opened_at', { ascending: false })
+          .limit(1);
+      if (openSessions && openSessions.length > 0) {
+          updatePayload.session_id = openSessions[0].id;
+      } else {
+          updatePayload.session_id = 'FECHADO';
+      }
+    }
+
     await supabase
       .from('orders')
       .eq('id', orderId)
-      .update({ status: newStatus });
+      .update(updatePayload);
   };
 
   const acceptDelivery = async (orderId: string) => {
@@ -192,11 +209,24 @@ export default function DeliveryPanel({ storeId, user, settings, orders, storeSl
 
     const finalizeBulk = async () => {
         setLoading(true);
+        let sessionValue = 'FECHADO';
+        
+        const { data: openSessions } = await supabase
+            .from('register_sessions')
+            .select('id')
+            .eq('store_id', storeId)
+            .eq('status', 'OPEN')
+            .order('opened_at', { ascending: false })
+            .limit(1);
+        if (openSessions && openSessions.length > 0) {
+            sessionValue = openSessions[0].id;
+        }
+
         for (const order of bulkDeliveries) {
             await supabase
                 .from('orders')
                 .eq('id', order.id)
-                .update({ status: 'ENTREGUE' });
+                .update({ status: 'ENTREGUE', session_id: sessionValue });
         }
         setShowBulkFinalizeModal(false);
         fetchWeeklyCount();

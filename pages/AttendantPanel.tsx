@@ -50,7 +50,6 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
   const [isGeneratingPix, setIsGeneratingPix] = useState(false);
   const [isPixCopied, setIsPixCopied] = useState(false);
   const [isPixApproved, setIsPixApproved] = useState(false);
-  const [selectedTablePayment, setSelectedTablePayment] = useState<string>('');
   
   const tables = Array.from({ length: settings.tableCount || 30 }, (_, i) => (i + 1).toString());
 
@@ -165,7 +164,6 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
     const isOccupied = type === 'MESA' ? occupiedTables.has(id) : activeCommands.has(id);
     
     if (isOccupied) {
-      setSelectedTablePayment('');
       setSelectedTableModal({ id, type });
     } else {
       onSelectTable(id);
@@ -220,11 +218,11 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
     }, 300);
   };
 
-  const updateTableOrders = async (tableNum: string, status: OrderStatus, type?: 'MESA' | 'COMANDA', paymentMethod?: string) => {
+  const updateTableOrders = async (tableNum: string, status: OrderStatus, type?: 'MESA' | 'COMANDA') => {
     const tableOrders = activeOrders.filter(o => o.tableNumber === tableNum && (!type || o.type === type));
     setIsUpdating(`table-${tableNum}`);
     try {
-        await Promise.all(tableOrders.map(o => updateStatus(o.id, status, paymentMethod)));
+        await Promise.all(tableOrders.map(o => updateStatus(o.id, status)));
         setSelectedTableModal(null);
     } finally {
         setIsUpdating(null);
@@ -283,7 +281,7 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
             alert("Pagamento PIX Confirmado com Sucesso!");
             // Se confirmado, vamos finalizar os pedidos automaticamente
             if (activeOrders.length > 0) {
-               updateTableOrders(generatedPix.tableNum, 'ENTREGUE', undefined, 'PIX');
+               updateTableOrders(generatedPix.tableNum, 'ENTREGUE');
             }
           }
         } catch (error) {
@@ -725,25 +723,13 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
               </button>
               
               {checkCanFinish(selectedTableModal.type) ? (
-                <div className="flex flex-col gap-2">
-                   <select 
-                     value={selectedTablePayment} 
-                     onChange={e => setSelectedTablePayment(e.target.value)}
-                     className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold text-xs uppercase text-gray-600"
-                   >
-                      <option value="">-- Forma de Pagto (Obrigatório) --</option>
-                      {['PIX','CARTAO','DINHEIRO','DEBITO'].map(m => (
-                         <option key={m} value={m}>{m}</option>
-                      ))}
-                   </select>
-                   <button 
-                     disabled={isUpdating === `table-${selectedTableModal.id}` || !selectedTablePayment}
-                     onClick={() => updateTableOrders(selectedTableModal.id, 'ENTREGUE', selectedTableModal.type, selectedTablePayment)} 
-                     className="w-full flex items-center justify-center gap-4 p-5 bg-green-500 rounded-2xl font-black text-[11px] uppercase tracking-wider text-white hover:bg-green-600 transition-all active:scale-95 disabled:opacity-50 disabled:bg-gray-300"
-                   >
-                     {isUpdating === `table-${selectedTableModal.id}` ? <Loader2 className="animate-spin" size={20} /> : <CheckCircle size={20} />} Confirmar Finalização
-                   </button>
-                </div>
+                <button 
+                  disabled={isUpdating === `table-${selectedTableModal.id}`}
+                  onClick={() => updateTableOrders(selectedTableModal.id, 'ENTREGUE', selectedTableModal.type)} 
+                  className="w-full flex items-center gap-4 p-5 bg-green-50 rounded-2xl border border-green-100 font-black text-[11px] uppercase tracking-wider text-green-700 hover:bg-green-100 transition-all active:scale-95"
+                >
+                  {isUpdating === `table-${selectedTableModal.id}` ? <Loader2 className="animate-spin" size={20} /> : <CheckCircle className="text-green-500" size={20} />} Finalizar Pedidos
+                </button>
               ) : (
                 <div className="w-full flex items-center gap-4 p-5 bg-gray-50 rounded-2xl border border-gray-100 font-black text-[9px] uppercase tracking-wider text-gray-400 cursor-not-allowed">
                   <Lock size={16} /> {settings.requirePosFinalization ? 'Finalizar no PDV' : 'Apenas Gerente'}
