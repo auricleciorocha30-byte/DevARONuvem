@@ -32,7 +32,7 @@ interface Props {
   onSelectTable: (table: string | null) => void;
   orders: Order[];
   settings: StoreSettings;
-  updateStatus: (id: string, status: OrderStatus) => Promise<void>;
+  updateStatus: (id: string, status: OrderStatus, paymentMethod?: string, paymentDetails?: string) => Promise<void>;
   onLogout: () => void;
   isOffline?: boolean;
 }
@@ -50,6 +50,12 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
   const [isGeneratingPix, setIsGeneratingPix] = useState(false);
   const [isPixCopied, setIsPixCopied] = useState(false);
   const [isPixApproved, setIsPixApproved] = useState(false);
+  const [paymentModalData, setPaymentModalData] = useState<{
+    orderIds: string[];
+    totalAmount: number;
+    tableNum?: string;
+    onSuccess: (method: string, details: string) => Promise<void>;
+  } | null>(null);
   
   const tables = Array.from({ length: settings.tableCount || 30 }, (_, i) => (i + 1).toString());
 
@@ -220,6 +226,43 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
 
   const updateTableOrders = async (tableNum: string, status: OrderStatus, type?: 'MESA' | 'COMANDA') => {
     const tableOrders = activeOrders.filter(o => o.tableNumber === tableNum && (!type || o.type === type));
+
+    if (status === 'ENTREGUE') {
+        const totalAmount = tableOrders.reduce((acc, o) => acc + (o.total || 0), 0);
+        const orderIds = tableOrders.map(o => o.id);
+
+        if (isPixApproved) {
+            // Fulfill automatically as PIX
+            const paymentDetailsStr = JSON.stringify([{ method: 'PIX', amount: totalAmount }]);
+            setIsUpdating(`table-${tableNum}`);
+            try {
+                await Promise.all(orderIds.map(oId => updateStatus(oId, 'ENTREGUE', 'PIX', paymentDetailsStr)));
+                setSelectedTableModal(null);
+            } finally {
+                setIsUpdating(null);
+            }
+            return;
+        }
+
+        // Otherwise, show payment method selection modal
+        setPaymentModalData({
+            orderIds,
+            totalAmount,
+            tableNum: (type || 'MESA') + ' ' + tableNum,
+            onSuccess: async (method: string, details: string) => {
+                setIsUpdating(`table-${tableNum}`);
+                try {
+                    await Promise.all(orderIds.map(oId => updateStatus(oId, 'ENTREGUE', method, details)));
+                    setSelectedTableModal(null);
+                } finally {
+                    setIsUpdating(null);
+                    setPaymentModalData(null);
+                }
+            }
+        });
+        return;
+    }
+
     setIsUpdating(`table-${tableNum}`);
     try {
         await Promise.all(tableOrders.map(o => updateStatus(o.id, status)));
@@ -296,9 +339,40 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
   }, [generatedPix, isPixApproved, settings.onlinePaymentAccessToken, activeOrders]);
 
   const handleGroupStatusUpdate = async (ids: string[], status: OrderStatus) => {
+    if (status === 'ENTREGUE') {
+         const ordersToUpdate = ids.filter(id => {
+             const order = displayOrders.find(o => o.originalIds?.includes(id) || o.id === id);
+             if (order && order.type === 'ENTREGA' && settings.requirePosFinalization) {
+                 return false; // Cannot set to ENTREGUE directly
+             }
+             return true;
+         });
+
+         if (ordersToUpdate.length > 0) {
+              const targetOrders = activeOrders.filter(o => ordersToUpdate.includes(o.id));
+              const totalAmount = targetOrders.reduce((acc, o) => acc + (o.total || 0), 0);
+              
+              setPaymentModalData({
+                  orderIds: ordersToUpdate,
+                  totalAmount,
+                  tableNum: targetOrders[0]?.tableNumber || undefined,
+                  onSuccess: async (method: string, details: string) => {
+                      setIsUpdating(ids[0]);
+                      try {
+                          await Promise.all(ordersToUpdate.map(id => updateStatus(id, 'ENTREGUE', method, details)));
+                      } finally {
+                          setIsUpdating(null);
+                          setPaymentModalData(null);
+                      }
+                  }
+              });
+         }
+         return;
+    }
+
     setIsUpdating(ids[0]);
     try {
-        if (status === 'ENTREGUE' || status === 'ENVIADO_PARA_ENTREGA') {
+        if (status === 'ENVIADO_PARA_ENTREGA') {
              // Check if any of these orders are ENTREGA and require POS finalization
              const ordersToUpdate = ids.filter(id => {
                  const order = displayOrders.find(o => o.originalIds?.includes(id) || o.id === id);
@@ -749,6 +823,61 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
                   <Lock size={16} /> Cancelar (Apenas Gerente)
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {paymentModalData && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-sm p-6 overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-black text-gray-800 uppercase tracking-wide">Finalizar e Receber</h3>
+              <button 
+                onClick={() => setPaymentModalData(null)} 
+                className="p-1 px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-extrabold rounded-lg transition-all text-xs uppercase"
+              >
+                Voltar
+              </button>
+            </div>
+
+            <div className="bg-blue-50 text-blue-800 p-5 rounded-2xl mb-6 text-center">
+              <span className="text-[10px] font-black uppercase tracking-wider text-blue-500 block mb-1">Total a Receber</span>
+              <span className="text-3xl font-black text-blue-900 font-brand">R$ {paymentModalData.totalAmount.toFixed(2)}</span>
+              {paymentModalData.tableNum && (
+                <span className="block mt-1.5 text-xs font-bold uppercase text-blue-600 bg-blue-100/50 py-1 px-2 rounded-lg inline-block">
+                  {paymentModalData.tableNum}
+                </span>
+              )}
+            </div>
+
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 text-center">Forma de Pagamento Obrigatória</p>
+            
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              {[
+                { id: 'DINHEIRO', label: 'Dinheiro', desc: '💵 Notas/Moedas', color: 'border-green-200 hover:bg-green-50 text-green-700 hover:border-green-400 font-black' },
+                { id: 'PIX', label: 'PIX', desc: '📱 QR Code/Chave', color: 'border-cyan-200 hover:bg-cyan-50 text-cyan-700 hover:border-cyan-400 font-black' },
+                { id: 'CARTAO', label: 'Cartão Crd', desc: '💳 Maquininha', color: 'border-indigo-200 hover:bg-indigo-50 text-indigo-700 hover:border-indigo-400 font-black' },
+                { id: 'DEBITO', label: 'Cartão Deb', desc: '💳 Débito', color: 'border-teal-200 hover:bg-teal-50 text-teal-700 hover:border-teal-400 font-black' },
+                { id: 'VALES', label: 'Vale Ref.', desc: '🎟️ Ticket/Alim.', color: 'border-orange-200 hover:bg-orange-50 text-orange-700 hover:border-orange-400 font-black' },
+                { id: 'A_PAGAR', label: 'A Pagar', desc: '⌛ Marcar Fiado', color: 'border-amber-200 hover:bg-amber-50 text-amber-700 hover:border-amber-400 font-black' },
+              ].map(method => (
+                <button
+                  key={method.id}
+                  onClick={() => {
+                    const detailsStr = JSON.stringify([{ method: method.id, amount: paymentModalData.totalAmount }]);
+                    paymentModalData.onSuccess(method.id, detailsStr);
+                  }}
+                  className={`flex flex-col items-center justify-center p-4 border rounded-2xl transition-all active:scale-95 text-center ${method.color}`}
+                >
+                  <span className="font-extrabold text-xs tracking-tight uppercase">{method.label}</span>
+                  <span className="text-[9px] font-medium opacity-80 mt-1">{method.desc}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="text-center text-[9px] text-gray-400 uppercase font-black tracking-wide leading-relaxed">
+              ⚠️ ATENÇÃO: Registrar o pagamento é necessário para somar este valor no fluxo de caixa do PDV.
             </div>
           </div>
         </div>

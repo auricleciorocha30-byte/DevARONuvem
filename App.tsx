@@ -583,7 +583,7 @@ function StoreContext() {
   };
 
   const pendingStatusUpdates = useRef(new Set<string>());
-  const updateOrderStatus = async (id: string, status: OrderStatus) => {
+  const updateOrderStatus = async (id: string, status: OrderStatus, paymentMethod?: string, paymentDetails?: string) => {
     if (pendingStatusUpdates.current.has(id + status)) return;
     pendingStatusUpdates.current.add(id + status);
 
@@ -690,6 +690,12 @@ function StoreContext() {
       } else if (order && status === 'ENTREGUE' && order.stockDeducted === false) {
           // Deduct stock if it wasn't deducted yet
           let updatePayload: any = { status, stockDeducted: 1 };
+          if (paymentMethod) {
+              updatePayload.paymentMethod = paymentMethod;
+          }
+          if (paymentDetails) {
+              updatePayload.paymentDetails = paymentDetails;
+          }
           
           if ((status === 'ENTREGUE') && !id.startsWith('local_')) {
               let hasOpenSession = false;
@@ -769,6 +775,12 @@ function StoreContext() {
       } else {
           // For other statuses, just update normally
           let updatePayload: any = { status };
+          if (paymentMethod) {
+              updatePayload.paymentMethod = paymentMethod;
+          }
+          if (paymentDetails) {
+              updatePayload.paymentDetails = paymentDetails;
+          }
           
           if ((status === 'ENTREGUE') && !id.startsWith('local_')) {
               // Check if there's an open POS session
