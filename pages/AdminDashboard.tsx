@@ -29,9 +29,10 @@ interface Props {
   settings: StoreSettings;
   storeId?: string;
   onLogout?: () => void;
+  onSave?: (newSettings: StoreSettings) => Promise<void>;
 }
 
-const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, onLogout }) => {
+const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, onLogout, onSave }) => {
   const [searchParams] = useSearchParams();
   const [waitstaff, setWaitstaff] = useState<any[]>([]);
   const [isPrintingCommissionsOnly, setIsPrintingCommissionsOnly] = useState(false);
@@ -129,7 +130,7 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
   }, [filteredOrders, products]);
 
   const commissions = useMemo(() => {
-    const comms = new Map<string, { name: string, totalSales: number, commissionValue: number, rate: number }>();
+    const comms = new Map<string, { staffId: string, name: string, totalSales: number, commissionValue: number, rate: number }>();
     
     filteredOrders.filter(o => o.status !== 'CANCELADO' && o.status !== 'PREPARANDO').forEach(order => {
       if (order.waitstaffName) {
@@ -147,6 +148,13 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
         }
         
         const staffId = staffMember ? staffMember.id : `deleted-${staffName.toLowerCase().replace(/\s+/g, '-')}`;
+        
+        // Skip orders from before last payout
+        const lastPaidAt = settings.waitstaffLastPaidAt?.[staffId] || 0;
+        if (new Date(order.createdAt).getTime() < lastPaidAt) {
+            return; // Skip this one for commission, already paid
+        }
+
         const existing = comms.get(staffId);
         const orderTotal = Number(order.total) || 0;
         const baseSales = orderTotal - (order.serviceFee || 0) - (order.deliveryFee || 0);
@@ -160,6 +168,7 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
           existing.commissionValue += commValue;
         } else {
           comms.set(staffId, {
+            staffId: staffId,
             name: staffMember?.name || staffName,
             totalSales: baseSales,
             commissionValue: commValue,
@@ -172,6 +181,12 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
         const driver = waitstaff.find(w => w.id === order.deliveryDriverId);
         if (driver) {
           const idStr = String(driver.id);
+          // Check last payout for driver too
+          const lastPaidAt = settings.waitstaffLastPaidAt?.[idStr] || 0;
+          if (new Date(order.createdAt).getTime() < lastPaidAt) {
+              return; // Already paid
+          }
+
           const driverCommValue = settings.waitstaffCommissions?.[idStr] || 0;
           
           if (driverCommValue > 0) {
@@ -183,6 +198,7 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
               existing.totalSales += (order.deliveryFee || 0);
             } else {
               comms.set(idStr, {
+                staffId: idStr,
                 name: driver.name + ' (Entregador)',
                 totalSales: (order.deliveryFee || 0),
                 commissionValue: driverCommValue,
@@ -195,7 +211,7 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
     });
     
     return Array.from(comms.values()).sort((a, b) => b.commissionValue - a.commissionValue);
-  }, [filteredOrders, waitstaff, settings.waitstaffCommissions]);
+  }, [filteredOrders, waitstaff, settings.waitstaffCommissions, settings.waitstaffLastPaidAt]);
 
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const lojaParam = storeSlug ? `?loja=${storeSlug}` : '';
@@ -207,6 +223,22 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
     navigator.clipboard.writeText(url);
     setCopiedLink(type);
     setTimeout(() => setCopiedLink(null), 2000);
+  };
+
+  const handlePayCommission = async (staffId: string, staffName: string) => {
+    if (!onSave) return;
+    const confirm = window.confirm(`Confirmar pagamento da comissão de ${staffName}? O saldo atual será zerado.`);
+    if (!confirm) return;
+
+    const currentWaitstaffLastPaidAt = settings.waitstaffLastPaidAt || {};
+    const updatedSettings = {
+       ...settings,
+       waitstaffLastPaidAt: {
+           ...currentWaitstaffLastPaidAt,
+           [staffId]: Date.now()
+       }
+    };
+    await onSave(updatedSettings);
   };
 
   return (
@@ -446,6 +478,7 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
                                 <th className="pb-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Taxa (%)</th>
                                 <th className="pb-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Total Vendas</th>
                                 <th className="pb-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Comissão</th>
+                                <th className="pb-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right no-print">Ações</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
@@ -459,11 +492,21 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
                                     <td className="py-4 text-sm font-black text-green-600 text-right">
                                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.commissionValue)}
                                     </td>
+                                    <td className="py-4 text-right no-print">
+                                      {item.commissionValue > 0 && onSave && (
+                                        <button 
+                                          onClick={() => handlePayCommission(item.staffId, item.name)}
+                                          className="px-3 py-1.5 bg-green-100 text-green-700 hover:bg-green-200 font-bold text-xs rounded-xl transition-colors"
+                                        >
+                                          PAGO
+                                        </button>
+                                      )}
+                                    </td>
                                 </tr>
                             ))}
                             {commissions.length === 0 && (
                                 <tr>
-                                    <td colSpan={4} className="py-8 text-center text-sm font-bold text-gray-400">
+                                    <td colSpan={5} className="py-8 text-center text-sm font-bold text-gray-400">
                                         Nenhuma comissão registrada para este período.
                                     </td>
                                 </tr>

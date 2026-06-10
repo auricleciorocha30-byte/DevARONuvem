@@ -1025,7 +1025,7 @@ function StoreContext() {
           ) : <Navigate to={loginRedirect} />
         )
       }>
-        <Route index element={<AdminDashboard orders={orders} products={products} settings={settings} storeId={currentStore?.id} onLogout={() => handleSetUser(null)} />} />
+        <Route index element={<AdminDashboard orders={orders} products={products} settings={settings} storeId={currentStore?.id} onLogout={() => handleSetUser(null)} onSave={handleUpdateSettings} />} />
         <Route path="cardapio-admin" element={<MenuManagement ecosystemUsage={ecosystemUsage} refreshEcosystemUsage={loadEcosystemUsage} settings={settings} storeId={currentStore?.id} products={products} saveProduct={async (p) => { 
           const payload: any = { ...p, store_id: currentStore?.id };
           if (payload.complements !== undefined) {

@@ -215,6 +215,7 @@ export interface StoreSettings {
   requirePosFinalization?: boolean;
   autoApproveDeliveries?: boolean;
   waitstaffCommissions?: Record<string, number>;
+  waitstaffLastPaidAt?: Record<string, number>;
   isDeliveryFeeActive?: boolean;
   freeDeliveryToleranceKm?: number;
   deliveryFeeRules?: { upToKm: number; fee: number }[];
