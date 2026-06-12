@@ -31,53 +31,11 @@ export default function IntegrationsPage({ settings, onSave, storeId }: Props) {
     onlinePaymentProvider: settings.onlinePaymentProvider || 'mercado_pago',
     onlinePaymentAccessToken: settings.onlinePaymentAccessToken || '',
     onlinePaymentPublicKey: settings.onlinePaymentPublicKey || '',
-    pagbankEnvironment: settings.pagbankEnvironment || 'sandbox',
     isOnlinePaymentActive: settings.isOnlinePaymentActive || false,
     mercadoPagoPointDeviceId: settings.mercadoPagoPointDeviceId || '',
     mercadoPagoWebhookSecret: settings.mercadoPagoWebhookSecret || '',
   });
 
-  const [isGeneratingKey, setIsGeneratingKey] = useState(false);
-
-  const handleGeneratePagBankKey = async () => {
-    if (!formData.onlinePaymentAccessToken) {
-      alert('Informe o Token (Chave Privada) antes de gerar a Chave Pública.');
-      return;
-    }
-    
-    setIsGeneratingKey(true);
-    try {
-      const response = await fetch('/api/pagbank/public-key', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token: formData.onlinePaymentAccessToken,
-          environment: formData.pagbankEnvironment
-        })
-      });
-      
-      const responseText = await response.text();
-      let data;
-      try {
-        data = responseText ? JSON.parse(responseText) : {};
-      } catch (e) {
-        throw new Error(`Resposta inválida do servidor ao gerar chave. (Status: ${response.status})`);
-      }
-      
-      if (response.ok && data.public_key) {
-        setFormData({ ...formData, onlinePaymentPublicKey: data.public_key });
-        alert('Chave Pública gerada e preenchida com sucesso!');
-      } else {
-        const errorMessage = data.error || (data.message) || (data.error_messages ? data.error_messages.map((m: any) => m.description).join(', ') : null);
-        alert('Erro ao gerar chave pública: ' + (errorMessage || `Status: ${response.status}`));
-      }
-    } catch (error: any) {
-      console.error(error);
-      alert('Erro ao comunicar com o servidor: ' + error.message);
-    } finally {
-      setIsGeneratingKey(false);
-    }
-  };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -254,47 +212,15 @@ export default function IntegrationsPage({ settings, onSave, storeId }: Props) {
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">Provedor</label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 gap-2">
                   <button
                     onClick={() => setFormData({ ...formData, onlinePaymentProvider: 'mercado_pago' })}
                     className={`py-3 rounded-xl font-bold text-[10px] transition-all border ${formData.onlinePaymentProvider === 'mercado_pago' ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-gray-50 text-gray-400 border-gray-100'}`}
                   >
                     Mercado Pago
                   </button>
-                  <button
-                    onClick={() => setFormData({ ...formData, onlinePaymentProvider: 'pagbank' })}
-                    className={`py-3 rounded-xl font-bold text-[10px] transition-all border ${formData.onlinePaymentProvider === 'pagbank' ? 'bg-green-600 text-white border-green-600 shadow-md' : 'bg-gray-50 text-gray-400 border-gray-100'}`}
-                  >
-                    PagBank
-                  </button>
-                  <button
-                    onClick={() => setFormData({ ...formData, onlinePaymentProvider: 'asaas' })}
-                    className={`py-3 rounded-xl font-bold text-[10px] transition-all border ${formData.onlinePaymentProvider === 'asaas' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-gray-50 text-gray-400 border-gray-100'}`}
-                  >
-                    Asaas
-                  </button>
                 </div>
               </div>
-
-              {formData.onlinePaymentProvider === 'pagbank' && (
-                <div>
-                  <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2 ml-1">Ambiente PagBank</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => setFormData({ ...formData, pagbankEnvironment: 'sandbox' })}
-                      className={`py-3 rounded-xl font-bold text-xs transition-all border ${formData.pagbankEnvironment === 'sandbox' ? 'bg-orange-600 text-white border-orange-600 shadow-md' : 'bg-gray-50 text-gray-400 border-gray-100'}`}
-                    >
-                      Sandbox (Testes)
-                    </button>
-                    <button
-                      onClick={() => setFormData({ ...formData, pagbankEnvironment: 'production' })}
-                      className={`py-3 rounded-xl font-bold text-xs transition-all border ${formData.pagbankEnvironment === 'production' ? 'bg-primary text-white border-primary shadow-md' : 'bg-gray-50 text-gray-400 border-gray-100'}`}
-                    >
-                      Produção (Real)
-                    </button>
-                  </div>
-                </div>
-              )}
 
               {formData.onlinePaymentProvider === 'mercado_pago' && (
                 <div className="bg-blue-50/50 p-5 rounded-2xl border border-blue-100 space-y-4 transition-all">
@@ -374,21 +300,7 @@ export default function IntegrationsPage({ settings, onSave, storeId }: Props) {
                       placeholder="Identificador da Chave..."
                     />
                   </div>
-                  {formData.onlinePaymentProvider === 'pagbank' && (
-                    <button
-                      onClick={handleGeneratePagBankKey}
-                      disabled={isGeneratingKey}
-                      className="px-6 bg-green-50 text-green-600 border border-green-100 rounded-2xl font-bold text-xs hover:bg-green-100 transition-all disabled:opacity-50"
-                    >
-                      {isGeneratingKey ? <Loader2 className="animate-spin" size={18} /> : 'Gerar Chave'}
-                    </button>
-                  )}
                 </div>
-                {formData.onlinePaymentProvider === 'pagbank' && (
-                  <p className="text-[10px] text-gray-400 mt-2 ml-1 italic">
-                    * Clique em "Gerar Chave" para obter a chave pública automaticamente usando seu Access Token.
-                  </p>
-                )}
               </div>
 
               {formData.onlinePaymentProvider === 'mercado_pago' && (

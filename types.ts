@@ -225,11 +225,10 @@ export interface StoreSettings {
   focusNfeToken?: string;
   focusNfeEnvironment?: 'production' | 'homologation';
   focusNfeCertificate?: string;
-  onlinePaymentProvider?: 'mercado_pago' | 'pagbank' | 'asaas';
+  onlinePaymentProvider?: 'mercado_pago';
   onlinePaymentAccessToken?: string;
   onlinePaymentPublicKey?: string;
   mercadoPagoWebhookSecret?: string;
-  pagbankEnvironment?: 'production' | 'sandbox';
   isOnlinePaymentActive?: boolean;
   mercadoPagoPointDeviceId?: string;
   syncIntervals?: {

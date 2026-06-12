@@ -1163,43 +1163,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
           }
         }
 
-        if ((payment === 'ONLINE' || combinedPayment === 'ONLINE') && settings.onlinePaymentProvider === 'pagbank') {
-          try {
-            const redirectStoreUrl = `${window.location.origin}${window.location.pathname}#/cardapio?loja=${settings.slug || storeSlug}${urlModo ? '&modo=' + urlModo : ''}`;
-            const response = await fetch('/api/v1/process-payment', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                token: settings.onlinePaymentAccessToken,
-                environment: settings.pagbankEnvironment || 'sandbox',
-                orderData: generatedOrderData,
-                storeUrl: redirectStoreUrl,
-                storeSlug: settings.slug || storeSlug,
-                storeId: storeId
-              })
-            });
-            
-            const responseText = await response.text();
-            let data;
-            try {
-              data = responseText ? JSON.parse(responseText) : {};
-            } catch (e) {
-              console.error('Non-JSON response from PagBank API:', responseText);
-              throw new Error(`Resposta inválida do servidor. (Status: ${response.status})`);
-            }
 
-            if (data.checkout_url) {
-              window.location.href = data.checkout_url;
-              return; // Stop execution to allow redirect
-            } else {
-              const errorMessage = data.error || (data.message) || (data.error_messages ? data.error_messages.map((m: any) => m.description).join(', ') : null);
-              alert('Erro ao gerar link de pagamento PagBank: ' + (errorMessage || `Status: ${response.status}`));
-            }
-          } catch (err: any) {
-            console.error('Erro no pagamento online PagBank:', err);
-            alert(`Erro ao gerar link de pagamento PagBank: ${err.message}`);
-          }
-        }
 
         setCheckoutStep('success'); 
     } catch (err: any) { 

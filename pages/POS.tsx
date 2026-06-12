@@ -1545,15 +1545,13 @@ export default function POS({ storeId, user, settings, orders, onLogout, updateS
 
         const redirectStoreUrl = `${window.location.origin}/pagamento-ok`;
 
-        const endpoint = settings.onlinePaymentProvider === 'mercado_pago' ? '/api/mercado-pago/create-preference' : '/api/v1/process-payment';
+        const endpoint = '/api/mercado-pago/create-preference';
         
         const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                token: settings.onlinePaymentAccessToken,
                 accessToken: settings.onlinePaymentAccessToken,
-                environment: settings.pagbankEnvironment || 'sandbox',
                 orderData: mockOrder,
                 status: 'pending',
                 storeUrl: redirectStoreUrl,

@@ -29,85 +29,7 @@ export default {
       });
     }
 
-    // PAGBANK WEBHOOK
-    if (url.pathname === "/api/webhooks/pagbank") {
-      try {
-        const body = await request.clone().json();
-        console.log("PagBank Webhook received:", body);
-        
-        let reference_id = body.reference_id;
-        let status = body.status;
 
-        if (body.charges && body.charges.length > 0) {
-            status = body.charges[0].status;
-            reference_id = body.charges[0].reference_id || reference_id;
-        }
-        
-        if (reference_id) {
-          const mainTursoUrl = "https://produtodevaro-auricleciorocha30-byte.aws-us-east-1.turso.io";
-          const mainTursoToken = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzIxMzYwOTMsImlkIjoiMDE5YzliNzctZGMwMS03MmIwLWFmYWItYWRlOGY0MjM5YTBjIiwicmlkIjoiYTQyYjFmY2EtYjc0YS00MGMwLTk3M2QtODlmNmFlMTBkYzFiIn0.A7LAbG4yZ70-XPczvHXgaVUm2t_rJuTlsMpefd86FVprMb50rPZU5aICZdVvQvXpdnwOiav_nNMRCOOmi2cQDQ";
-          
-          let targetDbUrl = mainTursoUrl;
-          let targetDbToken = mainTursoToken;
-
-          const slug = url.searchParams.get('slug');
-          
-          if (slug) {
-              try {
-                  const querySql = `SELECT dbUrl, dbAuthToken FROM store_profiles WHERE slug = ? LIMIT 1`;
-                  const resp = await fetch(mainTursoUrl, {
-                      method: 'POST',
-                      headers: { 'Authorization': `Bearer ${mainTursoToken}`, 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ statements: [{ q: querySql, params: [slug] }] })
-                  });
-                  const json = await resp.json();
-                  if (json[0]?.results?.rows?.length > 0) {
-                      const row = json[0].results.rows[0];
-                      const cols = json[0].results.columns;
-                      const dbUrlIndex = cols.indexOf('dbUrl');
-                      const dbTokenIndex = cols.indexOf('dbAuthToken');
-                      if (row[dbUrlIndex] && row[dbTokenIndex]) {
-                          targetDbUrl = row[dbUrlIndex];
-                          targetDbToken = row[dbTokenIndex];
-
-                          if (targetDbUrl.startsWith('libsql://')) {
-                              targetDbUrl = targetDbUrl.replace('libsql://', 'https://');
-                          }
-                      }
-                  }
-              } catch (e) {
-                  console.error("Failed to query store database details:", e);
-              }
-          }
-          
-          let newStatus = 'AGUARDANDO_PAGAMENTO';
-          if (status === 'PAID' || status === 'COMPLETED' || status === 'AUTHORIZED') {
-            newStatus = 'PAGO';
-          } else if (status === 'CANCELED' || status === 'DECLINED') {
-            newStatus = 'CANCELADO';
-          }
-
-          const updateSql = `UPDATE orders SET status = ? WHERE id = ? OR id = ?`;
-          await fetch(targetDbUrl, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${targetDbToken}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              statements: [{ q: updateSql, params: [newStatus, reference_id, isNaN(Number(reference_id)) ? -1 : Number(reference_id)] }]
-            })
-          });
-          
-          return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
-        }
-        
-        return new Response("OK", { status: 200, headers: corsHeaders });
-      } catch (error) {
-        console.error("Webhook Error:", error);
-        return new Response("OK", { status: 200, headers: corsHeaders }); // Always return 200 to PagBank
-      }
-    }
 
     // MERCADO PAGO WEBHOOK (Notifications)
     if (url.pathname === "/api/webhooks/mercadopago" && request.method === "POST") {
@@ -197,105 +119,7 @@ export default {
       }
     }
 
-    // PAGBANK CHECKOUT (Unified Path)
-    if (url.pathname === "/api/pbank/checkout" || url.pathname === "/api/v1/process-payment" || url.pathname === "/api/v1/process-payment/") {
-      if (request.method !== "POST") {
-        return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405, headers: corsHeaders });
-      }
 
-      try {
-        const body = await request.json();
-        const { token, environment, orderData, storeUrl, storeSlug } = body;
-
-        if (!token) {
-          return new Response(JSON.stringify({ error: "Token não fornecido." }), { status: 400, headers: corsHeaders });
-        }
-
-        const baseUrl = environment === 'production' ? 'https://api.pagseguro.com' : 'https://sandbox.api.pagseguro.com';
-        
-        const items = orderData.items.map((item) => ({ 
-          name: item.name, 
-          quantity: 1, 
-          unit_amount: Math.round(Number(item.price) * Number(item.quantity) * 100) 
-        }));
-        
-        if (orderData.deliveryFee > 0) items.push({ name: 'Taxa de Entrega', quantity: 1, unit_amount: Math.round(Number(orderData.deliveryFee) * 100) });
-        if (orderData.serviceFee > 0) items.push({ name: 'Taxa de Serviço', quantity: 1, unit_amount: Math.round(Number(orderData.serviceFee) * 100) });
-
-        let amountToCharge = orderData.total;
-        if (orderData.paymentDetails) {
-          try {
-            const details = JSON.parse(orderData.paymentDetails);
-            const onlinePayment = details.find((d) => d.method === 'ONLINE');
-            if (onlinePayment) amountToCharge = onlinePayment.amount;
-          } catch (e) {}
-        }
-
-        const redirectUrl = storeUrl.includes('?') 
-          ? `${storeUrl}&payment=success&orderId=${orderData.id}` 
-          : `${storeUrl}?payment=success&orderId=${orderData.id}`;
-
-        const notificationUrl = storeSlug 
-            ? `${new URL(request.url).origin}/api/webhooks/pagbank?slug=${storeSlug}`
-            : `${new URL(request.url).origin}/api/webhooks/pagbank`;
-
-        const pagbankBody = {
-          reference_id: orderData.id,
-          items: (orderData.discountAmount > 0 || amountToCharge !== orderData.total) 
-            ? [{ name: `Pedido #${orderData.displayId}`, quantity: 1, unit_amount: Math.round(amountToCharge * 100) }]
-            : items,
-          redirect_url: redirectUrl,
-          notification_urls: [notificationUrl],
-          payment_methods: [{ type: 'CREDIT_CARD' }, { type: 'DEBIT_CARD' }, { type: 'BOLETO' }, { type: 'PIX' }]
-        };
-
-        if (orderData.customerName && orderData.customerName !== 'Cliente PDV') {
-          const nameParts = orderData.customerName.trim().split(' ');
-          if (nameParts.length >= 2) {
-            pagbankBody.customer = { name: orderData.customerName, email: 'cliente@email.com' };
-          }
-        }
-
-        const resp = await fetch(`${baseUrl}/checkouts`, {
-          method: 'POST',
-          headers: { 
-            'Authorization': `Bearer ${token}`, 
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify(pagbankBody)
-        });
-
-        const responseText = await resp.text();
-        let data;
-        try {
-          data = responseText ? JSON.parse(responseText) : {};
-        } catch (e) {
-          console.error("PagBank Checkout Non-JSON:", responseText);
-          return new Response(JSON.stringify({ error: `PagBank retornou resposta inválida (${resp.status}): ${responseText.substring(0, 100)}` }), { status: 500, headers: corsHeaders });
-        }
-
-        if (!resp.ok) {
-          const detail = data.error_messages ? data.error_messages.map(m => m.description).join(', ') : (data.message || JSON.stringify(data));
-          return new Response(JSON.stringify({ error: detail || "Erro no PagBank" }), { 
-              status: resp.status,
-              headers: { ...corsHeaders, "Content-Type": "application/json" }
-          });
-        }
-
-        const checkoutLink = data.links?.find((l) => l.rel === 'PAY')?.href;
-        if (!checkoutLink) {
-          return new Response(JSON.stringify({ error: 'Link PAY não encontrado na resposta do PagBank' }), { status: 500, headers: corsHeaders });
-        }
-        return new Response(JSON.stringify({ checkout_url: checkoutLink, id: data.id }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-
-      } catch (error) {
-        return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
-      }
-    }
 
     // MERCADO PAGO CREATE PREFERENCE
     if (url.pathname === "/api/mercado-pago/create-preference" && request.method === "POST") {
@@ -373,37 +197,7 @@ export default {
       }
     }
 
-    // PAGBANK PUBLIC KEY
-    if (url.pathname === "/api/pagbank/public-key" && request.method === "POST") {
-      try {
-        const body = await request.json();
-        const { token, environment } = body;
-        if (!token) return new Response(JSON.stringify({ error: 'Token não fornecido.' }), { status: 400, headers: corsHeaders });
-        const baseUrl = environment === 'production' ? 'https://api.pagseguro.com' : 'https://sandbox.api.pagseguro.com';
-        
-        const resp = await fetch(`${baseUrl}/public-keys`, { 
-          method: 'POST', 
-          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Accept': 'application/json' }, 
-          body: JSON.stringify({ type: 'card' }) 
-        });
-        
-        const responseText = await resp.text();
-        let data;
-        try {
-          data = responseText ? JSON.parse(responseText) : {};
-        } catch (e) {
-           return new Response(JSON.stringify({ error: `PagBank retornou resposta inválida (${resp.status})` }), { status: 500, headers: corsHeaders });
-        }
 
-        if (!resp.ok) {
-           const detail = data.error_messages ? data.error_messages.map(m => m.description).join(', ') : (data.message || JSON.stringify(data));
-           return new Response(JSON.stringify({ error: detail || 'Erro ao gerar chave' }), { status: resp.status, headers: corsHeaders });
-        }
-        return new Response(JSON.stringify(data), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      } catch (error) {
-        return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
-      }
-    }
 
     
     // MERCADO PAGO PIX CHECK STATUS
