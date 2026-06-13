@@ -1,7 +1,7 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Order, OrderStatus, Product, OrderType, OrderItem, StoreSettings } from '../types';
-import { Clock, Printer, UserRound, CheckCircle2, DollarSign, AlertCircle, MapPin, Phone, MessageSquare, Ticket, Percent, Navigation, CreditCard, Wallet, Banknote, FileText, Loader2, Search, Trash2, User } from 'lucide-react';
+import { Clock, Printer, UserRound, CheckCircle2, DollarSign, AlertCircle, MapPin, Phone, MessageSquare, Ticket, Percent, Navigation, CreditCard, Wallet, Banknote, FileText, Loader2, Search, Trash2, User, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 const getComboItems = (comboItems: any): any[] => {
@@ -142,6 +142,16 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
 
     return Array.from(groupsMap.values()).sort((a, b) => b.createdAt - a.createdAt);
   }, [orders, filterType, searchTerm]);
+
+  const itemsPerPage = 20;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterType, searchTerm]);
+
+  const totalPages = Math.ceil(displayGroups.length / itemsPerPage);
+  const currentGroups = displayGroups.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const handleEmitNfce = async (group: GroupedOrder) => {
     if (settings?.lockedFeatures?.includes('NFE')) {
@@ -485,7 +495,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-h-[calc(100vh-200px)] overflow-y-auto pr-2 pb-10 custom-scrollbar">
-        {displayGroups.map(group => (
+        {currentGroups.map(group => (
           <div key={group.id} className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 flex flex-col hover:shadow-xl transition-all relative overflow-hidden group">
             <div className="absolute top-0 right-0 p-2 bg-gray-50 rounded-bl-2xl">
                 <span className="text-[8px] font-black text-gray-300 uppercase">#{group.displayId || String(group.id).slice(-4)}</span>
@@ -692,6 +702,60 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
           </div>
         ))}
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+          <p className="text-xs text-gray-500 font-medium">
+            Mostrando <span className="font-bold text-gray-900">{(currentPage - 1) * itemsPerPage + 1}</span> a <span className="font-bold text-gray-900">{Math.min(currentPage * itemsPerPage, displayGroups.length)}</span> de <span className="font-bold text-gray-900">{displayGroups.length}</span> pedidos
+          </p>
+          <div className="flex items-center gap-2">
+             <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="p-2 bg-gray-50 text-gray-500 rounded-xl hover:bg-gray-100 hover:text-gray-800 disabled:opacity-50 transition-colors"
+             >
+                <ChevronLeft size={18} />
+             </button>
+             
+             <div className="flex gap-1">
+               {Array.from({ length: totalPages }).map((_, i) => {
+                 const page = i + 1;
+                 const distance = Math.abs(page - currentPage);
+                 
+                 // Show limited pages to prevent overflow
+                 if (totalPages > 7) {
+                   if (page !== 1 && page !== totalPages && distance > 1) {
+                     if (distance === 2) return <span key={page} className="px-2 text-gray-400">...</span>;
+                     return null;
+                   }
+                 }
+
+                 return (
+                   <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`w-8 h-8 rounded-xl font-bold text-xs flex items-center justify-center transition-colors ${
+                        currentPage === page 
+                          ? 'bg-primary text-white shadow-md' 
+                          : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                      }`}
+                   >
+                     {page}
+                   </button>
+                 );
+               })}
+             </div>
+
+             <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="p-2 bg-gray-50 text-gray-500 rounded-xl hover:bg-gray-100 hover:text-gray-800 disabled:opacity-50 transition-colors"
+             >
+                <ChevronRight size={18} />
+             </button>
+          </div>
+        </div>
+      )}
 
       {printOrder && (
           <div id="thermal-receipt">

@@ -159,6 +159,8 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   useEffect(() => {
     if (currentOrderId) {
       let isMounted = true;
+      let localInterval: any = null;
+      
       const checkAndPollStatus = async () => {
         try {
           const { data: currentOrder } = await supabase.from('orders').select('total, status').eq('id', currentOrderId).single();
@@ -166,8 +168,10 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
           
           if (currentOrder.status === 'PAGO') {
             setVerifiedPaymentStatus('success');
+            if (localInterval) clearInterval(localInterval);
           } else if (currentOrder.status === 'CANCELADO') {
              setVerifiedPaymentStatus('failure');
+             if (localInterval) clearInterval(localInterval);
           } else {
              const amount = currentOrder.total;
              if (paymentStatus === 'success' && (currentOrder.status === 'AGUARDANDO_PAGAMENTO' || currentOrder.status === 'PENDENTE')) {
@@ -176,12 +180,14 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                   paymentDetails: JSON.stringify([{ method: 'ONLINE', status: 'approved', amount }]) 
                });
                setVerifiedPaymentStatus('success');
+               if (localInterval) clearInterval(localInterval);
              } else if (paymentStatus === 'failure' && (currentOrder.status === 'AGUARDANDO_PAGAMENTO' || currentOrder.status === 'PENDENTE')) {
                await supabase.from('orders').eq('id', currentOrderId).update({ 
                   status: 'CANCELADO',
                   paymentDetails: JSON.stringify([{ method: 'ONLINE', status: 'rejected', amount }]) 
                });
                setVerifiedPaymentStatus('failure');
+               if (localInterval) clearInterval(localInterval);
              } else {
                setVerifiedPaymentStatus('pending');
              }
@@ -193,13 +199,13 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
 
       checkAndPollStatus();
       
-      const interval = setInterval(() => {
+      localInterval = setInterval(() => {
          checkAndPollStatus();
-      }, 5000);
+      }, 10000);
 
       return () => {
          isMounted = false;
-         clearInterval(interval);
+         if (localInterval) clearInterval(localInterval);
       };
     }
   }, [paymentStatus, currentOrderId]);

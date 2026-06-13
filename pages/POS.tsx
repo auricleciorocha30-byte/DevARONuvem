@@ -63,6 +63,7 @@ interface POSProps {
   user: Waitstaff;
   settings: StoreSettings;
   orders: Order[];
+  products: Product[];
   onLogout: () => void;
   updateStatus: (id: string, status: OrderStatus) => void;
   isOffline?: boolean;
@@ -79,9 +80,13 @@ interface Payment {
   amount: number;
 }
 
-export default function POS({ storeId, user, settings, orders, onLogout, updateStatus, isOffline, ecosystemUsage, refreshEcosystemUsage }: POSProps) {
+export default function POS({ storeId, user, settings, orders, products: propProducts, onLogout, updateStatus, isOffline, ecosystemUsage, refreshEcosystemUsage }: POSProps) {
   const navigate = useNavigate();
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Product[]>(propProducts || []);
+  
+  useEffect(() => {
+    setProducts(propProducts || []);
+  }, [propProducts]);
   const [couriers, setCouriers] = useState<Waitstaff[]>([]);
   const [cart, setCart] = useState<OrderItem[]>(() => {
     const saved = localStorage.getItem(`pos-cart-${storeId}`);
@@ -187,7 +192,7 @@ export default function POS({ storeId, user, settings, orders, onLogout, updateS
     });
   }, [products, search, selectedCategory]);
 
-  const [isProductsLoading, setIsProductsLoading] = useState(true);
+  const [isProductsLoading, setIsProductsLoading] = useState(false);
   const [isLookingUpCommand, setIsLookingUpCommand] = useState(false);
   const [visibleCount, setVisibleCount] = useState(10);
   const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -667,7 +672,10 @@ export default function POS({ storeId, user, settings, orders, onLogout, updateS
       }
       setContingencyOrders([]);
       localStorage.removeItem(`contingency_orders_${storeId}`);
-      fetchProducts(); // Refresh stock
+      
+      const { data } = await supabase.from('products').select('*').eq('store_id', storeId);
+      if (data) setProducts(data);
+
       alert("Pedidos sincronizados com sucesso!");
     } catch (err: any) {
       alert("Erro ao sincronizar pedidos: " + err.message);
@@ -1190,7 +1198,6 @@ export default function POS({ storeId, user, settings, orders, onLogout, updateS
   };
 
   useEffect(() => {
-    fetchProducts();
     fetchCouriers();
     fetchSession();
     fetchCustomers();
@@ -1279,30 +1286,6 @@ export default function POS({ storeId, user, settings, orders, onLogout, updateS
       }
     } catch (err: any) {
       alert("Erro ao abrir o caixa: " + err.message);
-    }
-  };
-
-  const fetchProducts = async () => {
-    setIsProductsLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('store_id', storeId)
-        .eq('isActive', true);
-      if (error) throw error;
-      if (data) {
-        setProducts(data);
-        localStorage.setItem(`cached_products_${storeId}`, JSON.stringify(data));
-      }
-    } catch (e) {
-      console.error("Error fetching products:", e);
-      const cached = localStorage.getItem(`cached_products_${storeId}`);
-      if (cached) {
-        try { setProducts(JSON.parse(cached)); } catch (err) {}
-      }
-    } finally {
-      setIsProductsLoading(false);
     }
   };
 
@@ -1970,8 +1953,9 @@ export default function POS({ storeId, user, settings, orders, onLogout, updateS
         for (const id of uniqueIds) {
             await updateStatus(id, 'CANCELADO');
         }
-
-        await fetchProducts();
+        
+        const { data: updatedProducts } = await supabase.from('products').select('*').eq('store_id', storeId);
+        if (updatedProducts) setProducts(updatedProducts);
 
         setCart([]);
         setOriginalCart([]);
@@ -2301,7 +2285,15 @@ export default function POS({ storeId, user, settings, orders, onLogout, updateS
       setSelectedCustomer(null);
       setCustomerSearchTerm('');
       setIsCheckoutOpen(false);
-      fetchProducts(); // Refresh stock
+
+      setProducts(prev => prev.map(p => {
+          const diff = stockUpdates.get(p.id);
+          if (diff !== undefined && p.stock != null) {
+            return { ...p, stock: p.stock + diff };
+          }
+          return p;
+      }));
+
       fetchCustomers(); // Refresh customers points
       
     } catch (err: any) {

@@ -30,21 +30,21 @@ import { Product, Order, StoreSettings, Waitstaff, OrderStatus, StoreProfile } f
 import { INITIAL_SETTINGS } from './constants.ts';
 
 // Pages
-import AdminDashboard from './pages/AdminDashboard.tsx';
-import MenuManagement from './pages/MenuManagement.tsx';
-import OrdersList from './pages/OrdersList.tsx';
-import StoreSettingsPage from './pages/StoreSettingsPage.tsx';
-import DigitalMenu from './pages/DigitalMenu.tsx';
-import TVBoard from './pages/TVBoard.tsx';
-import AttendantPanel from './pages/AttendantPanel.tsx';
-import LoginPage from './pages/LoginPage.tsx';
-import WaitstaffManagement from './pages/WaitstaffManagement.tsx';
-import { CustomerManagement } from './pages/CustomerManagement.tsx';
-import POS from './pages/POS.tsx';
-import DeliveryPanel from './pages/DeliveryPanel.tsx';
-import KitchenBoard from './pages/KitchenBoard.tsx';
-import SuperAdminPanel from './pages/SuperAdminPanel.tsx';
-import IntegrationsPage from './pages/IntegrationsPage.tsx';
+const AdminDashboard = React.lazy(() => import('./pages/AdminDashboard.tsx'));
+const MenuManagement = React.lazy(() => import('./pages/MenuManagement.tsx'));
+const OrdersList = React.lazy(() => import('./pages/OrdersList.tsx'));
+const StoreSettingsPage = React.lazy(() => import('./pages/StoreSettingsPage.tsx'));
+const DigitalMenu = React.lazy(() => import('./pages/DigitalMenu.tsx'));
+const TVBoard = React.lazy(() => import('./pages/TVBoard.tsx'));
+const AttendantPanel = React.lazy(() => import('./pages/AttendantPanel.tsx'));
+const LoginPage = React.lazy(() => import('./pages/LoginPage.tsx'));
+const WaitstaffManagement = React.lazy(() => import('./pages/WaitstaffManagement.tsx'));
+const CustomerManagement = React.lazy(() => import('./pages/CustomerManagement.tsx').then(module => ({ default: module.CustomerManagement })));
+const POS = React.lazy(() => import('./pages/POS.tsx'));
+const DeliveryPanel = React.lazy(() => import('./pages/DeliveryPanel.tsx'));
+const KitchenBoard = React.lazy(() => import('./pages/KitchenBoard.tsx'));
+const SuperAdminPanel = React.lazy(() => import('./pages/SuperAdminPanel.tsx'));
+const IntegrationsPage = React.lazy(() => import('./pages/IntegrationsPage.tsx'));
 
 const SOUNDS = {
   NEW_ORDER: 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3',
@@ -384,14 +384,19 @@ function StoreContext() {
     if (!currentStore) return;
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
     const [ordersRes, productsRes, usersRes] = await Promise.all([
-       supabase.from('orders').select('id').eq('store_id', currentStore.id).gte('createdAt', startOfMonth),
-       supabase.from('products').select('id').eq('store_id', currentStore.id),
-       supabase.from('waitstaff').select('id').eq('store_id', currentStore.id)
+       supabase.from('orders').select('COUNT(*) as count').eq('store_id', currentStore.id).gte('createdAt', startOfMonth),
+       supabase.from('products').select('COUNT(*) as count').eq('store_id', currentStore.id),
+       supabase.from('waitstaff').select('COUNT(*) as count').eq('store_id', currentStore.id)
     ]);
+    
+    const ordersCount = ordersRes.data?.[0]?.count || 0;
+    const productsCount = productsRes.data?.[0]?.count || 0;
+    const usersCount = usersRes.data?.[0]?.count || 0;
+
     setEcosystemUsage({
-       ordersThisMonth: ordersRes.data?.length || 0,
-       productsCount: productsRes.data?.length || 0,
-       usersCount: (usersRes.data?.length || 0) + 1 // Add 1 for the main store owner account
+       ordersThisMonth: ordersCount,
+       productsCount: productsCount,
+       usersCount: usersCount + 1 // Add 1 for the main store owner account
     });
   }, [currentStore]);
 
@@ -467,20 +472,8 @@ function StoreContext() {
   useEffect(() => {
     if (!currentStore) return;
 
-    // Load orders from cache immediately
-    const cachedOrders = localStorage.getItem(`${ORDERS_CACHE_KEY}_${currentStore.id}`);
-    if (cachedOrders) {
-        try {
-            const parsed = JSON.parse(cachedOrders);
-            setOrders(parsed);
-            ordersRef.current = parsed;
-        } catch (e) {
-            console.error("Error parsing cached orders:", e);
-        }
-    }
-
     const fetchMetadata = async () => {
-      if (!navigator.onLine || !currentStore) return;
+      if (!navigator.onLine) return;
 
       try {
         const [pRes, cRes] = await Promise.all([
@@ -490,7 +483,6 @@ function StoreContext() {
         
         if (pRes.error) {
             console.error("Error fetching products:", pRes.error);
-            alert(`Erro ao buscar produtos: ${pRes.error.message || JSON.stringify(pRes.error)}`);
         } else if (pRes.data) {
           const mappedP = pRes.data.map(mapProductFromDb);
           setProducts(mappedP);
@@ -508,18 +500,35 @@ function StoreContext() {
     };
 
     fetchMetadata();
+  }, [currentStore, mapProductFromDb]);
+
+  useEffect(() => {
+    if (!currentStore) return;
+
+    // Load orders from cache immediately
+    const cachedOrders = localStorage.getItem(`${ORDERS_CACHE_KEY}_${currentStore.id}`);
+    if (cachedOrders) {
+        try {
+            const parsed = JSON.parse(cachedOrders);
+            setOrders(parsed);
+            ordersRef.current = parsed;
+        } catch (e) {
+            console.error("Error parsing cached orders:", e);
+        }
+    }
+
     syncOrders();
 
     const startPolling = () => {
       const syncs = settings?.syncIntervals;
-      let intervalSec = 20;
+      let intervalSec = 30;
 
-      if (location.pathname.includes('/cozinha')) intervalSec = syncs?.kitchen || 20;
-      else if (location.pathname.includes('/tv')) intervalSec = syncs?.tv || 20;
-      else if (location.pathname.includes('/atendimento')) intervalSec = syncs?.waitress || 20;
-      else if (location.pathname.includes('/pdv')) intervalSec = syncs?.pos || 20;
-      else if (location.pathname.includes('/entregas')) intervalSec = syncs?.delivery || 20;
-      else if (location.pathname === '/' || location.pathname.includes('/pedidos')) intervalSec = syncs?.admin || 20;
+      if (location.pathname.includes('/cozinha')) intervalSec = syncs?.kitchen || 60;
+      else if (location.pathname.includes('/tv')) intervalSec = syncs?.tv || 60;
+      else if (location.pathname.includes('/atendimento')) intervalSec = syncs?.waitress || 60;
+      else if (location.pathname.includes('/pdv')) intervalSec = syncs?.pos || 60;
+      else if (location.pathname.includes('/entregas')) intervalSec = syncs?.delivery || 60;
+      else if (location.pathname === '/' || location.pathname.includes('/pedidos')) intervalSec = syncs?.admin || 60;
       
       const intervalMs = intervalSec * 1000;
       if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
@@ -938,7 +947,8 @@ function StoreContext() {
   const loginRedirect = `/login${lojaParam}${lojaParam ? '&' : '?'}view=login`;
 
   return (
-    <Routes>
+    <React.Suspense fallback={<div className="min-h-screen bg-slate-900 flex items-center justify-center"><Loader2 className="animate-spin text-secondary" size={48} /></div>}>
+      <Routes>
       <Route path="/atendimento" element={
         adminUser && (adminUser.role === 'ATENDENTE' || adminUser.role === 'GERENTE') && adminUser.store_id === currentStore?.id ? (
           <AttendantPanel adminUser={adminUser} orders={orders} settings={settings} onSelectTable={setActiveTable} updateStatus={updateOrderStatus} onLogout={() => handleSetUser(null)} isOffline={isOffline} />
@@ -988,6 +998,7 @@ function StoreContext() {
             user={adminUser} 
             settings={settings}
             orders={orders}
+            products={products}
             onLogout={() => handleSetUser(null)}
             updateStatus={updateOrderStatus}
             isOffline={isOffline}
@@ -1073,7 +1084,8 @@ function StoreContext() {
       </Route>
 
       <Route path="*" element={<Navigate to={storeSlug ? `/cardapio${lojaParam}` : "/"} />} />
-    </Routes>
+      </Routes>
+    </React.Suspense>
   );
 }
 
