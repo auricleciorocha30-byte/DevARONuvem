@@ -324,7 +324,7 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                               <span className={`text-xs font-bold ${dayConfig.isOpen ? 'text-gray-800' : 'text-gray-400 line-through'}`}>{name}</span>
                             </div>
                           </div>
-                          <div className="flex gap-2">
+                          <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
                             <input 
                               type="time" 
                               value={dayConfig.openTime}
@@ -333,9 +333,9 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                                 const curr = localSettings.operatingHours || defaultOperatingHours;
                                 setLocalSettings({...localSettings, operatingHours: { ...curr, [idx]: { ...dayConfig, openTime: e.target.value } }});
                               }}
-                              className="w-full px-2 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg disabled:opacity-50 outline-none focus:border-purple-400"
+                              className="w-full min-w-0 px-2 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg disabled:opacity-50 outline-none focus:border-purple-400 text-center"
                             />
-                            <span className="text-gray-400 text-[10px] uppercase font-bold self-center">às</span>
+                            <span className="text-gray-400 text-[10px] uppercase font-bold text-center">às</span>
                             <input 
                               type="time" 
                               value={dayConfig.closeTime}
@@ -344,7 +344,7 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                                 const curr = localSettings.operatingHours || defaultOperatingHours;
                                 setLocalSettings({...localSettings, operatingHours: { ...curr, [idx]: { ...dayConfig, closeTime: e.target.value } }});
                               }}
-                              className="w-full px-2 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg disabled:opacity-50 outline-none focus:border-purple-400"
+                              className="w-full min-w-0 px-2 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg disabled:opacity-50 outline-none focus:border-purple-400 text-center"
                             />
                           </div>
                         </div>

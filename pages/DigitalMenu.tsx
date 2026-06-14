@@ -212,9 +212,10 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   }, [paymentStatus, currentOrderId]);
 
   const effectiveTable = initialTable || urlTable || null;
-  const isStoreClosed = settings.isStoreOpen === false;
 
   const [isWaitstaff, setIsWaitstaff] = useState(initialIsWaitstaff || !!localStorage.getItem('gc-conveniencia-session-v2'));
+
+  const isStoreClosed = settings.isStoreOpen === false && !isWaitstaff;
 
   const [hasSelectedMode, setHasSelectedMode] = useState(() => {
     if (urlType && ['BALCAO', 'ENTREGA', 'MESA', 'COMANDA'].includes(urlType)) return true;
