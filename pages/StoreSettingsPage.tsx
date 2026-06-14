@@ -47,6 +47,18 @@ interface Props {
   storeId?: string;
 }
 
+const defaultOperatingHours = {
+  0: { isOpen: false, openTime: '08:00', closeTime: '18:00' }, // Domingo
+  1: { isOpen: true, openTime: '08:00', closeTime: '18:00' }, // Segunda
+  2: { isOpen: true, openTime: '08:00', closeTime: '18:00' }, // Terça
+  3: { isOpen: true, openTime: '08:00', closeTime: '18:00' }, // Quarta
+  4: { isOpen: true, openTime: '08:00', closeTime: '18:00' }, // Quinta
+  5: { isOpen: true, openTime: '08:00', closeTime: '18:00' }, // Sexta
+  6: { isOpen: true, openTime: '08:00', closeTime: '12:00' }, // Sábado
+};
+
+const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+
 const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeId }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
@@ -274,11 +286,72 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                 </div>
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase ml-2">Horário de Funcionamento</label>
+                <label className="text-[10px] font-bold text-gray-400 uppercase ml-2">Horário de Funcionamento (Texto Livre)</label>
                 <div className="relative">
                   <Clock className="absolute left-4 top-4 text-gray-300" size={18} />
                   <textarea placeholder="Ex: Seg a Sex: 08:00 às 18:00&#10;Sáb: 08:00 às 12:00" value={localSettings.businessHours || ''} onChange={(e) => setLocalSettings({...localSettings, businessHours: e.target.value})} className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none resize-none min-h-[100px]" />
                 </div>
+              </div>
+
+              <div className="space-y-4 pt-4 border-t border-gray-100">
+                <div className="flex items-center justify-between p-4 bg-purple-50 border border-purple-100 rounded-2xl">
+                  <div>
+                    <h3 className="text-xs font-bold text-purple-900">Automação de Turnos</h3>
+                    <p className="text-[10px] text-purple-700">Abre e fecha a loja e o cardápio automaticamente nos horários abaixo.</p>
+                  </div>
+                  <Switch 
+                    checked={localSettings.shiftAutomation ?? false} 
+                    onChange={(v) => setLocalSettings({...localSettings, shiftAutomation: v})} 
+                  />
+                </div>
+
+                {localSettings.shiftAutomation && (
+                  <div className="space-y-2 p-4 bg-gray-50 border border-gray-100 rounded-2xl">
+                    <p className="text-[10px] font-bold text-gray-500 uppercase mb-3">Definir Horários (Dia a Dia)</p>
+                    {dayNames.map((name, idx) => {
+                      const dayConfig = (localSettings.operatingHours && localSettings.operatingHours[idx]) || defaultOperatingHours[idx as keyof typeof defaultOperatingHours];
+                      return (
+                        <div key={idx} className="flex flex-col gap-3 bg-white p-3 rounded-xl border border-gray-200">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <Switch 
+                                checked={dayConfig.isOpen} 
+                                onChange={(v) => {
+                                  const curr = localSettings.operatingHours || defaultOperatingHours;
+                                  setLocalSettings({...localSettings, operatingHours: { ...curr, [idx]: { ...dayConfig, isOpen: v } }});
+                                }} 
+                              />
+                              <span className={`text-xs font-bold ${dayConfig.isOpen ? 'text-gray-800' : 'text-gray-400 line-through'}`}>{name}</span>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <input 
+                              type="time" 
+                              value={dayConfig.openTime}
+                              disabled={!dayConfig.isOpen}
+                              onChange={(e) => {
+                                const curr = localSettings.operatingHours || defaultOperatingHours;
+                                setLocalSettings({...localSettings, operatingHours: { ...curr, [idx]: { ...dayConfig, openTime: e.target.value } }});
+                              }}
+                              className="w-full px-2 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg disabled:opacity-50 outline-none focus:border-purple-400"
+                            />
+                            <span className="text-gray-400 text-[10px] uppercase font-bold self-center">às</span>
+                            <input 
+                              type="time" 
+                              value={dayConfig.closeTime}
+                              disabled={!dayConfig.isOpen}
+                              onChange={(e) => {
+                                const curr = localSettings.operatingHours || defaultOperatingHours;
+                                setLocalSettings({...localSettings, operatingHours: { ...curr, [idx]: { ...dayConfig, closeTime: e.target.value } }});
+                              }}
+                              className="w-full px-2 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg disabled:opacity-50 outline-none focus:border-purple-400"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           </section>
@@ -289,9 +362,11 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
             </h2>
             <div className={`p-4 rounded-2xl border-2 transition-all w-full flex items-center justify-between ${localSettings.isStoreOpen ? 'border-green-100 bg-green-50/50' : 'border-red-100 bg-red-50/50'}`}>
               <span className={`text-sm font-bold ${localSettings.isStoreOpen ? 'text-green-700' : 'text-red-700'}`}>
-                {localSettings.isStoreOpen ? 'LOJA ABERTA' : 'LOJA FECHADA'}
+                {localSettings.shiftAutomation ? 'AUTOMAÇÃO ATIVA' : (localSettings.isStoreOpen ? 'LOJA ABERTA' : 'LOJA FECHADA')}
               </span>
-              <Switch checked={localSettings.isStoreOpen ?? true} onChange={(v) => setLocalSettings({...localSettings, isStoreOpen: v})} />
+              {!localSettings.shiftAutomation && (
+                <Switch checked={localSettings.isStoreOpen ?? true} onChange={(v) => setLocalSettings({...localSettings, isStoreOpen: v})} />
+              )}
             </div>
 
             <div className="w-full mt-6 space-y-3 pt-6 border-t border-gray-100">

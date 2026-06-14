@@ -186,6 +186,14 @@ export interface StoreSettings {
   isKitchenActive?: boolean;
   isTvPanelActive?: boolean;
   isCashbackActive?: boolean;
+  shiftAutomation?: boolean;
+  operatingHours?: {
+    [day: number]: {
+      isOpen: boolean;
+      openTime: string;
+      closeTime: string;
+    };
+  };
   businessHours?: string;
   cashbackPercentage?: number;
   minCashbackToUse?: number;

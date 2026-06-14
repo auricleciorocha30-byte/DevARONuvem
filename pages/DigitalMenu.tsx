@@ -41,7 +41,8 @@ import {
   Clock,
   QrCode,
   CheckCircle2,
-  Percent
+  Percent,
+  Package
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Product, StoreSettings, Order, OrderItem, OrderType, PaymentMethod, Waitstaff, CartComplementItem, ComplementCategory } from '../types';
@@ -1301,14 +1302,21 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                {featuredProducts.map((featuredProduct) => (
                  <div key={featuredProduct.id} className="w-[85vw] max-w-[320px] sm:max-w-[360px] snap-center shrink-0 bg-white rounded-3xl p-3 sm:p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 flex flex-col gap-3 relative overflow-hidden group">
                     <div className="absolute top-4 right-4 bg-orange-500 text-white text-[8px] font-black uppercase px-2 py-1 rounded-full z-20 shadow-sm flex items-center gap-1"><Flame size={10} className="animate-pulse" /> Top</div>
-                    <div className="w-full h-40 rounded-2xl overflow-hidden shrink-0 bg-slate-50 relative group-hover:shadow-inner transition-shadow">
-                        <img 
-                          src={featuredProduct.imageUrl || undefined} 
-                          className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-700 cursor-pointer" 
-                          alt={featuredProduct.name} 
-                          onClick={(e) => { e.stopPropagation(); setExpandedImage(featuredProduct.imageUrl!); }}
-                          loading="lazy"
-                        />
+                    <div className="w-full h-40 rounded-2xl overflow-hidden shrink-0 bg-slate-50 relative group-hover:shadow-inner transition-shadow flex items-center justify-center">
+                        {featuredProduct.imageUrl && featuredProduct.imageUrl.trim() !== '' ? (
+                          <img 
+                            src={featuredProduct.imageUrl} 
+                            className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-700 cursor-pointer" 
+                            alt={featuredProduct.name} 
+                            onClick={(e) => { e.stopPropagation(); setExpandedImage(featuredProduct.imageUrl!); }}
+                            loading="lazy"
+                            onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <Package size={32} className="text-gray-300" />
+                        )}
                     </div>
                     <div className="flex-1 min-w-0 flex flex-col justify-between py-1 px-1">
                        <div className="min-w-0">
@@ -1372,14 +1380,21 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
               key={product.id} 
               className={`bg-white rounded-[1.5rem] p-3 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] flex gap-4 items-center border border-slate-100 transition-all w-full box-border group ${!product.isActive ? 'opacity-50 grayscale' : ''}`}
             >
-              <div className="relative shrink-0">
-                <img 
-                  src={product.imageUrl || undefined} 
-                  className="w-24 h-24 sm:w-28 sm:h-28 object-cover rounded-xl cursor-pointer transition-transform group-hover:scale-105" 
-                  alt={product.name} 
-                  onClick={(e) => { e.stopPropagation(); setExpandedImage(product.imageUrl!); }}
-                  loading="lazy"
-                />
+              <div className="relative shrink-0 flex items-center justify-center w-24 h-24 sm:w-28 sm:h-28 bg-gray-50 rounded-xl overflow-hidden">
+                {product.imageUrl && product.imageUrl.trim() !== '' ? (
+                  <img 
+                    src={product.imageUrl} 
+                    className="w-full h-full object-cover cursor-pointer transition-transform group-hover:scale-105" 
+                    alt={product.name} 
+                    onClick={(e) => { e.stopPropagation(); setExpandedImage(product.imageUrl!); }}
+                    loading="lazy"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <Package size={24} className="text-gray-300" />
+                )}
                 {product.isByWeight && <div className="absolute -top-2 -right-2 bg-blue-600 text-white p-1.5 rounded-lg shadow-md border-2 border-white"><Scale size={12} /></div>}
               </div>
               <div className="flex-1 min-w-0 flex flex-col justify-between h-full py-1">

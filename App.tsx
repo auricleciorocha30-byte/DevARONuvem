@@ -190,6 +190,46 @@ function StoreContext() {
     }
   }, [storeSlug, applyColors]);
 
+  useEffect(() => {
+    if (!settings.shiftAutomation || !settings.operatingHours || !currentStore) return;
+
+    const checkAutomation = () => {
+      const now = new Date();
+      const day = now.getDay();
+      const todayConfig = settings.operatingHours![day];
+
+      let isOpen = false;
+      if (todayConfig && todayConfig.isOpen) {
+        const parseTime = (timeStr: string) => {
+          const [h, m] = (timeStr || "00:00").split(':').map(Number);
+          return h * 60 + m;
+        };
+
+        const nowMins = now.getHours() * 60 + now.getMinutes();
+        const openMins = parseTime(todayConfig.openTime || "08:00");
+        const closeMins = parseTime(todayConfig.closeTime || "18:00");
+
+        if (closeMins < openMins) {
+          // Passes midnight (e.g. 18:00 to 02:00)
+          if (nowMins >= openMins || nowMins <= closeMins) isOpen = true;
+        } else {
+          // Same day (e.g. 08:00 to 18:00)
+          if (nowMins >= openMins && nowMins <= closeMins) isOpen = true;
+        }
+      }
+
+      if (settings.isStoreOpen !== isOpen) {
+        // Only update if changed
+        setSettings(prev => ({ ...prev, isStoreOpen: isOpen }));
+        setEcosystemUsage(prev => ({...prev})); // trigger rerender if needed
+      }
+    };
+
+    checkAutomation();
+    const interval = setInterval(checkAutomation, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [settings.shiftAutomation, settings.operatingHours, settings.isStoreOpen, currentStore]);
+
   const fetchStoreContext = async (slug: string) => {
     setLoadingStore(true);
     try {

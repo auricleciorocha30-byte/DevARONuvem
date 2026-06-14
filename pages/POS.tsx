@@ -3102,12 +3102,15 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                   className="bg-white p-2 md:p-3 rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-200 transition-all text-left flex flex-col h-full group relative overflow-hidden"
                 >
                   <div className="aspect-square rounded-lg overflow-hidden mb-2 bg-gray-50 relative shrink-0">
-                    {product.imageUrl ? (
+                    {product.imageUrl && product.imageUrl.trim() !== '' ? (
                       <img 
-                        src={product.imageUrl || undefined} 
+                        src={product.imageUrl} 
                         alt={product.name} 
                         className="w-full h-full object-cover transition-transform group-hover:scale-110" 
                         loading="lazy"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-200">
