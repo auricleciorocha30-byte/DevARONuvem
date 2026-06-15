@@ -249,7 +249,7 @@ function StoreContext() {
               if (parsed.dbUrl && parsed.dbAuthToken) {
                   (supabase as any).connectToStore(parsed.dbUrl, parsed.dbAuthToken);
                   // Run cleanup in background
-                  (supabase as any).cleanupOldCashHistory(parsed.id, 40);
+                  (supabase as any).cleanupOldData(parsed.id, 40);
               } else {
                   (supabase as any).disconnectStore();
               }
@@ -317,7 +317,7 @@ function StoreContext() {
             console.log("Connecting to dedicated DB for store:", fullStoreData.name);
             (supabase as any).connectToStore(fullStoreData.dbUrl, fullStoreData.dbAuthToken);
             // Run cleanup in background
-            (supabase as any).cleanupOldCashHistory(fullStoreData.id, 40);
+            (supabase as any).cleanupOldData(fullStoreData.id, 40);
         }
 
         // Cache store profile

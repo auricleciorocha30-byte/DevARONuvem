@@ -241,7 +241,9 @@ const INDEX_STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS idx_customers_store_id ON customers(store_id)`,
   `CREATE INDEX IF NOT EXISTS idx_waitstaff_store_id ON waitstaff(store_id)`,
   `CREATE INDEX IF NOT EXISTS idx_categories_store_id ON categories(store_id)`,
-  `CREATE INDEX IF NOT EXISTS idx_cash_movements_store_id ON cash_movements(store_id)`
+  `CREATE INDEX IF NOT EXISTS idx_cash_movements_store_id ON cash_movements(store_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_cash_movements_store_created ON cash_movements(store_id, createdAt)`,
+  `CREATE INDEX IF NOT EXISTS idx_register_sessions_store_opened ON register_sessions(store_id, opened_at)`
 ];
 
 
@@ -1369,7 +1371,7 @@ class TursoBridge {
       TursoBridge.disconnectStore();
   }
 
-  async cleanupOldCashHistory(storeId: string, days: number = 40) {
+  async cleanupOldData(storeId: string, days: number = 40) {
       if (!storeId) return;
       try {
           const cutoffTime = Date.now() - (days * 24 * 60 * 60 * 1000);
@@ -1390,9 +1392,17 @@ class TursoBridge {
               [storeId, cutoffTime]
           );
           
-          console.log(`Cleaned up cash history older than ${days} days.`);
+          // Delete old orders
+          const tempInstance3 = new TursoBridge();
+          tempInstance3.tableName = 'orders';
+          await tempInstance3.executeQuery(
+              `DELETE FROM orders WHERE store_id = ? AND createdAt < ?`,
+              [storeId, cutoffTime]
+          );
+          
+          console.log(`Cleaned up data older than ${days} days.`);
       } catch (err) {
-          console.error("Error cleaning up cash history:", err);
+          console.error("Error cleaning up old data:", err);
       }
   }
 }
