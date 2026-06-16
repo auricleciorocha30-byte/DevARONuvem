@@ -248,8 +248,13 @@ function StoreContext() {
               
               if (parsed.dbUrl && parsed.dbAuthToken) {
                   (supabase as any).connectToStore(parsed.dbUrl, parsed.dbAuthToken);
-                  // Run cleanup in background
-                  (supabase as any).cleanupOldData(parsed.id, 40);
+                  // Run cleanup in background once a day
+                  const lastCleanup = localStorage.getItem(`last_cleanup_${parsed.id}`);
+                  const today = new Date().toISOString().split('T')[0];
+                  if (lastCleanup !== today) {
+                      localStorage.setItem(`last_cleanup_${parsed.id}`, today);
+                      (supabase as any).cleanupOldData(parsed.id, mergedSettings.dataRetentionDays || 40);
+                  }
               } else {
                   (supabase as any).disconnectStore();
               }
@@ -316,8 +321,13 @@ function StoreContext() {
         if (fullStoreData.dbUrl && fullStoreData.dbAuthToken) {
             console.log("Connecting to dedicated DB for store:", fullStoreData.name);
             (supabase as any).connectToStore(fullStoreData.dbUrl, fullStoreData.dbAuthToken);
-            // Run cleanup in background
-            (supabase as any).cleanupOldData(fullStoreData.id, 40);
+            // Run cleanup in background once a day
+            const lastCleanup = localStorage.getItem(`last_cleanup_${fullStoreData.id}`);
+            const today = new Date().toISOString().split('T')[0];
+            if (lastCleanup !== today) {
+                localStorage.setItem(`last_cleanup_${fullStoreData.id}`, today);
+                (supabase as any).cleanupOldData(fullStoreData.id, mergedSettings.dataRetentionDays || 40);
+            }
         }
 
         // Cache store profile

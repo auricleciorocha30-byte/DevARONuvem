@@ -252,5 +252,6 @@ export interface StoreSettings {
   maxOrdersPerMonth?: number;
   maxProducts?: number;
   maxUsers?: number;
+  dataRetentionDays?: number;
   lockedFeatures?: ('ONLINE_PAYMENT' | 'NFE')[];
 }

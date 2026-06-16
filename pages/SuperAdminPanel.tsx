@@ -862,7 +862,7 @@ export default function SuperAdminPanel() {
 
                     <div className="space-y-4 pt-4 border-t border-slate-100">
                         <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2"><Settings className="text-secondary" /> Limites do Ecossistema</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Máx Pedidos/Mês</label>
                                 <input type="number" value={editProfileData.maxOrdersPerMonth || ''} onChange={e => setEditProfileData({...editProfileData, maxOrdersPerMonth: e.target.value ? Number(e.target.value) : undefined})} className="w-full px-6 py-4 bg-slate-50 rounded-2xl outline-none font-bold border border-transparent focus:border-slate-200" placeholder="Sem limite" />
@@ -874,6 +874,10 @@ export default function SuperAdminPanel() {
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Máx Usuários</label>
                                 <input type="number" value={editProfileData.maxUsers || ''} onChange={e => setEditProfileData({...editProfileData, maxUsers: e.target.value ? Number(e.target.value) : undefined})} className="w-full px-6 py-4 bg-slate-50 rounded-2xl outline-none font-bold border border-transparent focus:border-slate-200" placeholder="Sem limite" />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Retenção de Dados (Dias)</label>
+                                <input type="number" value={editProfileData.dataRetentionDays || ''} onChange={e => setEditProfileData({...editProfileData, dataRetentionDays: e.target.value ? Number(e.target.value) : undefined})} className="w-full px-6 py-4 bg-slate-50 rounded-2xl outline-none font-bold border border-transparent focus:border-slate-200" placeholder="Ex: 40" />
                             </div>
                         </div>
                         <div className="space-y-2 mt-4">
