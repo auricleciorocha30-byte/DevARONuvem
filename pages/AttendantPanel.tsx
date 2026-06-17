@@ -881,8 +881,7 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
                         PIX: { label: 'PIX', icon: '📱' },
                         CARTAO: { label: 'Crédito', icon: '💳' },
                         DEBITO: { label: 'Débito', icon: '💳' },
-                        VALES: { label: 'Refeição', icon: '🎟️' },
-                        A_PAGAR: { label: 'Fiado', icon: '⌛' },
+                        VALES: { label: 'Refeição', icon: '🎟️' }
                       }[p.method] || { label: p.method, icon: '💰' };
 
                       const otherPaymentsSum = splitPayments.reduce((acc, sp, i) => acc + (i === index ? 0 : (parseFloat(sp.amount) || 0)), 0);
@@ -989,8 +988,7 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
                           { id: 'PIX', label: 'PIX', icon: '📱' },
                           { id: 'CARTAO', label: 'Crédito', icon: '💳' },
                           { id: 'DEBITO', label: 'Débito', icon: '💳' },
-                          { id: 'VALES', label: 'Vale', icon: '🎟️' },
-                          { id: 'A_PAGAR', label: 'Fiado', icon: '⌛' },
+                          { id: 'VALES', label: 'Vale', icon: '🎟️' }
                         ].map(method => {
                           const exists = splitPayments.some(sp => sp.method === method.id);
                           return (
@@ -1063,8 +1061,7 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
                     { id: 'PIX', label: 'PIX', desc: '📱 QR Code/Chave', color: 'border-cyan-200 hover:bg-cyan-50 text-cyan-700 hover:border-cyan-400 font-black' },
                     { id: 'CARTAO', label: 'Cartão Crd', desc: '💳 Maquininha', color: 'border-indigo-200 hover:bg-indigo-50 text-indigo-700 hover:border-indigo-400 font-black' },
                     { id: 'DEBITO', label: 'Cartão Deb', desc: '💳 Débito', color: 'border-teal-200 hover:bg-teal-50 text-teal-700 hover:border-teal-400 font-black' },
-                    { id: 'VALES', label: 'Vale Ref.', desc: '🎟️ Ticket/Alim.', color: 'border-orange-200 hover:bg-orange-50 text-orange-700 hover:border-orange-400 font-black' },
-                    { id: 'A_PAGAR', label: 'A Pagar', desc: '⌛ Marcar Fiado', color: 'border-amber-200 hover:bg-amber-50 text-amber-700 hover:border-amber-400 font-black' },
+                    { id: 'VALES', label: 'Vale Ref.', desc: '🎟️ Ticket/Alim.', color: 'border-orange-200 hover:bg-orange-50 text-orange-700 hover:border-orange-400 font-black' }
                   ].map(method => (
                     <button
                       key={method.id}
