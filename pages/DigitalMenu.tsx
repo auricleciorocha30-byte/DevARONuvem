@@ -217,6 +217,34 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
 
   const isStoreClosed = settings.isStoreOpen === false && !isWaitstaff;
 
+  const nextOpeningTime = useMemo(() => {
+    if (!settings.operatingHours || !settings.shiftAutomation) return null;
+    const now = new Date();
+    const currentDay = now.getDay();
+    const nowMins = now.getHours() * 60 + now.getMinutes();
+    const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+
+    for (let i = 0; i <= 7; i++) {
+        const checkDay = (currentDay + i) % 7;
+        const config = (settings.operatingHours as any)[checkDay];
+        if (config?.isOpen) {
+            const [openH, openM] = (config.openTime || "00:00").split(':').map(Number);
+            const openMins = openH * 60 + openM;
+
+            if (i === 0) {
+                if (openMins > nowMins) {
+                    return `Hoje às ${config.openTime}`;
+                }
+            } else if (i === 1) {
+                return `Amanhã às ${config.openTime}`;
+            } else {
+                return `${dayNames[checkDay]} às ${config.openTime}`;
+            }
+        }
+    }
+    return null;
+  }, [settings.operatingHours, settings.shiftAutomation, isStoreClosed]);
+
   const [hasSelectedMode, setHasSelectedMode] = useState(() => {
     if (urlType && ['BALCAO', 'ENTREGA', 'MESA', 'COMANDA'].includes(urlType)) return true;
     if (isWaitstaff) return true;
@@ -1198,6 +1226,11 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
             <div className="bg-red-50 p-8 rounded-[2rem] border border-red-100 text-center space-y-4">
                <Power size={56} className="text-red-300 mx-auto" strokeWidth={1.5} />
                <p className="text-sm font-bold text-red-700 leading-relaxed uppercase">Nossa loja física e digital estão pausadas agora. Voltaremos em breve!</p>
+               {nextOpeningTime && (
+                 <div className="mt-4 inline-block bg-red-100/50 px-4 py-2 rounded-xl text-xs font-black text-red-800 uppercase tracking-widest border border-red-200">
+                    Abre {nextOpeningTime}
+                 </div>
+               )}
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
@@ -1285,9 +1318,16 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
 
       <main className="max-w-4xl mx-auto px-4 py-6 flex-1 pb-24 text-slate-800 overflow-x-hidden w-full box-border">
         {isStoreClosed && !isWaitstaff && (
-          <div className="bg-red-50 p-4 rounded-2xl border border-red-100 flex items-center gap-3 animate-pulse mb-6">
-            <AlertTriangle className="text-red-500 shrink-0" size={20} />
-            <p className="text-[10px] font-black uppercase text-red-700 tracking-widest">A loja está fechada. Apenas visualização.</p>
+          <div className="bg-red-50 p-4 rounded-2xl border border-red-100 flex items-center justify-between gap-3 animate-pulse mb-6 flex-wrap">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="text-red-500 shrink-0" size={20} />
+              <p className="text-[10px] font-black uppercase text-red-700 tracking-widest">A loja está fechada. Apenas visualização.</p>
+            </div>
+            {nextOpeningTime && (
+              <span className="text-[10px] font-bold bg-white text-red-600 px-2 py-1 rounded-lg border border-red-100 uppercase">
+                Abre {nextOpeningTime}
+              </span>
+            )}
           </div>
         )}
 
