@@ -309,6 +309,12 @@ async function startServer() {
       return res.status(400).json({ error: 'Dados incompletos para criação do banco de dados na Turso.' });
     }
 
+    if (orgName.includes('://') || orgName.includes('libsql') || orgName.includes('.')) {
+      return res.status(400).json({ 
+        error: 'O campo "Organização Turso (Nome da Conta)" está incorreto. Ele deve ser apenas o seu nome de usuário ou nome da organização na Turso (ex: "seu-usuario"), e não a URL do banco de dados (libsql://...). Por favor, corrija-o nas configurações globais.' 
+      });
+    }
+
     try {
       console.log(`[TURSO AUTOMATION] Creating database "${dbName}" in organization "${orgName}"`);
       
@@ -325,7 +331,15 @@ async function startServer() {
         })
       });
 
-      const createData = await createResp.json() as any;
+      let createData: any = {};
+      const createContentType = createResp.headers.get('content-type');
+      if (createContentType && createContentType.includes('application/json')) {
+        createData = await createResp.json();
+      } else {
+        const text = await createResp.text();
+        throw new Error(`A API da Turso retornou um erro inesperado (HTML/Texto). Verifique se o nome da sua organização "${orgName}" está correto nas configurações globais. Detalhes: ${text.substring(0, 150)}`);
+      }
+
       if (!createResp.ok) {
         console.error('[TURSO AUTOMATION] Create DB Error:', createData);
         throw new Error(createData.message || createData.error || 'Erro ao criar banco de dados na Turso. Verifique se o nome é único e o token é válido.');
@@ -350,7 +364,15 @@ async function startServer() {
         })
       });
 
-      const tokenData = await tokenResp.json() as any;
+      let tokenData: any = {};
+      const tokenContentType = tokenResp.headers.get('content-type');
+      if (tokenContentType && tokenContentType.includes('application/json')) {
+        tokenData = await tokenResp.json();
+      } else {
+        const text = await tokenResp.text();
+        throw new Error(`A API da Turso retornou erro ao gerar token (HTML/Texto). Detalhes: ${text.substring(0, 150)}`);
+      }
+
       if (!tokenResp.ok) {
         console.error('[TURSO AUTOMATION] Generate Token Error:', tokenData);
         throw new Error(tokenData.message || tokenData.error || 'Erro ao gerar token do banco na Turso');
