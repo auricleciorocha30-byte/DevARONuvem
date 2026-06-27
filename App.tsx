@@ -390,6 +390,7 @@ function StoreContext() {
     name: p.name || 'Sem nome',
     description: p.description || '',
     price: Number(p.price || 0),
+    costPrice: p.costPrice != null ? Number(p.costPrice) : (p.cost_price != null ? Number(p.cost_price) : 0),
     category: p.category || 'Geral',
     imageUrl: p.imageUrl || p.imageurl || p.image_url || '',
     isActive: p.isActive ?? p.isactive ?? p.is_active ?? true,

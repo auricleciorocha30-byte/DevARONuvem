@@ -156,7 +156,8 @@ const SCHEMA_STATEMENTS = [
     icms_situacao_tributaria TEXT,
     complements TEXT,
     isCombo INTEGER DEFAULT 0,
-    comboItems TEXT
+    comboItems TEXT,
+    costPrice REAL DEFAULT 0
   )`,
   `CREATE TABLE IF NOT EXISTS waitstaff (
     id TEXT PRIMARY KEY,
@@ -259,7 +260,7 @@ const TABLE_COLUMNS: { [key: string]: string[] } = {
     'id', 'store_id', 'name', 'description', 'price', 'category', 'imageUrl',
     'isActive', 'featuredDay', 'isByWeight', 'barcode', 'stock', 'showInMenu',
     'fractions', 'units', 'fractionPrice', 'ncm', 'cfop', 'icms_situacao_tributaria', 'complements',
-    'isCombo', 'comboItems'
+    'isCombo', 'comboItems', 'costPrice'
   ],
   waitstaff: [
     'id', 'store_id', 'name', 'password', 'role', 'phone'
@@ -364,6 +365,9 @@ async function ensureSchema() {
           
           if (!productColumns.includes('stock')) {
               try { await client.execute(`ALTER TABLE products ADD COLUMN stock REAL`); } catch (e) { console.warn(e); }
+          }
+          if (!productColumns.includes('costPrice')) {
+              try { await client.execute(`ALTER TABLE products ADD COLUMN costPrice REAL DEFAULT 0`); } catch (e) { console.warn(e); }
           }
           if (!productColumns.includes('showInMenu')) {
               try { await client.execute(`ALTER TABLE products ADD COLUMN showInMenu INTEGER DEFAULT 1`); } catch (e) { console.warn(e); }
@@ -543,6 +547,9 @@ class TursoBridge {
             
             if (!productColumns.includes('stock')) {
                 try { await this.executeSqlCustom(url, token, `ALTER TABLE products ADD COLUMN stock REAL`); } catch (e) { console.warn(e); }
+            }
+            if (!productColumns.includes('costPrice')) {
+                try { await this.executeSqlCustom(url, token, `ALTER TABLE products ADD COLUMN costPrice REAL DEFAULT 0`); } catch (e) { console.warn(e); }
             }
             if (!productColumns.includes('complements')) {
                 try { await this.executeSqlCustom(url, token, `ALTER TABLE products ADD COLUMN complements TEXT`); } catch (e) { console.warn(e); }
@@ -888,6 +895,7 @@ class TursoBridge {
              processedRow.isActive = Boolean(processedRow.isActive);
              processedRow.isByWeight = Boolean(processedRow.isByWeight);
              processedRow.showInMenu = Boolean(processedRow.showInMenu ?? 1);
+             processedRow.costPrice = Number(processedRow.costPrice || 0);
         }
         if (this.tableName === 'orders') {
              processedRow.isSynced = Boolean(processedRow.isSynced);

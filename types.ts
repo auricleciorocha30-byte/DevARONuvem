@@ -81,6 +81,7 @@ export interface Product {
   complements?: ComplementCategory[];
   isCombo?: boolean;
   comboItems?: ComboItem[];
+  costPrice?: number;
 }
 
 export interface OrderItem {

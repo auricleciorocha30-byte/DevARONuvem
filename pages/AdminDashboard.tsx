@@ -213,6 +213,95 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
     return Array.from(comms.values()).sort((a, b) => b.commissionValue - a.commissionValue);
   }, [filteredOrders, waitstaff, settings.waitstaffCommissions, settings.waitstaffLastPaidAt]);
 
+  const profitData = useMemo(() => {
+    let costTotal = 0;
+    const itemMap = new Map<string, { 
+      name: string, 
+      category: string, 
+      quantity: number, 
+      revenue: number, 
+      cost: number, 
+      profit: number,
+      margin: number 
+    }>();
+
+    const getProductCost = (p: Product): number => {
+      if (p.costPrice && p.costPrice > 0) {
+        return p.costPrice;
+      }
+      if (p.isCombo && p.comboItems && p.comboItems.length > 0) {
+        let comboCost = 0;
+        for (const item of p.comboItems) {
+          const subProduct = products.find(sub => sub.id === item.productId);
+          if (subProduct) {
+            comboCost += getProductCost(subProduct) * (item.quantity || 1);
+          }
+        }
+        return comboCost;
+      }
+      return p.costPrice || 0;
+    };
+
+    filteredOrders
+      .filter(o => o.status !== 'CANCELADO' && o.status !== 'PREPARANDO')
+      .forEach(order => {
+        (order.items || []).forEach(item => {
+          const productId = item.productId || 'unknown';
+          const qty = Number(item.quantity) || 0;
+          const subtotal = (Number(item.price) || 0) * qty;
+
+          // Find product cost
+          const productInfo = products.find(p => p.id === productId);
+          let unitCost = productInfo ? getProductCost(productInfo) : 0;
+
+          // Add complements cost
+          let complementsCost = 0;
+          if (item.complements && item.complements.length > 0) {
+            item.complements.forEach((cp: any) => {
+              const cpProduct = products.find(p => p.id === cp.itemId);
+              if (cpProduct) {
+                complementsCost += getProductCost(cpProduct) * (Number(cp.quantity) || 0);
+              }
+            });
+          }
+
+          const totalItemCost = (unitCost + complementsCost) * qty;
+          costTotal += totalItemCost;
+
+          const existing = itemMap.get(productId);
+          if (existing) {
+            existing.quantity += qty;
+            existing.revenue += subtotal;
+            existing.cost += totalItemCost;
+            existing.profit = existing.revenue - existing.cost;
+            existing.margin = existing.revenue > 0 ? (existing.profit / existing.revenue) * 100 : 0;
+          } else {
+            const itemProfit = subtotal - totalItemCost;
+            itemMap.set(productId, {
+              name: item.name || 'Produto sem nome',
+              category: productInfo?.category || 'Geral',
+              quantity: qty,
+              revenue: subtotal,
+              cost: totalItemCost,
+              profit: itemProfit,
+              margin: subtotal > 0 ? (itemProfit / subtotal) * 100 : 0
+            });
+          }
+        });
+      });
+
+    const productsProfitDetails = Array.from(itemMap.values()).sort((a, b) => b.profit - a.profit);
+    const profitTotal = totalSales - costTotal;
+    const profitMarginTotal = totalSales > 0 ? (profitTotal / totalSales) * 100 : 0;
+
+    return {
+      costTotal,
+      profitTotal,
+      profitMarginTotal,
+      productsProfitDetails
+    };
+  }, [filteredOrders, products, totalSales]);
+
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const lojaParam = storeSlug ? `?loja=${storeSlug}` : '';
 
@@ -362,10 +451,12 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
             </section>
 
             {/* KPIs */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 no-print-commissions">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 no-print-commissions">
                 <StatCard icon={<TrendingUp className="text-green-500" />} label="Faturamento" value={`R$ ${totalSales.toFixed(2)}`} color="bg-green-50" />
                 <StatCard icon={<ShoppingBag className="text-blue-500" />} label="Vendas (Qtd)" value={totalOrdersCount.toString()} color="bg-blue-50" />
                 <StatCard icon={<XCircle className="text-red-500" />} label="Cancelamentos" value={canceledOrdersCount.toString()} color="bg-red-50" />
+                <StatCard icon={<TrendingUp className="text-red-500 rotate-180" />} label="Custo Total" value={`R$ ${profitData.costTotal.toFixed(2)}`} color="bg-red-50/50" />
+                <StatCard icon={<TrendingUp className="text-emerald-500" />} label="Lucro Líquido" value={`R$ ${profitData.profitTotal.toFixed(2)} (${profitData.profitMarginTotal.toFixed(1)}%)`} color="bg-emerald-50" />
             </div>
 
             {/* GRÁFICO */}
@@ -423,6 +514,139 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
                                 <tr>
                                     <td colSpan={4} className="py-8 text-center text-sm font-bold text-gray-400">
                                         Nenhuma venda registrada neste período.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            {/* RELATÓRIO DE LUCRATIVIDADE */}
+            <section className="bg-white p-8 rounded-[3rem] shadow-sm border border-gray-100 no-print-commissions">
+                <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                        <TrendingUp className="text-emerald-500" /> Relatório de Lucratividade
+                    </h2>
+                    {profitData.productsProfitDetails.length > 0 && (
+                        <button 
+                            onClick={() => {
+                                const printWindow = window.open('', '', 'width=800,height=1000');
+                                if (printWindow) {
+                                    printWindow.document.write(`
+                                        <html>
+                                            <head>
+                                                <title>Relatório de Lucratividade - ${settings.storeName}</title>
+                                                <style>
+                                                    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 40px; color: #111; }
+                                                    h1 { font-size: 24px; margin-bottom: 5px; }
+                                                    p { font-size: 14px; color: #666; margin-bottom: 30px; }
+                                                    .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
+                                                    .summary-card { background: #f9fafb; padding: 15px; border-radius: 10px; border: 1px solid #eee; }
+                                                    .summary-label { font-size: 11px; color: #666; font-weight: bold; text-transform: uppercase; }
+                                                    .summary-value { font-size: 20px; font-weight: bold; margin-top: 5px; }
+                                                    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                                                    th, td { text-align: left; padding: 12px; border-bottom: 1px solid #eee; font-size: 13px; }
+                                                    th { background: #f3f4f6; font-weight: bold; text-transform: uppercase; font-size: 10px; color: #666; }
+                                                    .text-right { text-align: right; }
+                                                    .text-green { color: #10b981; font-weight: bold; }
+                                                    .text-red { color: #ef4444; }
+                                                    .margin-badge { background: #e6fbf4; color: #10b981; padding: 3px 8px; border-radius: 5px; font-weight: bold; font-size: 11px; }
+                                                </style>
+                                            </head>
+                                            <body>
+                                                <h1>Relatório de Lucratividade</h1>
+                                                <p>Gerado em ${new Date().toLocaleDateString('pt-BR')} | Período: ${filterMonth === -1 ? 'Últimos 2 Meses' : (filterDay !== 0 ? `${filterDay} de ` : 'Mês de ') + months[filterMonth - 1] + ' de ' + filterYear}</p>
+                                                
+                                                <div class="summary-grid">
+                                                    <div class="summary-card">
+                                                        <div class="summary-label">Faturamento Bruto</div>
+                                                        <div class="summary-value">R$ ${totalSales.toFixed(2)}</div>
+                                                    </div>
+                                                    <div class="summary-card">
+                                                        <div class="summary-label">Custo Total de Aquisição</div>
+                                                        <div class="summary-value">R$ ${profitData.costTotal.toFixed(2)}</div>
+                                                    </div>
+                                                    <div class="summary-card">
+                                                        <div class="summary-label">Lucro Líquido Estimado</div>
+                                                        <div class="summary-value text-green">R$ ${profitData.profitTotal.toFixed(2)}</div>
+                                                    </div>
+                                                </div>
+
+                                                <table>
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Produto</th>
+                                                            <th>Categoria</th>
+                                                            <th class="text-right">Qtd Vendida</th>
+                                                            <th class="text-right">Receita Total</th>
+                                                            <th class="text-right">Custo Total</th>
+                                                            <th class="text-right">Lucro Total</th>
+                                                            <th class="text-right">Margem</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        ${profitData.productsProfitDetails.map(p => `
+                                                            <tr>
+                                                                <td style="font-weight: bold;">${p.name}</td>
+                                                                <td>${p.category}</td>
+                                                                <td class="text-right">${p.quantity}</td>
+                                                                <td class="text-right">R$ ${p.revenue.toFixed(2)}</td>
+                                                                <td class="text-right">R$ ${p.cost.toFixed(2)}</td>
+                                                                <td class="text-right text-green">R$ ${p.profit.toFixed(2)}</td>
+                                                                <td class="text-right"><span class="margin-badge">${p.margin.toFixed(1)}%</span></td>
+                                                            </tr>
+                                                        `).join('')}
+                                                    </tbody>
+                                                </table>
+                                                <script>window.print();window.close();</script>
+                                            </body>
+                                        </html>
+                                    `);
+                                    printWindow.document.close();
+                                }
+                            }}
+                            className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-100 transition-all no-print"
+                        >
+                            <Printer size={14} /> Imprimir Relatório de Lucro
+                        </button>
+                    )}
+                </div>
+                <p className="text-xs text-gray-500 mb-4 no-print">Análise detalhada de custos, receitas e lucratividade real por produto.</p>
+                <div className="overflow-x-auto max-h-[400px] overflow-y-auto custom-scrollbar print:h-auto print:max-h-none print:overflow-visible">
+                    <table className="w-full text-left border-collapse relative print:static">
+                        <thead className="sticky top-0 z-10 bg-white print:static">
+                            <tr className="border-b border-gray-100">
+                                <th className="pb-4 pt-2 text-[10px] font-black uppercase tracking-widest text-gray-400 bg-white">Produto</th>
+                                <th className="pb-4 pt-2 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right bg-white">Qtd Vendida</th>
+                                <th className="pb-4 pt-2 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right bg-white">Receita</th>
+                                <th className="pb-4 pt-2 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right bg-white">Custo Total</th>
+                                <th className="pb-4 pt-2 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right bg-white">Lucro Líquido</th>
+                                <th className="pb-4 pt-2 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right bg-white">Margem</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                            {profitData.productsProfitDetails.map((item, index) => (
+                                <tr key={index} className="hover:bg-gray-50/50 transition-colors">
+                                    <td className="py-4 text-sm font-bold text-gray-800">
+                                        {item.name}
+                                        <div className="text-[10px] text-gray-400 font-normal">{item.category}</div>
+                                    </td>
+                                    <td className="py-4 text-sm font-semibold text-gray-600 text-right">{item.quantity}</td>
+                                    <td className="py-4 text-sm font-semibold text-gray-700 text-right">R$ {item.revenue.toFixed(2)}</td>
+                                    <td className="py-4 text-sm font-semibold text-gray-500 text-right">R$ {item.cost.toFixed(2)}</td>
+                                    <td className="py-4 text-sm font-black text-emerald-600 text-right">R$ {item.profit.toFixed(2)}</td>
+                                    <td className="py-4 text-sm text-right">
+                                        <span className="inline-block px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-bold">
+                                            {item.margin.toFixed(1)}%
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))}
+                            {profitData.productsProfitDetails.length === 0 && (
+                                <tr>
+                                    <td colSpan={6} className="py-8 text-center text-sm font-bold text-gray-400">
+                                        Nenhuma venda com precificação disponível neste período.
                                     </td>
                                 </tr>
                             )}

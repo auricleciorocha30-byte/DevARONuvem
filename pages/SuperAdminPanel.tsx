@@ -198,6 +198,7 @@ export default function SuperAdminPanel() {
     maxOrdersPerMonth?: number;
     maxProducts?: number;
     maxUsers?: number;
+    dataRetentionDays?: number;
     lockedFeatures?: ('ONLINE_PAYMENT' | 'NFE')[];
   }>({
     name: '',

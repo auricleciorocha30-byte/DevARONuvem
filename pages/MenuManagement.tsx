@@ -268,6 +268,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
             name: editingProduct.name || '',
             description: editingProduct.description || '',
             price: Number(editingProduct.price) || 0,
+            costPrice: Number(editingProduct.costPrice) || 0,
             category: editingProduct.category || categories[0] || 'Geral',
             imageUrl: editingProduct.imageUrl || 'https://picsum.photos/400/300',
             isActive: editingProduct.isActive !== false,
@@ -679,18 +680,28 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                   />
                 </div>
                 <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Preço de Custo (R$)</label>
+                  <PriceInput 
+                    value={editingProduct?.costPrice ?? 0}
+                    onChange={(val) => setEditingProduct({...editingProduct, costPrice: val})}
+                    className="w-full p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500" 
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
                     {editingProduct?.isByWeight ? 'Estoque Atual (KG)' : 'Estoque Atual (Unid)'}
                   </label>
                   <input type="number" step={editingProduct?.isByWeight ? "0.001" : "1"} value={editingProduct?.stock ?? ''} onFocus={(e) => e.target.select()} onChange={(e) => setEditingProduct({...editingProduct, stock: e.target.value === '' ? undefined : parseFloat(e.target.value)})} className="w-full p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500" placeholder="Opcional" />
                 </div>
-              </div>
-
-              <div>
+                <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Categoria</label>
                   <select required value={editingProduct?.category || ''} onChange={(e) => setEditingProduct({...editingProduct, category: e.target.value})} className="w-full p-2 border border-gray-200 rounded-lg bg-white outline-none">
                       {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                   </select>
+                </div>
               </div>
 
               {editingProduct?.isCombo && (
