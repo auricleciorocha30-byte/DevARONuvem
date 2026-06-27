@@ -302,7 +302,112 @@ async function startServer() {
     } catch (error) { res.status(500).json({ error: `Erro ao cancelar. ${error instanceof Error ? error.message : String(error)}` }); }
   });
 
+  // API Route for Turso Database Automation (Multi-tenant creation/deletion)
+  apiRouter.post('/turso/create-database', async (req, res) => {
+    const { dbName, platformToken, orgName } = req.body;
+    if (!dbName || !platformToken || !orgName) {
+      return res.status(400).json({ error: 'Dados incompletos para criação do banco de dados na Turso.' });
+    }
 
+    try {
+      console.log(`[TURSO AUTOMATION] Creating database "${dbName}" in organization "${orgName}"`);
+      
+      // 1. Create the database
+      const createResp = await fetch(`https://api.turso.tech/v1/organizations/${orgName}/databases`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${platformToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: dbName,
+          group: 'default'
+        })
+      });
+
+      const createData = await createResp.json() as any;
+      if (!createResp.ok) {
+        console.error('[TURSO AUTOMATION] Create DB Error:', createData);
+        throw new Error(createData.message || createData.error || 'Erro ao criar banco de dados na Turso. Verifique se o nome é único e o token é válido.');
+      }
+
+      const hostname = createData.database?.Hostname || createData.database?.hostname || `${dbName}-${orgName}.turso.io`;
+      const dbUrl = `libsql://${hostname}`;
+      
+      console.log(`[TURSO AUTOMATION] Database created successfully. URL: ${dbUrl}`);
+
+      // 2. Generate database token
+      console.log(`[TURSO AUTOMATION] Generating token for database "${dbName}"`);
+      const tokenResp = await fetch(`https://api.turso.tech/v1/organizations/${orgName}/databases/${dbName}/tokens`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${platformToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          expiration: 'never',
+          authorization: 'full-access'
+        })
+      });
+
+      const tokenData = await tokenResp.json() as any;
+      if (!tokenResp.ok) {
+        console.error('[TURSO AUTOMATION] Generate Token Error:', tokenData);
+        throw new Error(tokenData.message || tokenData.error || 'Erro ao gerar token do banco na Turso');
+      }
+
+      const dbAuthToken = tokenData.jwt || tokenData.token;
+      if (!dbAuthToken) {
+        throw new Error('Token não retornado pela Turso');
+      }
+
+      res.json({
+        success: true,
+        dbUrl,
+        dbAuthToken
+      });
+    } catch (error: any) {
+      console.error('[TURSO AUTOMATION] Flow Error:', error);
+      res.status(500).json({ error: error.message || String(error) });
+    }
+  });
+
+  apiRouter.post('/turso/delete-database', async (req, res) => {
+    const { dbName, platformToken, orgName } = req.body;
+    if (!dbName || !platformToken || !orgName) {
+      return res.status(400).json({ error: 'Dados incompletos para exclusão do banco de dados na Turso.' });
+    }
+
+    try {
+      console.log(`[TURSO AUTOMATION] Deleting database "${dbName}" in organization "${orgName}"`);
+      
+      const deleteResp = await fetch(`https://api.turso.tech/v1/organizations/${orgName}/databases/${dbName}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${platformToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      // Turso API for DELETE database returns 200 or 204. Sometimes response has no body on 204.
+      let deleteData: any = {};
+      if (deleteResp.status !== 204) {
+        try {
+          deleteData = await deleteResp.json();
+        } catch (e) {}
+      }
+
+      if (!deleteResp.ok) {
+        console.error('[TURSO AUTOMATION] Delete DB Error:', deleteData);
+        throw new Error(deleteData.message || deleteData.error || 'Erro ao excluir banco de dados na Turso');
+      }
+
+      res.json({ success: true, message: 'Banco de dados excluído com sucesso.' });
+    } catch (error: any) {
+      console.error('[TURSO AUTOMATION] Delete Flow Error:', error);
+      res.status(500).json({ error: error.message || String(error) });
+    }
+  });
 
   // Catch-all for API router to log 404s within the API prefix
   apiRouter.all('*all', (req, res) => {
