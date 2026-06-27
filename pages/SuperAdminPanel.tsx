@@ -599,26 +599,98 @@ export default function SuperAdminPanel() {
 
         try {
             const dbName = `devaro-${slug}`.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-            
-            const dbResp = await fetch('/api/turso/create-database', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    dbName,
-                    platformToken,
-                    orgName
-                })
-            });
+            let dbData: { dbUrl: string; dbAuthToken: string } | null = null;
 
-            const dbData = await dbResp.json();
-            if (!dbResp.ok) {
-                throw new Error(dbData.error || 'Falha ao criar banco de dados na Turso.');
+            try {
+                // Try to create and authenticate database directly from client side first
+                console.log("[TURSO] Tentando criar banco diretamente via API da Turso (bypass de rotas de servidor local)...");
+                const createResp = await fetch(`https://api.turso.tech/v1/organizations/${orgName}/databases`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${platformToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: dbName,
+                        group: 'default'
+                    })
+                });
+
+                if (!createResp.ok) {
+                    const errText = await createResp.text();
+                    let errMsg = "Erro de API";
+                    try {
+                        const errJson = JSON.parse(errText);
+                        errMsg = errJson.message || errJson.error || errMsg;
+                    } catch (e) {
+                        errMsg = errText || errMsg;
+                    }
+                    throw new Error(errMsg);
+                }
+
+                const createResult = await createResp.json() as any;
+                const hostname = createResult.database?.Hostname || createResult.database?.hostname || `${dbName}-${orgName}.turso.io`;
+                const dbUrl = `libsql://${hostname}`;
+
+                console.log("[TURSO] Banco de dados criado. Gerando token de acesso do banco diretamente...");
+                const tokenResp = await fetch(`https://api.turso.tech/v1/organizations/${orgName}/databases/${dbName}/tokens`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${platformToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        expiration: 'never',
+                        authorization: 'full-access'
+                    })
+                });
+
+                if (!tokenResp.ok) {
+                    throw new Error("Falha ao gerar o token de acesso para o novo banco de dados.");
+                }
+
+                const tokenResult = await tokenResp.json() as any;
+                const dbAuthToken = tokenResult.jwt || tokenResult.token;
+
+                if (!dbAuthToken) {
+                    throw new Error("Token de acesso não retornado pela API da Turso.");
+                }
+
+                dbData = { dbUrl, dbAuthToken };
+                console.log("[TURSO] Banco criado com sucesso diretamente via navegador!");
+            } catch (directErr: any) {
+                console.warn("[TURSO] Não foi possível criar o banco diretamente (CORS ou erro de rede). Tentando via proxy do servidor...", directErr);
+                
+                // Fallback to Express backend proxy
+                const dbResp = await fetch('/api/turso/create-database', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        dbName,
+                        platformToken,
+                        orgName
+                    })
+                });
+
+                const proxyData = await dbResp.json();
+                if (!dbResp.ok) {
+                    throw new Error(proxyData.error || proxyData.message || 'Falha na criação automática via servidor e via chamada direta.');
+                }
+
+                dbData = {
+                    dbUrl: proxyData.dbUrl,
+                    dbAuthToken: proxyData.dbAuthToken
+                };
             }
 
-            finalDbUrl = dbData.dbUrl;
-            finalDbAuthToken = dbData.dbAuthToken;
+            if (dbData) {
+                finalDbUrl = dbData.dbUrl;
+                finalDbAuthToken = dbData.dbAuthToken;
+            } else {
+                throw new Error("Nenhum dado do banco de dados retornado.");
+            }
         } catch (err: any) {
             console.error("Erro na criação automática de banco:", err);
             alert(`Erro na automação da Turso: ${err.message || String(err)}\n\nA criação da loja foi interrompida.`);
@@ -715,20 +787,45 @@ export default function SuperAdminPanel() {
                 const dbName = `devaro-${storeToDel.slug}`.toLowerCase().replace(/[^a-z0-9-]/g, '-');
                 
                 try {
-                    const resp = await fetch('/api/turso/delete-database', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            dbName,
-                            platformToken,
-                            orgName
-                        })
-                    });
-                    const data = await resp.json();
-                    if (!resp.ok) throw new Error(data.error || "Erro desconhecido");
-                    console.log("[TURSO] Programmatic database deleted successfully!");
+                    try {
+                        console.log("[TURSO] Tentando excluir banco diretamente via API da Turso...");
+                        const delResp = await fetch(`https://api.turso.tech/v1/organizations/${orgName}/databases/${dbName}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Authorization': `Bearer ${platformToken}`
+                            }
+                        });
+
+                        if (!delResp.ok && delResp.status !== 204) {
+                            const errText = await delResp.text();
+                            let errMsg = "Erro de API ao excluir";
+                            try {
+                                const errJson = JSON.parse(errText);
+                                errMsg = errJson.message || errJson.error || errMsg;
+                            } catch (e) {
+                                errMsg = errText || errMsg;
+                            }
+                            throw new Error(errMsg);
+                        }
+                        console.log("[TURSO] Banco de dados excluído com sucesso diretamente via navegador!");
+                    } catch (directErr) {
+                        console.warn("[TURSO] Não foi possível excluir o banco diretamente (CORS ou erro de rede). Tentando via proxy do servidor...", directErr);
+                        
+                        const resp = await fetch('/api/turso/delete-database', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                dbName,
+                                platformToken,
+                                orgName
+                            })
+                        });
+                        const data = await resp.json();
+                        if (!resp.ok) throw new Error(data.error || "Erro desconhecido");
+                        console.log("[TURSO] Banco de dados excluído via proxy do servidor!");
+                    }
                 } catch (err: any) {
                     console.error("Erro ao deletar banco na Turso:", err);
                     alert(`A loja foi excluída localmente, mas houve um erro ao deletar o banco na Turso: ${err.message || String(err)}\n\nPor favor, exclua o banco manualmente no painel da Turso se necessário.`);
