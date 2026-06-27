@@ -199,7 +199,6 @@ export default function SuperAdminPanel() {
     maxProducts?: number;
     maxUsers?: number;
     lockedFeatures?: ('ONLINE_PAYMENT' | 'NFE')[];
-    dataRetentionDays?: number;
   }>({
     name: '',
     slug: '',
@@ -219,8 +218,7 @@ export default function SuperAdminPanel() {
     maxOrdersPerMonth: undefined,
     maxProducts: undefined,
     maxUsers: undefined,
-    lockedFeatures: [],
-    dataRetentionDays: 40
+    lockedFeatures: []
   });
 
   // Estados para Gerenciamento de Equipe
@@ -253,14 +251,10 @@ export default function SuperAdminPanel() {
     dbAuthToken: ''
   });
 
-  const [autoCreateDb, setAutoCreateDb] = useState(false);
-
   const [showGlobalSettings, setShowGlobalSettings] = useState(false);
   const [globalSettingsData, setGlobalSettingsData] = useState({
     dbUrl: localStorage.getItem('master_db_url') || '',
-    dbAuthToken: localStorage.getItem('master_db_token') || '',
-    tursoPlatformToken: localStorage.getItem('turso_platform_token') || '',
-    tursoOrg: localStorage.getItem('turso_org') || ''
+    dbAuthToken: localStorage.getItem('master_db_token') || ''
   });
 
   const handleSaveGlobalSettings = (e: React.FormEvent) => {
@@ -275,18 +269,6 @@ export default function SuperAdminPanel() {
       localStorage.setItem('master_db_token', globalSettingsData.dbAuthToken);
     } else {
       localStorage.removeItem('master_db_token');
-    }
-
-    if (globalSettingsData.tursoPlatformToken) {
-      localStorage.setItem('turso_platform_token', globalSettingsData.tursoPlatformToken);
-    } else {
-      localStorage.removeItem('turso_platform_token');
-    }
-
-    if (globalSettingsData.tursoOrg) {
-      localStorage.setItem('turso_org', globalSettingsData.tursoOrg);
-    } else {
-      localStorage.removeItem('turso_org');
     }
     
     alert('Configurações globais salvas com sucesso! A página será recarregada.');
@@ -584,121 +566,6 @@ export default function SuperAdminPanel() {
     
     const slug = formData.slug || formData.name.toLowerCase().replace(/[^a-z0-9]/g, '-');
     
-    let finalDbUrl = formData.dbUrl ? formData.dbUrl.trim() : '';
-    let finalDbAuthToken = formData.dbAuthToken ? formData.dbAuthToken.trim() : '';
-
-    if (autoCreateDb) {
-        const platformToken = localStorage.getItem('turso_platform_token');
-        const orgName = localStorage.getItem('turso_org');
-        
-        if (!platformToken || !orgName) {
-            alert("Credenciais da plataforma Turso ausentes nas configurações globais. Preencha-as antes de usar a criação automática.");
-            setIsSaving(false);
-            return;
-        }
-
-        try {
-            const dbName = `devaro-${slug}`.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-            let dbData: { dbUrl: string; dbAuthToken: string } | null = null;
-
-            try {
-                // Try to create and authenticate database directly from client side first
-                console.log("[TURSO] Tentando criar banco diretamente via API da Turso (bypass de rotas de servidor local)...");
-                const createResp = await fetch(`https://api.turso.tech/v1/organizations/${orgName}/databases`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${platformToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        name: dbName,
-                        group: 'default'
-                    })
-                });
-
-                if (!createResp.ok) {
-                    const errText = await createResp.text();
-                    let errMsg = "Erro de API";
-                    try {
-                        const errJson = JSON.parse(errText);
-                        errMsg = errJson.message || errJson.error || errMsg;
-                    } catch (e) {
-                        errMsg = errText || errMsg;
-                    }
-                    throw new Error(errMsg);
-                }
-
-                const createResult = await createResp.json() as any;
-                const hostname = createResult.database?.Hostname || createResult.database?.hostname || `${dbName}-${orgName}.turso.io`;
-                const dbUrl = `libsql://${hostname}`;
-
-                console.log("[TURSO] Banco de dados criado. Gerando token de acesso do banco diretamente...");
-                const tokenResp = await fetch(`https://api.turso.tech/v1/organizations/${orgName}/databases/${dbName}/tokens`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${platformToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        expiration: 'never',
-                        authorization: 'full-access'
-                    })
-                });
-
-                if (!tokenResp.ok) {
-                    throw new Error("Falha ao gerar o token de acesso para o novo banco de dados.");
-                }
-
-                const tokenResult = await tokenResp.json() as any;
-                const dbAuthToken = tokenResult.jwt || tokenResult.token;
-
-                if (!dbAuthToken) {
-                    throw new Error("Token de acesso não retornado pela API da Turso.");
-                }
-
-                dbData = { dbUrl, dbAuthToken };
-                console.log("[TURSO] Banco criado com sucesso diretamente via navegador!");
-            } catch (directErr: any) {
-                console.warn("[TURSO] Não foi possível criar o banco diretamente (CORS ou erro de rede). Tentando via proxy do servidor...", directErr);
-                
-                // Fallback to Express backend proxy
-                const dbResp = await fetch('/api/turso/create-database', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        dbName,
-                        platformToken,
-                        orgName
-                    })
-                });
-
-                const proxyData = await dbResp.json();
-                if (!dbResp.ok) {
-                    throw new Error(proxyData.error || proxyData.message || 'Falha na criação automática via servidor e via chamada direta.');
-                }
-
-                dbData = {
-                    dbUrl: proxyData.dbUrl,
-                    dbAuthToken: proxyData.dbAuthToken
-                };
-            }
-
-            if (dbData) {
-                finalDbUrl = dbData.dbUrl;
-                finalDbAuthToken = dbData.dbAuthToken;
-            } else {
-                throw new Error("Nenhum dado do banco de dados retornado.");
-            }
-        } catch (err: any) {
-            console.error("Erro na criação automática de banco:", err);
-            alert(`Erro na automação da Turso: ${err.message || String(err)}\n\nA criação da loja foi interrompida.`);
-            setIsSaving(false);
-            return;
-        }
-    }
-
     const newStore = {
       name: formData.name,
       slug: slug,
@@ -707,8 +574,8 @@ export default function SuperAdminPanel() {
       logourl: formData.logoUrl || INITIAL_SETTINGS.logoUrl,
       isactive: true,
       createdat: Date.now(),
-      dbUrl: finalDbUrl,
-      dbAuthToken: finalDbAuthToken,
+      dbUrl: formData.dbUrl ? formData.dbUrl.trim() : '',
+      dbAuthToken: formData.dbAuthToken ? formData.dbAuthToken.trim() : '',
       settings: JSON.stringify({ 
         ...INITIAL_SETTINGS, 
         storeName: formData.name,
@@ -749,7 +616,6 @@ export default function SuperAdminPanel() {
 
       setShowModal(false);
       setFormData({ name: '', slug: '', address: '', whatsapp: '', logoUrl: '', dbUrl: '', dbAuthToken: '' });
-      setAutoCreateDb(false);
       fetchStores();
     }
     setIsSaving(false);
@@ -760,14 +626,6 @@ export default function SuperAdminPanel() {
     
     setLoading(true);
     try {
-        // Get store details before deleting to check for Turso database URL
-        const { data: storeToDel } = await supabase.from('store_profiles').select('dbUrl, slug').eq('id', id).maybeSingle();
-        
-        let deleteTursoDb = false;
-        if (storeToDel && (storeToDel as any).dbUrl && localStorage.getItem('turso_platform_token') && localStorage.getItem('turso_org')) {
-            deleteTursoDb = window.confirm(`Deseja também excluir permanentemente o banco de dados dedicado na Turso ligado a esta loja?\n\nBanco: ${(storeToDel as any).dbUrl}`);
-        }
-
         // Clean up related data
         await supabase.from('products').eq('store_id', id).delete();
         await supabase.from('categories').eq('store_id', id).delete();
@@ -780,57 +638,6 @@ export default function SuperAdminPanel() {
         if (error) {
             alert("Erro ao excluir loja: " + (error.message || "Erro desconhecido"));
         } else {
-            // Delete Turso DB if requested
-            if (deleteTursoDb && storeToDel) {
-                const platformToken = localStorage.getItem('turso_platform_token');
-                const orgName = localStorage.getItem('turso_org');
-                const dbName = `devaro-${storeToDel.slug}`.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-                
-                try {
-                    try {
-                        console.log("[TURSO] Tentando excluir banco diretamente via API da Turso...");
-                        const delResp = await fetch(`https://api.turso.tech/v1/organizations/${orgName}/databases/${dbName}`, {
-                            method: 'DELETE',
-                            headers: {
-                                'Authorization': `Bearer ${platformToken}`
-                            }
-                        });
-
-                        if (!delResp.ok && delResp.status !== 204) {
-                            const errText = await delResp.text();
-                            let errMsg = "Erro de API ao excluir";
-                            try {
-                                const errJson = JSON.parse(errText);
-                                errMsg = errJson.message || errJson.error || errMsg;
-                            } catch (e) {
-                                errMsg = errText || errMsg;
-                            }
-                            throw new Error(errMsg);
-                        }
-                        console.log("[TURSO] Banco de dados excluído com sucesso diretamente via navegador!");
-                    } catch (directErr) {
-                        console.warn("[TURSO] Não foi possível excluir o banco diretamente (CORS ou erro de rede). Tentando via proxy do servidor...", directErr);
-                        
-                        const resp = await fetch('/api/turso/delete-database', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({
-                                dbName,
-                                platformToken,
-                                orgName
-                            })
-                        });
-                        const data = await resp.json();
-                        if (!resp.ok) throw new Error(data.error || "Erro desconhecido");
-                        console.log("[TURSO] Banco de dados excluído via proxy do servidor!");
-                    }
-                } catch (err: any) {
-                    console.error("Erro ao deletar banco na Turso:", err);
-                    alert(`A loja foi excluída localmente, mas houve um erro ao deletar o banco na Turso: ${err.message || String(err)}\n\nPor favor, exclua o banco manualmente no painel da Turso se necessário.`);
-                }
-            }
             fetchStores();
         }
     } catch (err) {
@@ -1306,7 +1113,7 @@ export default function SuperAdminPanel() {
             <p className="text-slate-500 font-medium">Controle administrativo centralizado para todas as lojas.</p>
           </div>
           <button 
-            onClick={() => { setAutoCreateDb(false); setShowModal(true); }}
+            onClick={() => setShowModal(true)}
             className="flex items-center justify-center gap-2 px-10 py-5 bg-[#001F3F] text-white font-bold rounded-[1.5rem] shadow-2xl hover:bg-black transition-all active:scale-95 group"
           >
             <Plus size={20} className="group-hover:rotate-90 transition-transform" /> Nova Loja Parceira
@@ -1434,53 +1241,14 @@ export default function SuperAdminPanel() {
 
                 <div className="space-y-4 pt-4 border-t border-slate-100">
                     <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2"><Zap size={16} /> Banco de Dados Dedicado (Opcional)</h3>
-                    
-                    {localStorage.getItem('turso_platform_token') && localStorage.getItem('turso_org') && (
-                        <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 space-y-3">
-                            <label className="flex items-center gap-3 cursor-pointer select-none">
-                                <input 
-                                    type="checkbox" 
-                                    checked={autoCreateDb} 
-                                    onChange={e => {
-                                        setAutoCreateDb(e.target.checked);
-                                        if (e.target.checked) {
-                                            setFormData(prev => ({
-                                                ...prev,
-                                                dbUrl: 'Será gerado automaticamente',
-                                                dbAuthToken: 'Será gerado automaticamente'
-                                            }));
-                                        } else {
-                                            setFormData(prev => ({
-                                                ...prev,
-                                                dbUrl: '',
-                                                dbAuthToken: ''
-                                            }));
-                                        }
-                                    }} 
-                                    className="rounded border-slate-300 text-[#001F3F] focus:ring-[#001F3F] w-4 h-4"
-                                />
-                                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Criar Banco de Dados Dedicado na Turso Automaticamente</span>
-                            </label>
-                            {autoCreateDb && (
-                                <p className="text-[10px] text-slate-500 font-medium">
-                                    O banco de dados será programado e provisionado na sua conta Turso usando o slug identificador <strong className="font-mono text-xs">{formData.slug || 'slug-da-loja'}</strong>. Os campos Database URL e Auth Token serão preenchidos automaticamente após a criação.
-                                </p>
-                            )}
-                        </div>
-                    )}
-
-                    {!autoCreateDb && (
-                        <>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Database URL</label>
-                                <input type="text" value={formData.dbUrl} onChange={e => setFormData({...formData, dbUrl: e.target.value})} className="w-full px-6 py-4 bg-slate-50 rounded-2xl outline-none font-mono text-xs border border-transparent focus:border-slate-200" placeholder="libsql://..." />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Auth Token</label>
-                                <input type="password" value={formData.dbAuthToken} onChange={e => setFormData({...formData, dbAuthToken: e.target.value})} className="w-full px-6 py-4 bg-slate-50 rounded-2xl outline-none font-mono text-xs border border-transparent focus:border-slate-200" placeholder="ey..." />
-                            </div>
-                        </>
-                    )}
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Database URL</label>
+                        <input type="text" value={formData.dbUrl} onChange={e => setFormData({...formData, dbUrl: e.target.value})} className="w-full px-6 py-4 bg-slate-50 rounded-2xl outline-none font-mono text-xs border border-transparent focus:border-slate-200" placeholder="libsql://..." />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Auth Token</label>
+                        <input type="password" value={formData.dbAuthToken} onChange={e => setFormData({...formData, dbAuthToken: e.target.value})} className="w-full px-6 py-4 bg-slate-50 rounded-2xl outline-none font-mono text-xs border border-transparent focus:border-slate-200" placeholder="ey..." />
+                    </div>
                 </div>
                 <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Logotipo</label>
@@ -1523,23 +1291,6 @@ export default function SuperAdminPanel() {
                     <div className="space-y-2">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Auth Token</label>
                         <input type="password" value={globalSettingsData.dbAuthToken} onChange={e => setGlobalSettingsData({...globalSettingsData, dbAuthToken: e.target.value})} className="w-full px-6 py-4 bg-slate-50 rounded-2xl outline-none font-mono text-xs border border-transparent focus:border-slate-200" placeholder="ey..." />
-                    </div>
-
-                    <div className="border-t border-slate-100 my-4 pt-4">
-                        <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                           <Zap size={14} className="text-[#001F3F]" /> Automação de Bancos de Dados Turso
-                        </h4>
-                        
-                        <div className="space-y-4 mt-2">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Turso Platform API Token</label>
-                                <input type="password" value={globalSettingsData.tursoPlatformToken} onChange={e => setGlobalSettingsData({...globalSettingsData, tursoPlatformToken: e.target.value})} className="w-full px-6 py-4 bg-slate-50 rounded-2xl outline-none font-mono text-xs border border-transparent focus:border-slate-200" placeholder="token da plataforma turso (Ex: api_key_...)" />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Organização Turso (Nome da Conta)</label>
-                                <input type="text" value={globalSettingsData.tursoOrg} onChange={e => setGlobalSettingsData({...globalSettingsData, tursoOrg: e.target.value})} className="w-full px-6 py-4 bg-slate-50 rounded-2xl outline-none font-mono text-xs border border-transparent focus:border-slate-200" placeholder="ex: seu-usuario-turso" />
-                            </div>
-                        </div>
                     </div>
                 </div>
                 
