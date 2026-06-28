@@ -325,14 +325,14 @@ export default function SuperAdminPanel() {
                     (supabase as any).disconnectStore();
                 }
                 
-                const { data: oData, error: oError } = await supabase
+                const { data: countData, error: oError } = await supabase
                     .from('orders')
-                    .select('id')
+                    .select('COUNT(*) as count')
                     .eq('store_id', store.id)
                     .gte('createdAt', startOfMonth);
                     
-                if (oData && !oError) {
-                    counts[store.id] = oData.length;
+                if (countData && countData[0] && !oError) {
+                    counts[store.id] = countData[0].count;
                 }
             } catch (err) {
                 console.error("Error fetching orders for store", store.slug, err);

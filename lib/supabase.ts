@@ -238,13 +238,15 @@ const INDEX_STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS idx_orders_store_created ON orders(store_id, createdAt)`,
   `CREATE INDEX IF NOT EXISTS idx_orders_store_status ON orders(store_id, status)`,
   `CREATE INDEX IF NOT EXISTS idx_orders_store_driver ON orders(store_id, deliveryDriverId)`,
+  `CREATE INDEX IF NOT EXISTS idx_orders_store_session ON orders(store_id, session_id)`,
   `CREATE INDEX IF NOT EXISTS idx_products_store_id ON products(store_id)`,
   `CREATE INDEX IF NOT EXISTS idx_customers_store_id ON customers(store_id)`,
   `CREATE INDEX IF NOT EXISTS idx_waitstaff_store_id ON waitstaff(store_id)`,
   `CREATE INDEX IF NOT EXISTS idx_categories_store_id ON categories(store_id)`,
   `CREATE INDEX IF NOT EXISTS idx_cash_movements_store_id ON cash_movements(store_id)`,
   `CREATE INDEX IF NOT EXISTS idx_cash_movements_store_created ON cash_movements(store_id, createdAt)`,
-  `CREATE INDEX IF NOT EXISTS idx_register_sessions_store_opened ON register_sessions(store_id, opened_at)`
+  `CREATE INDEX IF NOT EXISTS idx_register_sessions_store_opened ON register_sessions(store_id, opened_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_register_sessions_store_status ON register_sessions(store_id, status)`
 ];
 
 
@@ -285,7 +287,7 @@ const TABLE_COLUMNS: { [key: string]: string[] } = {
 };
 
 let schemaInitializedVersion = '';
-const CURRENT_SCHEMA_VERSION = 'v5';
+const CURRENT_SCHEMA_VERSION = 'v6';
 let initializationPromise: Promise<void> | null = null;
 
 async function ensureSchema() {

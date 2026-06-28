@@ -89,15 +89,15 @@ export default function DeliveryPanel({ storeId, user, settings, orders, storeSl
       try {
           const { data, error } = await supabase
               .from('orders')
-              .select('id')
+              .select('COUNT(*) as count')
               .eq('store_id', storeId)
               .eq('type', 'ENTREGA')
               .eq('deliveryDriverId', user.id)
               .eq('status', 'ENTREGUE')
               .gte('createdAt', startOfWeek);
               
-          if (!error && data) {
-              setWeeklyCount(data.length);
+          if (!error && data && data[0]) {
+              setWeeklyCount(data[0].count);
           }
       } catch (err) {
           console.error("Erro ao buscar contador semanal:", err);

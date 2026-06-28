@@ -609,11 +609,12 @@ function StoreContext() {
       const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
       const { data } = await supabase
         .from('orders')
-        .select('id')
+        .select('COUNT(*) as count')
         .eq('store_id', currentStore?.id)
         .gte('createdAt', startOfMonth);
         
-      if (data && data.length >= settings.maxOrdersPerMonth) {
+      const currentOrdersCount = data?.[0]?.count || 0;
+      if (currentOrdersCount >= settings.maxOrdersPerMonth) {
         alert("Seu limite máximo de pedidos para este mês foi atingido. Entre em contato com seu consultor para fazer um upgrade do seu plano.");
         // We dispatch a custom event to show upgrade modal globally if needed, or returning early handles the block.
         return false;
