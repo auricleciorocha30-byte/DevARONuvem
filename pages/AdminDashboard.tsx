@@ -202,12 +202,14 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
       if (p.costPrice && p.costPrice > 0) {
         return p.costPrice;
       }
-      if (p.isCombo && p.comboItems && p.comboItems.length > 0) {
+      const hasComboItems = p.comboItems || (p as any).comboitems || (p as any).combo_items;
+      const isComboProduct = p.isCombo || (p as any).iscombo || (p as any).is_combo;
+      if (isComboProduct && hasComboItems && hasComboItems.length > 0) {
         let comboCost = 0;
-        for (const item of p.comboItems) {
-          const subProduct = products.find(sub => sub.id === item.productId);
+        for (const cOf of hasComboItems) {
+          const subProduct = products.find(sub => sub.id === cOf.productId);
           if (subProduct) {
-            comboCost += getProductCost(subProduct) * (item.quantity || 1);
+            comboCost += getProductCost(subProduct) * (Number(cOf.quantity) || 1);
           }
         }
         return comboCost;
@@ -219,12 +221,12 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
       .filter(o => o.status !== 'CANCELADO' && o.status !== 'PREPARANDO')
       .forEach(order => {
         (order.items || []).forEach(item => {
-          const productId = item.productId || 'unknown';
+          const targetProductId = item.originalProductId || item.productId || 'unknown';
           const qty = Number(item.quantity) || 0;
           const subtotal = (Number(item.price) || 0) * qty;
 
           // Find product cost
-          const productInfo = products.find(p => p.id === productId);
+          const productInfo = products.find(p => p.id === targetProductId);
           let unitCost = productInfo ? getProductCost(productInfo) : 0;
 
           // Add complements cost
@@ -244,7 +246,7 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
           const totalItemCost = (unitCost + complementsCost) * qty;
           costTotal += totalItemCost;
 
-          const existing = itemMap.get(productId);
+          const existing = itemMap.get(targetProductId);
           if (existing) {
             existing.quantity += qty;
             existing.revenue += subtotal;
@@ -253,8 +255,8 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
             existing.margin = existing.revenue > 0 ? (existing.profit / existing.revenue) * 100 : 0;
           } else {
             const itemProfit = subtotal - totalItemCost;
-            itemMap.set(productId, {
-              name: item.name || 'Produto sem nome',
+            itemMap.set(targetProductId, {
+              name: productInfo?.name || item.name || 'Produto sem nome',
               category: productInfo?.category || 'Geral',
               quantity: qty,
               revenue: subtotal,
@@ -265,11 +267,11 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
           }
 
           // If the product is a combo, also add its sub-products quantity sold to their respective rows
-          const isCombo = item.isCombo || productInfo?.isCombo;
-          const comboItems = item.comboItems || productInfo?.comboItems;
+          const isCombo = item.isCombo || productInfo?.isCombo || (productInfo as any)?.iscombo || (productInfo as any)?.is_combo;
+          const comboItems = item.comboItems || productInfo?.comboItems || (productInfo as any)?.comboitems || (productInfo as any)?.combo_items;
 
           if (isCombo && comboItems && comboItems.length > 0) {
-            comboItems.forEach(cItem => {
+            comboItems.forEach((cItem: any) => {
               const subProductId = cItem.productId;
               const subQty = (Number(cItem.quantity) || 1) * qty;
 
