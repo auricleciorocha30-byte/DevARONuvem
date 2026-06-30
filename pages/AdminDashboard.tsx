@@ -101,33 +101,6 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
     
   const totalOrdersCount = filteredOrders.filter(o => o.status !== 'CANCELADO').length;
   const canceledOrdersCount = filteredOrders.filter(o => o.status === 'CANCELADO').length;
-  
-  const salesByProduct = useMemo(() => {
-    const map = new Map<string, { name: string, category: string, quantity: number, total: number, isByWeight: boolean }>();
-    filteredOrders.filter(o => o.status !== 'CANCELADO' && o.status !== 'PREPARANDO').forEach(order => {
-        (order.items || []).forEach(item => {
-          const productId = item.productId || 'unknown';
-          const existing = map.get(productId);
-          const qty = Number(item.quantity) || 0;
-          const price = Number(item.price) || 0;
-          const subtotal = price * qty;
-          if (existing) {
-            existing.quantity += qty;
-            existing.total += subtotal;
-          } else {
-            const productInfo = products.find(p => p.id === productId);
-            map.set(productId, {
-              name: item.name || 'Produto sem nome',
-              category: productInfo?.category || 'Geral',
-              quantity: qty,
-              total: subtotal,
-              isByWeight: !!item.isByWeight
-            });
-          }
-        });
-      });
-    return Array.from(map.values()).sort((a, b) => b.total - a.total);
-  }, [filteredOrders, products]);
 
   const commissions = useMemo(() => {
     const comms = new Map<string, { staffId: string, name: string, totalSales: number, commissionValue: number, rate: number }>();
@@ -258,9 +231,12 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
           let complementsCost = 0;
           if (item.complements && item.complements.length > 0) {
             item.complements.forEach((cp: any) => {
-              const cpProduct = products.find(p => p.id === cp.itemId);
+              const cpProduct = products.find(p => 
+                p.id === cp.itemId || 
+                p.name.trim().toLowerCase() === cp.name.trim().toLowerCase()
+              );
               if (cpProduct) {
-                complementsCost += getProductCost(cpProduct) * (Number(cp.quantity) || 0);
+                complementsCost += getProductCost(cpProduct) * (Number(cp.quantity) || 1);
               }
             });
           }
@@ -285,6 +261,33 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
               cost: totalItemCost,
               profit: itemProfit,
               margin: subtotal > 0 ? (itemProfit / subtotal) * 100 : 0
+            });
+          }
+
+          // If the product is a combo, also add its sub-products quantity sold to their respective rows
+          const isCombo = item.isCombo || productInfo?.isCombo;
+          const comboItems = item.comboItems || productInfo?.comboItems;
+
+          if (isCombo && comboItems && comboItems.length > 0) {
+            comboItems.forEach(cItem => {
+              const subProductId = cItem.productId;
+              const subQty = (Number(cItem.quantity) || 1) * qty;
+
+              const existingSub = itemMap.get(subProductId);
+              if (existingSub) {
+                existingSub.quantity += subQty;
+              } else {
+                const subProductInfo = products.find(p => p.id === subProductId);
+                itemMap.set(subProductId, {
+                  name: subProductInfo?.name || cItem.name || 'Produto sem nome',
+                  category: subProductInfo?.category || 'Geral',
+                  quantity: subQty,
+                  revenue: 0,
+                  cost: 0,
+                  profit: 0,
+                  margin: 0
+                });
+              }
             });
           }
         });
@@ -480,46 +483,6 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
                     </ResponsiveContainer>
                 </div>
                 <p className="text-[9px] text-gray-400 mt-4 text-center italic">Relatório gerado em {currentYearValue}. {filterDay === 0 ? "Exibindo média acumulada do mês." : `Exibindo dados do dia ${filterDay}.`}</p>
-            </section>
-
-            {/* RELATÓRIO DE PRODUTOS */}
-            <section className="bg-white p-8 rounded-[3rem] shadow-sm border border-gray-100 no-print-commissions">
-                <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-                    <ShoppingBag className="text-secondary" /> Detalhamento de Produtos
-                </h2>
-                <div className="overflow-x-auto max-h-[400px] overflow-y-auto custom-scrollbar print:h-auto print:max-h-none print:overflow-visible">
-                    <table className="w-full text-left border-collapse relative print:static">
-                        <thead className="sticky top-0 z-10 bg-white print:static">
-                            <tr className="border-b border-gray-100">
-                                <th className="pb-4 pt-2 text-[10px] font-black uppercase tracking-widest text-gray-400 bg-white">Produto</th>
-                                <th className="pb-4 pt-2 text-[10px] font-black uppercase tracking-widest text-gray-400 bg-white">Categoria</th>
-                                <th className="pb-4 pt-2 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right bg-white">Qtd</th>
-                                <th className="pb-4 pt-2 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right bg-white">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                            {salesByProduct.map((item, index) => (
-                                <tr key={index} className="hover:bg-gray-50/50 transition-colors">
-                                    <td className="py-4 text-sm font-bold text-gray-800">{item.name}</td>
-                                    <td className="py-4 text-xs font-bold text-gray-500">{item.category}</td>
-                                    <td className="py-4 text-sm font-black text-primary text-right">
-                                        {item.isByWeight ? `${item.quantity.toFixed(3)} kg` : item.quantity}
-                                    </td>
-                                    <td className="py-4 text-sm font-black text-green-600 text-right">
-                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.total)}
-                                    </td>
-                                </tr>
-                            ))}
-                            {salesByProduct.length === 0 && (
-                                <tr>
-                                    <td colSpan={4} className="py-8 text-center text-sm font-bold text-gray-400">
-                                        Nenhuma venda registrada neste período.
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
             </section>
 
             {/* RELATÓRIO DE LUCRATIVIDADE */}
