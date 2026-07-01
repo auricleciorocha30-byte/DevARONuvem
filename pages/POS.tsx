@@ -146,6 +146,11 @@ export default function POS({ storeId, user, settings, orders, products: propPro
   const [pointPaymentId, setPointPaymentId] = useState<string | null>(null);
   const [pointStatus, setPointStatus] = useState<string | null>(null);
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
+  const [printConfirmModal, setPrintConfirmModal] = useState<{ isOpen: boolean, order: Order | null, isContingency: boolean }>({
+    isOpen: false,
+    order: null,
+    isContingency: false
+  });
   const [isEmittingNfce, setIsEmittingNfce] = useState(false);
   const [generatedPix, setGeneratedPix] = useState<{ qr_code: string; qr_code_base64: string; id: string } | null>(null);
   const [isGeneratingPix, setIsGeneratingPix] = useState(false);
@@ -2084,9 +2089,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
         localStorage.setItem(`contingency_orders_${storeId}`, JSON.stringify(newContingencyList));
         
         setLastOrder(newOrderObj);
-        if (confirm("Venda realizada em MODO CONTINGÊNCIA! Deseja imprimir o cupom?")) {
-            printReceipt(newOrderObj);
-        }
+        setPrintConfirmModal({ isOpen: true, order: newOrderObj, isContingency: true });
         
         setCart([]);
         setOriginalCart([]);
@@ -2267,9 +2270,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
         }
 
         // Auto print or show print option
-        if (confirm("Venda realizada! Deseja imprimir o cupom?")) {
-            printReceipt(newOrder);
-        }
+        setPrintConfirmModal({ isOpen: true, order: newOrder, isContingency: false });
       }
 
       setCart([]);
@@ -4459,6 +4460,46 @@ export default function POS({ storeId, user, settings, orders, products: propPro
             <div className="flex gap-2 mt-6">
               <button onClick={() => setShowNewCustomerModal(false)} className="flex-1 py-3 bg-gray-200 rounded-xl font-bold">Cancelar</button>
               <button onClick={handleSaveNewCustomer} className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold">Salvar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Receipt Print Confirmation Modal */}
+      {printConfirmModal.isOpen && printConfirmModal.order && (
+        <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-[2.5rem] overflow-hidden shadow-2xl p-6 text-center animate-scale-up space-y-6">
+            <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto">
+              <Printer size={32} />
+            </div>
+            
+            <div className="space-y-2">
+              <h3 className="text-xl font-extrabold text-gray-800">
+                {printConfirmModal.isContingency ? "Venda realizada em MODO CONTINGÊNCIA!" : "Venda realizada!"}
+              </h3>
+              <p className="text-sm font-medium text-gray-500">
+                Deseja imprimir o cupom deste pedido?
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => {
+                  printReceipt(printConfirmModal.order!);
+                  setPrintConfirmModal({ isOpen: false, order: null, isContingency: false });
+                }}
+                className="w-full py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-2xl transition-colors shadow-md shadow-green-100 flex items-center justify-center gap-2"
+              >
+                <Printer size={18} /> Sim, Imprimir
+              </button>
+              <button
+                onClick={() => {
+                  setPrintConfirmModal({ isOpen: false, order: null, isContingency: false });
+                }}
+                className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold rounded-2xl transition-colors"
+              >
+                Não Imprimir
+              </button>
             </div>
           </div>
         </div>

@@ -514,26 +514,26 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
 
       {showCategoryModal && (
         <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-scale-up">
-            <div className="p-6 border-b flex items-center justify-between bg-gray-50">
+          <div className="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-scale-up max-h-[85vh] flex flex-col">
+            <div className="p-6 border-b flex items-center justify-between bg-gray-50 shrink-0">
               <h2 className="text-xl font-bold">Gerenciar Categorias</h2>
               <button onClick={() => setShowCategoryModal(false)} className="text-gray-400 p-2 hover:bg-gray-100 rounded-full transition-colors"><X /></button>
             </div>
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-6 overflow-y-auto custom-scrollbar flex-1">
                 <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-500 uppercase">Nova Categoria</label>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-center">
                         <input 
                             type="text" 
                             value={newCategoryName} 
                             onChange={(e) => setNewCategoryName(e.target.value)}
-                            className="flex-1 p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500"
+                            className="flex-1 min-w-0 p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500"
                             placeholder="Ex: Bebidas, Doces..."
                         />
                         <button 
                             onClick={handleAddCategory}
                             disabled={isSavingCategory || !newCategoryName.trim()}
-                            className="px-4 py-2 bg-[#3d251e] text-white rounded-lg font-bold disabled:opacity-50"
+                            className="px-4 py-2 bg-[#3d251e] text-white rounded-lg font-bold disabled:opacity-50 shrink-0"
                         >
                             {isSavingCategory ? <Loader2 className="animate-spin" size={20}/> : <Plus size={20}/>}
                         </button>
