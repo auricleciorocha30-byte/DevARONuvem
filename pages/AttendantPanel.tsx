@@ -412,7 +412,7 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
       )}
       <style>{`
         @media print {
-          @page { margin: 0; }
+          @page { size: portrait; margin: 0; }
           html, body { margin: 0; padding: 0; background: #fff !important; }
           body * { visibility: hidden; }
           #thermal-receipt-waiter, #thermal-receipt-waiter * { visibility: visible; color: black !important; font-weight: 900 !important; }

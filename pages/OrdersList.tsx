@@ -452,7 +452,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
     <div className="space-y-6 text-zinc-900">
       <style>{`
         @media print {
-          @page { margin: 0; }
+          @page { size: portrait; margin: 0; }
           html, body { margin: 0; padding: 0; background: #fff !important; }
           body * { visibility: hidden; }
           #thermal-receipt, #thermal-receipt * { visibility: visible; }

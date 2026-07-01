@@ -2666,7 +2666,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
           <head>
             <title>Cupom</title>
             <style>
-              @page { margin: 0; size: auto; }
+              @page { size: portrait; margin: 0; }
               body { margin: 0; padding: 5px; background: white; font-family: monospace; }
               * { 
                 color: black !important; 
@@ -2732,7 +2732,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
           <head>
             <title>Orcamento</title>
             <style>
-              @page { margin: 0; size: auto; }
+              @page { size: portrait; margin: 0; }
               body { margin: 0; padding: 5px; background: white; font-family: monospace; }
               * { 
                 color: black !important; 
@@ -2809,7 +2809,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
           <head>
             <title>Relatorio</title>
             <style>
-              @page { margin: 0; size: auto; }
+              @page { size: portrait; margin: 0; }
               body { margin: 0; padding: 5px; background: white; font-family: monospace; }
               * { 
                 color: black !important; 
