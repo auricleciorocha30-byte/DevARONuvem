@@ -238,6 +238,15 @@ export default function POS({ storeId, user, settings, orders, products: propPro
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+  const [debouncedCustomerSearchTerm, setDebouncedCustomerSearchTerm] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedCustomerSearchTerm(customerSearchTerm);
+    }, 400); // 400ms debounce
+    return () => clearTimeout(timer);
+  }, [customerSearchTerm]);
+
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [deliveryFee, setDeliveryFee] = useState<number>(0);
@@ -1205,16 +1214,34 @@ export default function POS({ storeId, user, settings, orders, products: propPro
   useEffect(() => {
     fetchCouriers();
     fetchSession();
-    fetchCustomers();
   }, [storeId, isContingencyMode]);
 
-  const fetchCustomers = async () => {
+  useEffect(() => {
+    fetchCustomers(debouncedCustomerSearchTerm);
+  }, [storeId, isContingencyMode, debouncedCustomerSearchTerm]);
+
+  const fetchCustomers = async (term = '') => {
     if (!storeId || isContingencyMode) return;
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('customers')
         .select('*')
         .eq('store_id', storeId);
+
+      if (term.trim()) {
+        const cleanTerm = term.trim();
+        query = query.or(`name.ilike.%${cleanTerm}%,phone.ilike.%${cleanTerm}%,cpf.ilike.%${cleanTerm}%`);
+      }
+
+      query = query.order('name');
+
+      if (!term.trim()) {
+        query = query.limit(20);
+      } else {
+        query = query.limit(50);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       setCustomers(data || []);
     } catch (err) {

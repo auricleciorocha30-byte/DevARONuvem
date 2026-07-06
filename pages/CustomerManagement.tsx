@@ -11,22 +11,46 @@ export function CustomerManagement({ storeId }: { storeId?: string }) {
   const [editingCustomer, setEditingCustomer] = useState<Partial<Customer> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 400); // 400ms debounce
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   useEffect(() => {
     if (storeId) {
-      fetchCustomers();
+      fetchCustomers(debouncedSearchTerm);
     } else {
       setIsLoading(false);
     }
-  }, [storeId]);
+  }, [storeId, debouncedSearchTerm]);
 
-  const fetchCustomers = async () => {
+  const fetchCustomers = async (term = '') => {
     if (!storeId) return;
+    setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('customers')
         .select('*')
-        .eq('store_id', storeId)
-        .order('name');
+        .eq('store_id', storeId);
+      
+      if (term.trim()) {
+        const cleanTerm = term.trim();
+        query = query.or(`name.ilike.%${cleanTerm}%,phone.ilike.%${cleanTerm}%,cpf.ilike.%${cleanTerm}%`);
+      }
+      
+      query = query.order('name');
+      
+      if (!term.trim()) {
+        query = query.limit(50);
+      } else {
+        query = query.limit(100);
+      }
+      
+      const { data, error } = await query;
       
       if (error) throw error;
       setCustomers(data || []);
@@ -69,7 +93,7 @@ export function CustomerManagement({ storeId }: { storeId?: string }) {
         if (error) throw error;
       }
 
-      await fetchCustomers();
+      await fetchCustomers(debouncedSearchTerm);
       setIsModalOpen(false);
       setEditingCustomer(null);
     } catch (err: any) {
@@ -90,7 +114,7 @@ export function CustomerManagement({ storeId }: { storeId?: string }) {
         .delete();
       
       if (error) throw error;
-      await fetchCustomers();
+      await fetchCustomers(debouncedSearchTerm);
     } catch (err) {
       console.error('Error deleting customer:', err);
       alert('Erro ao excluir cliente.');
@@ -110,7 +134,7 @@ export function CustomerManagement({ storeId }: { storeId?: string }) {
         .update({ points: 0 });
       
       if (error) throw error;
-      await fetchCustomers();
+      await fetchCustomers(debouncedSearchTerm);
       alert('Cashback de todos os clientes foi zerado com sucesso.');
     } catch (err: any) {
       console.error('Error clearing all cashback:', err);
@@ -120,10 +144,7 @@ export function CustomerManagement({ storeId }: { storeId?: string }) {
     }
   };
 
-  const filteredCustomers = customers.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    c.phone.includes(searchTerm)
-  );
+  const filteredCustomers = customers;
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -169,6 +190,11 @@ export function CustomerManagement({ storeId }: { storeId?: string }) {
               className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
             />
           </div>
+          {searchTerm.trim() === '' && customers.length >= 50 && (
+            <p className="text-xs text-gray-400 mt-1.5 ml-1">
+              Mostrando os primeiros 50 clientes. Digite no campo de busca para pesquisar outros.
+            </p>
+          )}
         </div>
 
         {isLoading ? (

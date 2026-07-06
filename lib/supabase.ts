@@ -818,6 +818,37 @@ class TursoBridge {
     return this;
   }
 
+  or(clause: string) {
+    if (!clause) return this;
+    const parts = clause.split(',');
+    const subQueries: string[] = [];
+    
+    parts.forEach(part => {
+      const match = part.trim().split('.');
+      if (match.length >= 3) {
+        const column = match[0];
+        const operator = match[1];
+        let val = match.slice(2).join('.');
+        
+        if (val.startsWith('%')) val = val.substring(1);
+        if (val.endsWith('%')) val = val.substring(0, val.length - 1);
+        
+        if (operator === 'ilike' || operator === 'like') {
+          subQueries.push(`${column} LIKE ?`);
+          this.params.push(`%${val}%`);
+        } else if (operator === 'eq') {
+          subQueries.push(`${column} = ?`);
+          this.params.push(val);
+        }
+      }
+    });
+    
+    if (subQueries.length > 0) {
+      this.queries.push(`(${subQueries.join(' OR ')})`);
+    }
+    return this;
+  }
+
   order(column: string, config: { ascending: boolean } = { ascending: true }) {
     this.orderCol = column;
     this.orderDir = config.ascending ? 'ASC' : 'DESC';
