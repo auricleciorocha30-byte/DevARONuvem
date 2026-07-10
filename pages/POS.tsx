@@ -239,6 +239,35 @@ export default function POS({ storeId, user, settings, orders, products: propPro
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
   const [debouncedCustomerSearchTerm, setDebouncedCustomerSearchTerm] = useState('');
+  const [cep, setCep] = useState('');
+  const [isCepLoading, setIsCepLoading] = useState(false);
+
+  const fetchCepPOS = async (cepValue: string) => {
+    const cleanCep = cepValue.replace(/\D/g, '');
+    setCep(cepValue);
+    if (cleanCep.length === 8) {
+      setIsCepLoading(true);
+      try {
+        const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+        const data = await res.json();
+        if (!data.erro) {
+          const street = data.logradouro || '';
+          const neighborhood = data.bairro || '';
+          const city = data.localidade || '';
+          const uf = data.uf || '';
+          const prepopulatedAddress = `${street}, , ${neighborhood}, ${city} - ${uf}`;
+          setDeliveryDetails(prev => ({
+            ...prev,
+            address: prepopulatedAddress
+          }));
+        }
+      } catch (err) {
+        console.error("Erro ao buscar CEP no PDV:", err);
+      } finally {
+        setIsCepLoading(false);
+      }
+    }
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -2127,6 +2156,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
         setLoadedServiceFee(0);
         setCommandNumber('');
         setDeliveryDetails({ customerName: '', customerPhone: '', address: '', driverId: '', payOnDelivery: false, useStoreOrigin: true, originAddress: '', referencePoint: '' });
+        setCep('');
         setDeliveryFee(0);
         setSelectedCustomer(null);
         setCustomerSearchTerm('');
@@ -2309,6 +2339,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
       setLoadedServiceFee(0);
       setCommandNumber('');
       setDeliveryDetails({ customerName: '', customerPhone: '', address: '', driverId: '', payOnDelivery: false, useStoreOrigin: true, originAddress: '', referencePoint: '' });
+      setCep('');
       setDeliveryFee(0);
       setSelectedCustomer(null);
       setCustomerSearchTerm('');
@@ -3712,6 +3743,22 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                                   className="w-full pl-10 p-3 rounded-xl border border-blue-100 focus:ring-2 focus:ring-blue-400 outline-none"
                                   placeholder="CPF do Cliente"
                               />
+                          </div>
+                      </div>
+                      <div className="space-y-1">
+                          <label className="text-xs font-bold text-blue-700 uppercase">CEP</label>
+                          <div className="relative">
+                              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-300" size={16} />
+                              <input 
+                                  type="text" 
+                                  value={cep}
+                                  onChange={e => fetchCepPOS(e.target.value)}
+                                  className="w-full pl-10 pr-10 p-3 rounded-xl border border-blue-100 focus:ring-2 focus:ring-blue-400 outline-none"
+                                  placeholder="00000-000"
+                              />
+                              {isCepLoading && (
+                                <Loader2 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-500 animate-spin" />
+                              )}
                           </div>
                       </div>
                       <div className="space-y-1 md:col-span-2">
