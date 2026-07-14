@@ -21,7 +21,8 @@ import {
   MoreVertical,
   MessageCircle,
   WifiOff,
-  QrCode
+  QrCode,
+  AlertTriangle
 } from 'lucide-react';
 import { Order, OrderStatus, Waitstaff, StoreSettings } from '../types';
 import { supabase } from '../lib/supabase';
@@ -861,6 +862,59 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
                 </span>
               )}
             </div>
+
+            {(() => {
+              const targetOrders = orders.filter(o => paymentModalData?.orderIds.includes(o.id));
+              const allPaid = targetOrders.length > 0 && targetOrders.every(o => o.status === 'PAGO');
+              const somePaid = targetOrders.some(o => o.status === 'PAGO');
+              const paidOrders = targetOrders.filter(o => o.status === 'PAGO');
+              const unpaidOrders = targetOrders.filter(o => o.status !== 'PAGO');
+
+              if (allPaid) {
+                return (
+                  <div className="bg-green-50 text-green-800 p-4 rounded-2xl mb-6 border border-green-200 flex flex-col items-center justify-center text-center">
+                    <span className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-green-600 mb-1">
+                      <CheckCircle size={16} className="text-green-500 animate-pulse" /> PAGAMENTO JÁ REALIZADO
+                    </span>
+                    <span className="text-xs font-bold leading-relaxed">
+                      Todos os pedidos já foram pagos via: <br />
+                      <strong className="text-green-700 bg-green-100/50 px-2 py-0.5 rounded-md inline-block mt-1 font-black">
+                        {targetOrders.map(o => o.paymentMethod || 'Online').filter((v, i, a) => a.indexOf(v) === i).join(', ')}
+                      </strong>
+                    </span>
+                  </div>
+                );
+              }
+
+              if (somePaid) {
+                return (
+                  <div className="bg-yellow-50 text-yellow-800 p-4 rounded-2xl mb-6 border border-yellow-200 flex flex-col items-center justify-center text-center">
+                    <span className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-yellow-600 mb-1">
+                      <AlertTriangle size={16} className="text-yellow-500 animate-pulse" /> PAGAMENTO PARCIAL
+                    </span>
+                    <span className="text-xs font-bold leading-relaxed">
+                      Atenção: Alguns pedidos já estão pagos! <br />
+                      <div className="mt-1.5 flex gap-1.5 justify-center flex-wrap">
+                        <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-md font-black">
+                          Pago: R$ {paidOrders.reduce((acc, o) => acc + (o.total || 0), 0).toFixed(2)}
+                        </span>
+                        <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-md font-black">
+                          Pendente: R$ {unpaidOrders.reduce((acc, o) => acc + (o.total || 0), 0).toFixed(2)}
+                        </span>
+                      </div>
+                    </span>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="bg-red-50 text-red-800 p-3 rounded-2xl mb-6 border border-red-100 flex items-center justify-center gap-2 text-center">
+                  <span className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-red-500">
+                    <Clock size={14} className="text-red-500 animate-pulse" /> AGUARDANDO PAGAMENTO (NÃO PAGO)
+                  </span>
+                </div>
+              );
+            })()}
 
             {isSplitMode ? (
               <div className="flex flex-col flex-1 overflow-hidden">
