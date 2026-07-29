@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Product } from '../types';
-import { Plus, Search, Edit2, Trash2, Camera, Star, Tag, X, Loader2, Weight, Power, ListTree, ScanLine, FileText, Printer, Layers } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Camera, Star, Tag, X, Loader2, Weight, Power, ListTree, ScanLine, FileText, Printer, Layers, Check } from 'lucide-react';
 import { Switch } from '../components/Switch';
 import { ComplementBuilder } from '../components/ComplementBuilder';
 import { supabase } from '../lib/supabase';
@@ -119,6 +119,9 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
   const [isSaving, setIsSaving] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [isSavingCategory, setIsSavingCategory] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const [editingCategoryValue, setEditingCategoryValue] = useState('');
+  const [isSavingCategoryEdit, setIsSavingCategoryEdit] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [productTab, setProductTab] = useState<'INFO' | 'OPCOES'>('INFO');
 
@@ -341,6 +344,67 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
     }
   };
 
+  const handleEditCategory = async (oldName: string) => {
+    const trimmedNewName = editingCategoryValue.trim();
+    if (!trimmedNewName) {
+      alert("O nome da categoria não pode ser vazio.");
+      return;
+    }
+
+    if (trimmedNewName === oldName) {
+      setEditingCategory(null);
+      return;
+    }
+
+    if (categories.some(c => c.toLowerCase() === trimmedNewName.toLowerCase() && c !== oldName)) {
+      alert("Esta categoria já existe.");
+      return;
+    }
+
+    if (!storeId) {
+      alert("Erro: Loja não identificada. Recarregue a página.");
+      return;
+    }
+
+    setIsSavingCategoryEdit(true);
+    try {
+      // 1. Update categories table in supabase
+      const { error: catError } = await supabase
+        .from('categories')
+        .eq('name', oldName)
+        .eq('store_id', storeId)
+        .update({ name: trimmedNewName });
+
+      if (catError) throw catError;
+
+      // 2. Update category name on any products that use it
+      const { error: prodError } = await supabase
+        .from('products')
+        .eq('category', oldName)
+        .eq('store_id', storeId)
+        .update({ category: trimmedNewName });
+
+      if (prodError) {
+        console.warn("Aviso ao atualizar produtos da categoria editada:", prodError);
+      }
+
+      // 3. Update local categories array
+      setCategories(categories.map(c => c === oldName ? trimmedNewName : c));
+      
+      // 4. Trigger onCategoryChange to reload everything
+      if (onCategoryChange) {
+        await onCategoryChange();
+      }
+
+      setEditingCategory(null);
+    } catch (err: any) {
+      console.error(err);
+      alert(`Erro ao editar categoria: ${err.message}`);
+    } finally {
+      setIsSavingCategoryEdit(false);
+    }
+  };
+
   const handleDeleteCategory = async (catName: string) => {
     if (products.some(p => p.category === catName)) {
       alert("Não é possível excluir uma categoria que possui produtos vinculados.");
@@ -543,17 +607,69 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                 <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-500 uppercase">Categorias Atuais</label>
                     <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-2">
-                        {categories.map((cat, idx) => (
-                            <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 group">
-                                <span className="font-medium text-gray-700">{cat}</span>
-                                <button 
-                                    onClick={() => handleDeleteCategory(cat)}
-                                    className="p-2 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
-                            </div>
-                        ))}
+                        {categories.map((cat, idx) => {
+                            const isEditing = editingCategory === cat;
+                            return (
+                                <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 group min-h-[50px]">
+                                    {isEditing ? (
+                                        <div className="flex gap-2 items-center w-full">
+                                            <input 
+                                                type="text" 
+                                                value={editingCategoryValue} 
+                                                onChange={(e) => setEditingCategoryValue(e.target.value)}
+                                                className="flex-1 min-w-0 p-1.5 px-3 text-sm border border-orange-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 bg-white font-medium text-gray-700"
+                                                autoFocus
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        e.preventDefault();
+                                                        handleEditCategory(cat);
+                                                    } else if (e.key === 'Escape') {
+                                                        setEditingCategory(null);
+                                                    }
+                                                }}
+                                            />
+                                            <button 
+                                                onClick={() => handleEditCategory(cat)}
+                                                disabled={isSavingCategoryEdit || !editingCategoryValue.trim()}
+                                                className="p-1.5 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 shrink-0"
+                                            >
+                                                {isSavingCategoryEdit ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                                            </button>
+                                            <button 
+                                                onClick={() => setEditingCategory(null)}
+                                                disabled={isSavingCategoryEdit}
+                                                className="p-1.5 bg-gray-200 text-gray-500 rounded-lg hover:bg-gray-300 transition-colors shrink-0"
+                                            >
+                                                <X size={14} />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <span className="font-medium text-gray-700">{cat}</span>
+                                            <div className="flex gap-1 shrink-0 group-hover:opacity-100 md:opacity-0 transition-opacity">
+                                                <button 
+                                                    onClick={() => {
+                                                        setEditingCategory(cat);
+                                                        setEditingCategoryValue(cat);
+                                                    }}
+                                                    className="p-2 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                                                    title="Editar Categoria"
+                                                >
+                                                    <Edit2 size={16} />
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleDeleteCategory(cat)}
+                                                    className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                    title="Excluir Categoria"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             </div>

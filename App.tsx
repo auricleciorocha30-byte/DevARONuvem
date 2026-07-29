@@ -1125,8 +1125,22 @@ function StoreContext() {
 
           // Update local state immediately
           setProducts(prev => prev.filter(item => item.id !== id));
-        }} categories={categories} setCategories={setCategories} onCategoryChange={() => {
-          // No cache to clear
+        }} categories={categories} setCategories={setCategories} onCategoryChange={async () => {
+          if (!currentStore) return;
+          try {
+            const [pRes, cRes] = await Promise.all([
+              supabase.from('products').select('*').eq('store_id', currentStore.id),
+              supabase.from('categories').select('*').eq('store_id', currentStore.id)
+            ]);
+            if (pRes.data) {
+              setProducts(pRes.data.map(mapProductFromDb));
+            }
+            if (cRes.data) {
+              setCategories(cRes.data.map((c: any) => c.name));
+            }
+          } catch (err) {
+            console.error("Error reloading metadata after category change:", err);
+          }
         }} />} />
         <Route path="pedidos" element={<OrdersList orders={orders} updateStatus={updateOrderStatus} products={products} addOrder={addOrder} settings={settings} updateOrder={updateOrder} />} />
         <Route path="equipe" element={<WaitstaffManagement ecosystemUsage={ecosystemUsage} refreshEcosystemUsage={loadEcosystemUsage} currentStore={currentStore!} settings={settings} onUpdateSettings={handleUpdateSettings} />} />
