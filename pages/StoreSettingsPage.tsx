@@ -671,28 +671,63 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                               )}
                           </div>
 
-                          <div className="grid grid-cols-1 gap-3 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                          <div className="grid grid-cols-1 gap-3 max-h-80 overflow-y-auto custom-scrollbar pr-2">
                               {filteredProducts.map(product => {
                                   const isSelected = localSettings.applicableProductIds?.includes(product.id);
+                                  const customPct = localSettings.productSpecificDiscounts?.[product.id];
                                   return (
-                                      <button 
+                                      <div 
                                           key={product.id}
-                                          onClick={() => toggleProductSelection(product.id)}
-                                          className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${isSelected ? 'border-orange-500 bg-orange-50' : 'border-gray-100 bg-white hover:border-gray-200'}`}
+                                          className={`flex items-center justify-between gap-3 p-3 rounded-xl border transition-all ${isSelected ? 'border-orange-500 bg-orange-50/50' : 'border-gray-100 bg-white hover:border-gray-200'}`}
                                       >
-                                          <div className="relative">
-                                            <img src={product.imageUrl || undefined} className="w-10 h-10 rounded-lg object-cover" />
-                                            {isSelected && (
-                                                <div className="absolute -top-1 -right-1 bg-orange-500 text-white p-0.5 rounded-full shadow-sm">
-                                                    <Check size={10} />
-                                                </div>
-                                            )}
+                                          <div 
+                                              onClick={() => toggleProductSelection(product.id)}
+                                              className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
+                                          >
+                                              <div className="relative shrink-0">
+                                                <img src={product.imageUrl || undefined} className="w-10 h-10 rounded-lg object-cover" />
+                                                {isSelected && (
+                                                    <div className="absolute -top-1 -right-1 bg-orange-500 text-white p-0.5 rounded-full shadow-sm">
+                                                        <Check size={10} />
+                                                    </div>
+                                                )}
+                                              </div>
+                                              <div className="min-w-0 flex-1">
+                                                  <p className="text-xs font-bold text-gray-800 truncate">{product.name}</p>
+                                                  <p className="text-[10px] text-gray-400">{product.category} • R$ {product.price.toFixed(2)}</p>
+                                              </div>
                                           </div>
-                                          <div className="min-w-0 flex-1">
-                                              <p className="text-xs font-bold text-gray-800 truncate">{product.name}</p>
-                                              <p className="text-[10px] text-gray-400">{product.category}</p>
-                                          </div>
-                                      </button>
+
+                                          {isSelected && (
+                                              <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                                  <span className="text-[10px] font-bold text-orange-600 uppercase">Desc. Personalizado:</span>
+                                                  <div className="relative w-20">
+                                                      <input 
+                                                          type="number"
+                                                          min="1"
+                                                          max="100"
+                                                          placeholder={String(localSettings.couponDiscount || 10)}
+                                                          value={customPct ?? ''}
+                                                          onChange={(e) => {
+                                                              const val = e.target.value === '' ? undefined : Math.min(100, Math.max(0, Number(e.target.value)));
+                                                              const updatedDiscounts = { ...(localSettings.productSpecificDiscounts || {}) };
+                                                              if (val === undefined) {
+                                                                  delete updatedDiscounts[product.id];
+                                                              } else {
+                                                                  updatedDiscounts[product.id] = val;
+                                                              }
+                                                              setLocalSettings({
+                                                                  ...localSettings,
+                                                                  productSpecificDiscounts: updatedDiscounts
+                                                              });
+                                                          }}
+                                                          className="w-full pl-2 pr-6 py-1.5 text-xs font-black bg-white rounded-lg border border-orange-200 outline-none text-right text-orange-700 focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
+                                                      />
+                                                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-orange-400">%</span>
+                                                  </div>
+                                              </div>
+                                          )}
+                                      </div>
                                   );
                               })}
                           </div>

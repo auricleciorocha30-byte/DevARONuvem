@@ -121,15 +121,29 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
     const base = customBasePrice !== undefined ? customBasePrice : product.price;
     if (!settings?.isCouponActive || base <= 0) return null;
     const isApplicable = settings.isCouponForAllProducts || settings.applicableProductIds?.includes(product.id);
-    if (!isApplicable || !settings.couponDiscount || settings.couponDiscount <= 0) return null;
-    return base * (1 - settings.couponDiscount / 100);
+    if (!isApplicable) return null;
+
+    const specificDiscount = settings.productSpecificDiscounts?.[product.id];
+    const discountPercent = specificDiscount !== undefined && specificDiscount > 0
+      ? specificDiscount
+      : settings.couponDiscount;
+
+    if (!discountPercent || discountPercent <= 0) return null;
+    return base * (1 - discountPercent / 100);
   };
 
   const getPromotionalDiscountPercentage = (product: Product) => {
     if (!settings?.isCouponActive) return null;
     const isApplicable = settings.isCouponForAllProducts || settings.applicableProductIds?.includes(product.id);
-    if (!isApplicable || !settings.couponDiscount || settings.couponDiscount <= 0) return null;
-    return settings.couponDiscount;
+    if (!isApplicable) return null;
+
+    const specificDiscount = settings.productSpecificDiscounts?.[product.id];
+    const discountPercent = specificDiscount !== undefined && specificDiscount > 0
+      ? specificDiscount
+      : settings.couponDiscount;
+
+    if (!discountPercent || discountPercent <= 0) return null;
+    return discountPercent;
   };
 
   useEffect(() => {

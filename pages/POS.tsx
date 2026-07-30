@@ -1373,18 +1373,32 @@ export default function POS({ storeId, user, settings, orders, products: propPro
 
   const getPromotionalPrice = (product: Product, customBasePrice?: number) => {
     const base = customBasePrice !== undefined ? customBasePrice : product.price;
-    if (!settings.isCouponActive || !settings.couponDiscount || settings.couponDiscount <= 0 || base <= 0) return null;
+    if (!settings.isCouponActive || base <= 0) return null;
     const isApplicable = settings.isCouponForAllProducts || settings.applicableProductIds?.includes(product.id);
     if (!isApplicable) return null;
-    const discount = base * (settings.couponDiscount / 100);
+
+    const specificDiscount = settings.productSpecificDiscounts?.[product.id];
+    const discountPercent = specificDiscount !== undefined && specificDiscount > 0
+      ? specificDiscount
+      : settings.couponDiscount;
+
+    if (!discountPercent || discountPercent <= 0) return null;
+    const discount = base * (discountPercent / 100);
     return base - discount;
   };
 
   const getPromotionalDiscountPercentage = (product: Product) => {
     if (!settings.isCouponActive) return null;
     const isApplicable = settings.isCouponForAllProducts || settings.applicableProductIds?.includes(product.id);
-    if (!isApplicable || !settings.couponDiscount || settings.couponDiscount <= 0) return null;
-    return settings.couponDiscount;
+    if (!isApplicable) return null;
+
+    const specificDiscount = settings.productSpecificDiscounts?.[product.id];
+    const discountPercent = specificDiscount !== undefined && specificDiscount > 0
+      ? specificDiscount
+      : settings.couponDiscount;
+
+    if (!discountPercent || discountPercent <= 0) return null;
+    return discountPercent;
   };
 
   const handleProductClick = (product: Product) => {

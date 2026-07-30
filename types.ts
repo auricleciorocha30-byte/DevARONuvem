@@ -216,6 +216,7 @@ export interface StoreSettings {
   isCouponActive?: boolean;
   isCouponForAllProducts?: boolean;
   applicableProductIds?: string[];
+  productSpecificDiscounts?: Record<string, number>;
   lastUpdate?: number;
   pixQrCodeUrl?: string;
   usbPrinterVendorId?: number;
