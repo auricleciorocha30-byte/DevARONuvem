@@ -421,7 +421,7 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                 <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
                     <div className="flex items-center gap-2">
                         <Clock size={16} className="text-indigo-500" />
-                        <span className="text-xs font-bold text-gray-600">Agendar se Fechado</span>
+                        <span className="text-xs font-bold text-gray-600">Permitir Agendamento de Pedidos</span>
                     </div>
                     <Switch checked={localSettings.allowSchedulingWhenClosed ?? false} onChange={(v) => setLocalSettings({...localSettings, allowSchedulingWhenClosed: v})} />
                 </div>

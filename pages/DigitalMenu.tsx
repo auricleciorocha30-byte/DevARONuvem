@@ -2045,64 +2045,88 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                           </>
                         )}
 
-                        {isSchedulingMode && (
-                           <div className="p-5 bg-indigo-50/50 border border-indigo-100 rounded-3xl space-y-4 animate-scale-up">
-                              <div className="flex items-center gap-2 text-indigo-700">
-                                 <Clock size={18} />
-                                 <h4 className="font-black text-xs uppercase tracking-wider">Agendar Horário de Entrega/Retirada</h4>
-                              </div>
-                              
-                              <div className="space-y-3">
-                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest ml-1">Selecione o Dia</label>
-                                    <select 
-                                       value={selectedScheduledDate} 
-                                       onChange={e => {
-                                         setSelectedScheduledDate(e.target.value);
-                                         setSelectedScheduledTime('');
+                        {settings.allowSchedulingWhenClosed && (
+                           !isSchedulingMode ? (
+                              <button 
+                                 type="button"
+                                 onClick={() => setIsSchedulingMode(true)}
+                                 className="w-full p-4 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 border border-indigo-100 mb-4"
+                              >
+                                 <Calendar size={16} className="animate-bounce" />
+                                 Agendar entrega ou retirada para outro dia/horário
+                              </button>
+                           ) : (
+                              <div className="p-5 bg-indigo-50/50 border border-indigo-100 rounded-3xl space-y-4 animate-scale-up mb-4">
+                                 <div className="flex items-center justify-between text-indigo-700">
+                                    <div className="flex items-center gap-2">
+                                       <Clock size={18} />
+                                       <h4 className="font-black text-xs uppercase tracking-wider">Agendar Horário de Entrega/Retirada</h4>
+                                    </div>
+                                    <button 
+                                       type="button"
+                                       onClick={() => {
+                                          setIsSchedulingMode(false);
+                                          setSelectedScheduledDate('');
+                                          setSelectedScheduledTime('');
                                        }}
-                                       className="w-full px-4 py-3 bg-white border border-indigo-100 rounded-2xl outline-none text-sm font-bold text-slate-800"
+                                       className="text-[10px] font-black uppercase text-red-600 hover:underline"
                                     >
-                                       <option value="">Selecione um dia...</option>
-                                       {getAvailableDaysForScheduling().map(day => (
-                                          <option key={day.dateStr} value={day.dateStr}>
-                                             {day.label}
-                                          </option>
-                                       ))}
-                                    </select>
+                                       Desativar Agendamento
+                                    </button>
                                  </div>
+                                 
+                                 <div className="space-y-3">
+                                    <div className="space-y-1.5">
+                                       <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest ml-1">Selecione o Dia</label>
+                                       <select 
+                                          value={selectedScheduledDate} 
+                                          onChange={e => {
+                                             setSelectedScheduledDate(e.target.value);
+                                             setSelectedScheduledTime('');
+                                          }}
+                                          className="w-full px-4 py-3 bg-white border border-indigo-100 rounded-2xl outline-none text-sm font-bold text-slate-800"
+                                       >
+                                          <option value="">Selecione um dia...</option>
+                                          {getAvailableDaysForScheduling().map(day => (
+                                             <option key={day.dateStr} value={day.dateStr}>
+                                                {day.label}
+                                             </option>
+                                          ))}
+                                       </select>
+                                    </div>
 
-                                 {selectedScheduledDate && (() => {
-                                    const chosenDayObj = getAvailableDaysForScheduling().find(d => d.dateStr === selectedScheduledDate);
-                                    if (!chosenDayObj) return null;
-                                    const dayOfWeek = chosenDayObj.dayOfWeek;
-                                    const dayConfig = settings.operatingHours?.[dayOfWeek];
-                                    const displayHours = dayConfig ? `das ${dayConfig.openTime} às ${dayConfig.closeTime}` : '';
-                                    
-                                    return (
-                                       <div className="space-y-1.5 animate-scale-up">
-                                          <div className="flex justify-between items-center px-1">
-                                             <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Selecione o Horário</label>
-                                             {displayHours && (
-                                                <span className="text-[9px] font-black text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full uppercase">
-                                                   Funcionamento: {displayHours}
-                                                 </span>
-                                             )}
+                                    {selectedScheduledDate && (() => {
+                                       const chosenDayObj = getAvailableDaysForScheduling().find(d => d.dateStr === selectedScheduledDate);
+                                       if (!chosenDayObj) return null;
+                                       const dayOfWeek = chosenDayObj.dayOfWeek;
+                                       const dayConfig = settings.operatingHours?.[dayOfWeek];
+                                       const displayHours = dayConfig ? `das ${dayConfig.openTime} às ${dayConfig.closeTime}` : '';
+                                       
+                                       return (
+                                          <div className="space-y-1.5 animate-scale-up">
+                                             <div className="flex justify-between items-center px-1">
+                                                <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Selecione o Horário</label>
+                                                {displayHours && (
+                                                   <span className="text-[9px] font-black text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full uppercase">
+                                                      Funcionamento: {displayHours}
+                                                    </span>
+                                                )}
+                                             </div>
+                                             <div className="relative">
+                                                <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-400" size={18} />
+                                                <input 
+                                                   type="time" 
+                                                   value={selectedScheduledTime} 
+                                                   onChange={e => setSelectedScheduledTime(e.target.value)}
+                                                   className="w-full pl-12 pr-4 py-3 bg-white border border-indigo-100 rounded-2xl outline-none font-bold text-sm text-slate-800" 
+                                                />
+                                             </div>
                                           </div>
-                                          <div className="relative">
-                                             <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-400" size={18} />
-                                             <input 
-                                                type="time" 
-                                                value={selectedScheduledTime} 
-                                                onChange={e => setSelectedScheduledTime(e.target.value)}
-                                                className="w-full pl-12 pr-4 py-3 bg-white border border-indigo-100 rounded-2xl outline-none font-bold text-sm text-slate-800" 
-                                             />
-                                          </div>
-                                       </div>
-                                    );
-                                 })()}
+                                       );
+                                    })()}
+                                 </div>
                               </div>
-                           </div>
+                           )
                         )}
 
                         <div className="space-y-4 pt-4 border-t border-gray-100">
