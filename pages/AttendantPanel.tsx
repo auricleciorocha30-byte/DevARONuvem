@@ -59,11 +59,13 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
   } | null>(null);
   const [isSplitMode, setIsSplitMode] = useState(false);
   const [splitPayments, setSplitPayments] = useState<{ method: string; amount: string }[]>([]);
+  const [pendingPaymentConfirm, setPendingPaymentConfirm] = useState<{ methodId: string; detailsStr: string; label: string } | null>(null);
 
   useEffect(() => {
     if (!paymentModalData) {
       setIsSplitMode(false);
       setSplitPayments([]);
+      setPendingPaymentConfirm(null);
     }
   }, [paymentModalData]);
   
@@ -879,7 +881,7 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
                     <span className="text-xs font-bold leading-relaxed">
                       Todos os pedidos já foram pagos via: <br />
                       <strong className="text-green-700 bg-green-100/50 px-2 py-0.5 rounded-md inline-block mt-1 font-black">
-                        {targetOrders.map(o => o.paymentMethod || 'Online').filter((v, i, a) => a.indexOf(v) === i).join(', ')}
+                        {targetOrders.map(o => o.paymentMethod === 'ONLINE' ? 'Pagar externo' : (o.paymentMethod || 'Pagar externo')).filter((v, i, a) => a.indexOf(v) === i).join(', ')}
                       </strong>
                     </span>
                   </div>
@@ -916,7 +918,44 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
               );
             })()}
 
-            {isSplitMode ? (
+            {pendingPaymentConfirm ? (
+              <div className="flex flex-col items-center justify-center py-6 text-center animate-scale-up space-y-4 flex-1">
+                <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center text-amber-500 border border-amber-100 mb-2">
+                  <AlertTriangle size={32} className="animate-pulse" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-sm font-black text-gray-800 uppercase tracking-wider">Confirmar Pagamento?</h4>
+                  <p className="text-xs text-gray-500 leading-snug">
+                    Deseja mesmo registrar o pagamento de:
+                  </p>
+                  <p className="text-xl font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-xl inline-block mt-1">
+                    R$ {paymentModalData.totalAmount.toFixed(2)}
+                  </p>
+                  <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mt-1">
+                    Via: {pendingPaymentConfirm.label}
+                  </p>
+                </div>
+                <div className="flex w-full gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setPendingPaymentConfirm(null)}
+                    className="flex-1 py-3 px-4 border border-gray-200 text-gray-500 hover:bg-gray-50 font-black rounded-2xl text-xs uppercase transition-all tracking-wider"
+                  >
+                    Não, Voltar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      paymentModalData.onSuccess(pendingPaymentConfirm.methodId, pendingPaymentConfirm.detailsStr);
+                      setPendingPaymentConfirm(null);
+                    }}
+                    className="flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-black rounded-2xl text-xs uppercase transition-all tracking-wider shadow-md"
+                  >
+                    Sim, Confirmar
+                  </button>
+                </div>
+              </div>
+            ) : isSplitMode ? (
               <div className="flex flex-col flex-1 overflow-hidden">
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 text-center">
                   Combinar Diferentes Meios
@@ -1090,7 +1129,22 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
                               resolvedMethod = finalDetails[0].method;
                             }
 
-                            paymentModalData.onSuccess(resolvedMethod, JSON.stringify(finalDetails));
+                            const label = finalDetails.map(f => {
+                              const mDetails = {
+                                DINHEIRO: 'Dinheiro',
+                                PIX: 'PIX',
+                                CARTAO: 'Cartão Crédito',
+                                DEBITO: 'Cartão Débito',
+                                VALES: 'Vale Refeição'
+                              }[f.method] || f.method;
+                              return `${mDetails} (R$ ${f.amount.toFixed(2)})`;
+                            }).join(' + ');
+
+                            setPendingPaymentConfirm({
+                              methodId: resolvedMethod,
+                              detailsStr: JSON.stringify(finalDetails),
+                              label
+                            });
                           }}
                           className={`flex-[2] py-3 text-xs font-black rounded-2xl uppercase tracking-wider transition-all shadow-md active:scale-95 ${
                             splitTotal >= paymentModalData.totalAmount - 0.01 && splitPayments.length > 0
@@ -1121,7 +1175,11 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
                       key={method.id}
                       onClick={() => {
                         const detailsStr = JSON.stringify([{ method: method.id, amount: paymentModalData.totalAmount }]);
-                        paymentModalData.onSuccess(method.id, detailsStr);
+                        setPendingPaymentConfirm({
+                          methodId: method.id,
+                          detailsStr,
+                          label: method.label
+                        });
                       }}
                       className={`flex flex-col items-center justify-center p-4 border rounded-2xl transition-all active:scale-95 text-center ${method.color}`}
                     >

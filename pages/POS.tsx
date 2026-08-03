@@ -3936,7 +3936,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                                           <option value="VALES">Vales</option>
                                           <option value="PIX">Pix</option>
                                           {settings.isOnlinePaymentActive && (
-                                              <option value="ONLINE">Pagamento Online</option>
+                                              <option value="ONLINE">Pagar externo</option>
                                           )}
                                           {settings.onlinePaymentProvider === 'mercado_pago' && settings.mercadoPagoPointDeviceId && (
                                               <option value="MAQUININHA">Maquininha Point</option>

@@ -91,6 +91,9 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const paymentOrderId = searchParams.get('orderId');
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(paymentOrderId || null);
   const [verifiedPaymentStatus, setVerifiedPaymentStatus] = useState<string | null>(paymentStatus);
+  const [mpPaymentId, setMpPaymentId] = useState<string | null>(null);
+  const [pendingOrderToSave, setPendingOrderToSave] = useState<Order | null>(null);
+  const [countdownSeconds, setCountdownSeconds] = useState<number>(120);
   
   const [cart, setCart] = useState<OrderItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(!!paymentStatus);
@@ -172,7 +175,78 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   }, [checkoutStep, paymentStatus, paymentOrderId, verifiedPaymentStatus, generatedPix]);
 
   useEffect(() => {
-    if (currentOrderId) {
+    let timer: any = null;
+    if (generatedPix && verifiedPaymentStatus === 'pending') {
+      timer = setInterval(() => {
+        setCountdownSeconds(prev => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            setVerifiedPaymentStatus('failure');
+            setGeneratedPix(null);
+            setMpPaymentId(null);
+            setPendingOrderToSave(null);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [generatedPix, verifiedPaymentStatus]);
+
+  useEffect(() => {
+    if (mpPaymentId && settings.onlinePaymentAccessToken && verifiedPaymentStatus === 'pending') {
+      let isMounted = true;
+      let localInterval: any = null;
+
+      const checkMpStatus = async () => {
+        try {
+          const response = await fetch(`/api/mercado-pago/payment-status/${mpPaymentId}?accessToken=${settings.onlinePaymentAccessToken}`);
+          if (!response.ok || !isMounted) return;
+          const paymentData = await response.json();
+          if (!isMounted) return;
+
+          if (paymentData.status === 'approved') {
+            if (pendingOrderToSave) {
+              const updatedOrder: Order = {
+                ...pendingOrderToSave,
+                status: 'PAGO',
+                paymentDetails: JSON.stringify([{ method: 'ONLINE', status: 'approved', amount: pendingOrderToSave.total }])
+              };
+              
+              const success = await addOrder(updatedOrder);
+              if (success !== false) {
+                setVerifiedPaymentStatus('success');
+                setMpPaymentId(null);
+                setPendingOrderToSave(null);
+                if (localInterval) clearInterval(localInterval);
+              }
+            }
+          } else if (paymentData.status === 'rejected' || paymentData.status === 'cancelled') {
+            setVerifiedPaymentStatus('failure');
+            setMpPaymentId(null);
+            setPendingOrderToSave(null);
+            if (localInterval) clearInterval(localInterval);
+          }
+        } catch (error) {
+          console.error('Error fetching MP payment status:', error);
+        }
+      };
+
+      localInterval = setInterval(checkMpStatus, 5000);
+      checkMpStatus();
+
+      return () => {
+        isMounted = false;
+        if (localInterval) clearInterval(localInterval);
+      };
+    }
+  }, [mpPaymentId, pendingOrderToSave, settings.onlinePaymentAccessToken, verifiedPaymentStatus]);
+
+  useEffect(() => {
+    if (currentOrderId && !mpPaymentId) {
       let isMounted = true;
       let localInterval: any = null;
       
@@ -1144,9 +1218,13 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
               stockDeducted: true
             };
 
-            const success = await addOrder(finalOrder); 
-            if (success === false) {
-               return;
+            const isOnlinePix = (payment === 'PIX' || (payment === 'CASHBACK' && combinedPayment === 'PIX')) && settings.onlinePaymentProvider === 'mercado_pago' && settings.onlinePaymentAccessToken;
+
+            if (!isOnlinePix) {
+                const success = await addOrder(finalOrder); 
+                if (success === false) {
+                   return;
+                }
             }
             setCurrentOrderId(finalOrder.id);
             generatedOrderData = finalOrder;
@@ -1164,7 +1242,8 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
         setCombinedPayment('');
         if (!effectiveTable) setManualTable('');
         
-        if ((payment === 'PIX' || combinedPayment === 'PIX') && settings.onlinePaymentProvider === 'mercado_pago' && settings.onlinePaymentAccessToken) {
+        const isOnlinePix = (payment === 'PIX' || (payment === 'CASHBACK' && combinedPayment === 'PIX')) && settings.onlinePaymentProvider === 'mercado_pago' && settings.onlinePaymentAccessToken;
+        if (isOnlinePix) {
           try {
              const response = await fetch('/api/mercado-pago/create-pix', {
                method: 'POST',
@@ -1178,6 +1257,9 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
              const data = await response.json();
               if (data.qr_code) {
                setGeneratedPix({ qr_code: data.qr_code, qr_code_base64: data.qr_code_base64 });
+               setMpPaymentId(data.id);
+               setPendingOrderToSave(generatedOrderData);
+               setCountdownSeconds(120);
                setCurrentOrderId(generatedOrderData.id);
                setVerifiedPaymentStatus('pending');
                setCheckoutStep('success'); // Show success component with QR code
@@ -1187,7 +1269,8 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
           }
         }
         
-        if ((payment === 'ONLINE' || combinedPayment === 'ONLINE') && settings.onlinePaymentProvider === 'mercado_pago') {
+        const isOnlineCard = (payment === 'ONLINE' || (payment === 'CASHBACK' && combinedPayment === 'ONLINE')) && settings.onlinePaymentProvider === 'mercado_pago';
+        if (isOnlineCard) {
           try {
             const redirectStoreUrl = `${window.location.origin}${window.location.pathname}#/cardapio?loja=${settings.slug || storeSlug}${urlModo ? '&modo=' + urlModo : ''}`;
             const response = await fetch('/api/mercado-pago/create-preference', {
@@ -1812,7 +1895,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                 {id: 'CARTAO', icon: <CreditCard size={18}/>, label: 'Cartão'},
                                 {id: 'DINHEIRO', icon: <Banknote size={18}/>, label: 'Dinheiro'},
                                 {id: 'DEBITO', icon: <CreditCard size={18}/>, label: 'Débito'},
-                                {id: 'ONLINE', icon: <Globe size={18}/>, label: 'Pagar Online'},
+                                {id: 'ONLINE', icon: <Globe size={18}/>, label: 'Pagar externo'},
                                 {id: 'A_PAGAR', icon: <Wallet size={18}/>, label: 'Na Entrega'},
                                 {id: 'CASHBACK', icon: <Award size={18}/>, label: `Cashback`}
                               ].filter(m => {
@@ -1861,7 +1944,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                     {id: 'CARTAO', icon: <CreditCard size={18}/>, label: 'Cartão'},
                                     {id: 'DINHEIRO', icon: <Banknote size={18}/>, label: 'Dinheiro'},
                                     {id: 'DEBITO', icon: <CreditCard size={18}/>, label: 'Débito'},
-                                    {id: 'ONLINE', icon: <Globe size={18}/>, label: 'Pagar Online'},
+                                    {id: 'ONLINE', icon: <Globe size={18}/>, label: 'Pagar externo'},
                                     {id: 'A_PAGAR', icon: <Wallet size={18}/>, label: 'Na Entrega'},
                                   ].filter(m => {
                                     if (m.id === 'ONLINE' && (!settings.isOnlinePaymentActive || !settings.onlinePaymentProvider || settings.lockedFeatures?.includes('ONLINE_PAYMENT'))) return false;
@@ -1925,6 +2008,11 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                      {generatedPix && verifiedPaymentStatus !== 'success' && (
                         <div className="bg-white p-6 rounded-3xl border border-gray-200 text-center space-y-4 shadow-xl">
                            <h4 className="font-bold text-gray-800 text-sm">Pague agora com Pix (Mercado Pago)</h4>
+                           
+                           <div className="flex items-center justify-center gap-2 text-xs font-black bg-orange-50 text-orange-700 px-4 py-2.5 rounded-2xl border border-orange-100 max-w-[200px] mx-auto animate-pulse">
+                              <Clock size={16} />
+                              <span>Tempo restante: {Math.floor(countdownSeconds / 60).toString().padStart(2, '0')}:{(countdownSeconds % 60).toString().padStart(2, '0')}</span>
+                           </div>
                            <img src={`data:image/jpeg;base64,${generatedPix.qr_code_base64}`} alt="QR Code Pix" className="mx-auto w-48 h-48" />
                            <div className="bg-gray-50 p-3 rounded-xl">
                               <p className="text-[9px] text-gray-500 break-all select-all font-mono">{generatedPix.qr_code}</p>
