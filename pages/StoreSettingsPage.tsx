@@ -418,6 +418,13 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                     </div>
                     <Switch checked={localSettings.isDeliveryActive} onChange={(v) => setLocalSettings({...localSettings, isDeliveryActive: v})} />
                 </div>
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                    <div className="flex items-center gap-2">
+                        <Clock size={16} className="text-indigo-500" />
+                        <span className="text-xs font-bold text-gray-600">Agendar se Fechado</span>
+                    </div>
+                    <Switch checked={localSettings.allowSchedulingWhenClosed ?? false} onChange={(v) => setLocalSettings({...localSettings, allowSchedulingWhenClosed: v})} />
+                </div>
                 {localSettings.isDeliveryActive && (
                   <div className="p-3 bg-gray-50 rounded-xl space-y-1 mt-3">
                     <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Pedido Mínimo (R$)</label>

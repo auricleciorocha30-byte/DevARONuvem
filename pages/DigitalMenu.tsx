@@ -42,7 +42,8 @@ import {
   QrCode,
   CheckCircle2,
   Percent,
-  Package
+  Package,
+  Calendar
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Product, StoreSettings, Order, OrderItem, OrderType, PaymentMethod, Waitstaff, CartComplementItem, ComplementCategory } from '../types';
@@ -104,6 +105,9 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const [generatedDisplayId, setGeneratedDisplayId] = useState<string | null>(null);
   const [generatedPix, setGeneratedPix] = useState<{qr_code: string, qr_code_base64: string} | null>(null);
   const [isPixCopied, setIsPixCopied] = useState(false);
+  const [isSchedulingMode, setIsSchedulingMode] = useState(false);
+  const [selectedScheduledDate, setSelectedScheduledDate] = useState('');
+  const [selectedScheduledTime, setSelectedScheduledTime] = useState('');
   
   const [weightProduct, setWeightProduct] = useState<Product | null>(null);
   const [selectedWeightGrams, setSelectedWeightGrams] = useState<string>("");
@@ -119,6 +123,50 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const [trackingPhone, setTrackingPhone] = useState('');
   const [trackedOrders, setTrackedOrders] = useState<Order[]>([]);
   const [isTrackingLoading, setIsTrackingLoading] = useState(false);
+
+  const getAvailableDaysForScheduling = () => {
+    const days = [];
+    const weekdayNames = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+    
+    for (let i = 0; i < 7; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      const dayOfWeek = d.getDay();
+      
+      const dayConfig = settings.operatingHours?.[dayOfWeek];
+      const isOpenOnThisDay = dayConfig ? dayConfig.isOpen : true;
+      
+      if (isOpenOnThisDay) {
+        const dateStr = d.toISOString().split('T')[0];
+        const formattedDate = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+        days.push({
+          dateStr,
+          dayOfWeek,
+          label: i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : `${weekdayNames[dayOfWeek]} (${formattedDate})`,
+          dayName: weekdayNames[dayOfWeek],
+          formattedDate
+        });
+      }
+    }
+    
+    if (days.length === 0) {
+      for (let i = 0; i < 7; i++) {
+        const d = new Date();
+        d.setDate(d.getDate() + i);
+        const dayOfWeek = d.getDay();
+        const dateStr = d.toISOString().split('T')[0];
+        const formattedDate = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+        days.push({
+          dateStr,
+          dayOfWeek,
+          label: i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : `${weekdayNames[dayOfWeek]} (${formattedDate})`,
+          dayName: weekdayNames[dayOfWeek],
+          formattedDate
+        });
+      }
+    }
+    return days;
+  };
 
   const getPromotionalPrice = (product: Product, customBasePrice?: number) => {
     const base = customBasePrice !== undefined ? customBasePrice : product.price;
@@ -951,6 +999,38 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
 
   const handleCheckout = async () => {
     if (cart.length === 0) return;
+
+    if (isSchedulingMode) {
+      if (!selectedScheduledDate) {
+        showAlert('Selecione o dia para o agendamento.');
+        return;
+      }
+      if (!selectedScheduledTime) {
+        showAlert('Selecione o horário para o agendamento.');
+        return;
+      }
+      
+      const chosenDayObj = getAvailableDaysForScheduling().find(d => d.dateStr === selectedScheduledDate);
+      if (chosenDayObj) {
+        const dayOfWeek = chosenDayObj.dayOfWeek;
+        const dayConfig = settings.operatingHours?.[dayOfWeek];
+        
+        if (dayConfig && dayConfig.isOpen) {
+          const [hours, minutes] = selectedScheduledTime.split(':').map(Number);
+          const [openHours, openMinutes] = dayConfig.openTime.split(':').map(Number);
+          const [closeHours, closeMinutes] = dayConfig.closeTime.split(':').map(Number);
+          
+          const selectedMin = hours * 60 + minutes;
+          const openMin = openHours * 60 + openMinutes;
+          const closeMin = closeHours * 60 + closeMinutes;
+          
+          if (selectedMin < openMin || selectedMin > closeMin) {
+            showAlert(`O horário selecionado está fora do funcionamento da loja para este dia (${dayConfig.openTime} às ${dayConfig.closeTime}).`);
+            return;
+          }
+        }
+      }
+    }
     if ((orderType === 'MESA' || orderType === 'COMANDA') && !manualTable) { showAlert(`Informe o número da ${orderType === 'MESA' ? 'mesa' : 'comanda'}.`); return; }
     if (orderType === 'BALCAO' && (!customerName || !customerPhone) && !isWaitstaff) { showAlert('Informe o seu nome e telefone.'); return; }
     if ((orderType === 'MESA' || orderType === 'COMANDA') && !customerPhone && !isWaitstaff) { showAlert('Informe o seu telefone para iniciar/continuar.'); return; }
@@ -1215,7 +1295,10 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
               waitstaffName: activeWaitstaff?.name || undefined,
               couponApplied: undefined,
               discountAmount: undefined,
-              stockDeducted: true
+              stockDeducted: true,
+              scheduledTime: isSchedulingMode && selectedScheduledDate && selectedScheduledTime 
+                ? `${selectedScheduledDate.split('-').reverse().join('/')} às ${selectedScheduledTime}` 
+                : undefined
             };
 
             const isOnlinePix = (payment === 'PIX' || (payment === 'CASHBACK' && combinedPayment === 'PIX')) && settings.onlinePaymentProvider === 'mercado_pago' && settings.onlinePaymentAccessToken;
@@ -1241,6 +1324,9 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
         setPayment('');
         setCombinedPayment('');
         if (!effectiveTable) setManualTable('');
+        setIsSchedulingMode(false);
+        setSelectedScheduledDate('');
+        setSelectedScheduledTime('');
         
         const isOnlinePix = (payment === 'PIX' || (payment === 'CASHBACK' && combinedPayment === 'PIX')) && settings.onlinePaymentProvider === 'mercado_pago' && settings.onlinePaymentAccessToken;
         if (isOnlinePix) {
@@ -1320,15 +1406,73 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
             <p className="text-xs text-gray-400 mt-2 uppercase tracking-[0.2em] font-black">{isStoreClosed ? 'ESTAMOS FECHADOS NO MOMENTO' : 'Como deseja fazer seu pedido?'}</p>
           </div>
           {isStoreClosed ? (
-            <div className="bg-red-50 p-8 rounded-[2rem] border border-red-100 text-center space-y-4">
-               <Power size={56} className="text-red-300 mx-auto" strokeWidth={1.5} />
-               <p className="text-sm font-bold text-red-700 leading-relaxed uppercase">Nossa loja física e digital estão pausadas agora. Voltaremos em breve!</p>
-               {nextOpeningTime && (
-                 <div className="mt-4 inline-block bg-red-100/50 px-4 py-2 rounded-xl text-xs font-black text-red-800 uppercase tracking-widest border border-red-200">
-                    Abre {nextOpeningTime}
+            !isSchedulingMode ? (
+              <div className="bg-red-50 p-8 rounded-[2rem] border border-red-100 text-center space-y-4">
+                 <Power size={56} className="text-red-300 mx-auto" strokeWidth={1.5} />
+                 <p className="text-sm font-bold text-red-700 leading-relaxed uppercase">Nossa loja física e digital estão pausadas agora. Voltaremos em breve!</p>
+                 {nextOpeningTime && (
+                   <div className="mt-4 inline-block bg-red-100/50 px-4 py-2 rounded-xl text-xs font-black text-red-800 uppercase tracking-widest border border-red-200">
+                      Abre {nextOpeningTime}
+                   </div>
+                 )}
+                 {settings.allowSchedulingWhenClosed && (
+                   <div className="pt-4 border-t border-red-100 mt-2">
+                     <p className="text-[11px] font-bold text-slate-500 mb-3">Você pode adiantar a sua compra agendando a entrega ou retirada!</p>
+                     <button 
+                       onClick={() => {
+                         setIsSchedulingMode(true);
+                       }}
+                       className="w-full py-4 bg-primary text-white font-black rounded-2xl text-xs uppercase tracking-wider shadow-lg hover:opacity-90 transition-all flex items-center justify-center gap-2"
+                     >
+                       <Calendar size={18} />
+                       Fazer Pedido por Agendamento
+                     </button>
+                   </div>
+                 )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4">
+                 <div className="text-center bg-indigo-50 p-4 rounded-2xl border border-indigo-100 mb-2">
+                   <p className="text-xs font-black text-indigo-700 uppercase tracking-wider flex items-center justify-center gap-1.5">
+                     <Calendar size={14} /> Modo Agendamento Ativo
+                   </p>
+                   <p className="text-[10px] text-indigo-600 mt-1">Selecione como deseja receber seu pedido agendado</p>
                  </div>
-               )}
-            </div>
+                 {settings.isCounterPickupActive && (
+                   <button onClick={() => { setOrderType('BALCAO'); setHasSelectedMode(true); }} className="group flex items-center justify-between p-5 bg-orange-50/50 hover:bg-orange-100/50 rounded-[1.8rem] transition-all border border-orange-100 active:scale-95 text-left">
+                       <div className="flex items-center gap-5">
+                           <div className="p-4 bg-white rounded-2xl text-orange-600 shadow-sm transition-transform group-hover:scale-110"><ShoppingBag size={28} /></div>
+                           <div>
+                             <p className="font-bold text-lg text-primary leading-none">Retirar no Balcão</p>
+                             <p className="text-[10px] text-orange-700 opacity-60 font-black uppercase mt-1 tracking-wider">Vou buscar na loja</p>
+                           </div>
+                       </div>
+                       <ArrowRight className="text-orange-200 group-hover:text-orange-400 group-hover:translate-x-1 transition-all" size={20} />
+                   </button>
+                 )}
+                 {settings.isDeliveryActive && (
+                   <button onClick={() => { setOrderType('ENTREGA'); setHasSelectedMode(true); }} className="group flex items-center justify-between p-5 bg-orange-50/50 hover:bg-orange-100/50 rounded-[1.8rem] transition-all border border-orange-100 active:scale-95 text-left">
+                       <div className="flex items-center gap-5">
+                           <div className="p-4 bg-white rounded-2xl text-orange-600 shadow-sm transition-transform group-hover:scale-110"><Truck size={28} /></div>
+                           <div>
+                             <p className="font-bold text-lg text-primary leading-none">Receber em Casa</p>
+                             <p className="text-[10px] text-orange-700 opacity-60 font-black uppercase mt-1 tracking-wider">Delivery no meu endereço</p>
+                           </div>
+                       </div>
+                       <ArrowRight className="text-orange-200 group-hover:text-orange-400 group-hover:translate-x-1 transition-all" size={20} />
+                   </button>
+                 )}
+                 <button 
+                   onClick={() => {
+                     setIsSchedulingMode(false);
+                     setHasSelectedMode(false);
+                   }}
+                   className="mt-2 py-3 px-4 border border-gray-200 text-gray-500 hover:bg-gray-50 font-black rounded-2xl text-xs uppercase tracking-wider transition-all"
+                 >
+                   Voltar
+                 </button>
+              </div>
+            )
           ) : (
             <div className="grid grid-cols-1 gap-4">
                 {(!urlModo || urlModo === 'local') && settings.isTableOrderActive && (
@@ -1415,15 +1559,29 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
 
       <main className="max-w-4xl mx-auto px-4 py-6 flex-1 pb-24 text-slate-800 overflow-x-hidden w-full box-border">
         {isStoreClosed && !isWaitstaff && (
-          <div className="bg-red-50 p-4 rounded-2xl border border-red-100 flex items-center justify-between gap-3 animate-pulse mb-6 flex-wrap">
+          <div className={`${isSchedulingMode ? 'bg-indigo-50 border-indigo-100 text-indigo-700' : 'bg-red-50 border-red-100 text-red-700'} p-4 rounded-2xl border flex items-center justify-between gap-3 animate-pulse mb-6 flex-wrap`}>
             <div className="flex items-center gap-3">
-              <AlertTriangle className="text-red-500 shrink-0" size={20} />
-              <p className="text-[10px] font-black uppercase text-red-700 tracking-widest">A loja está fechada. Apenas visualização.</p>
+              {isSchedulingMode ? <Clock className="text-indigo-500 shrink-0" size={20} /> : <AlertTriangle className="text-red-500 shrink-0" size={20} />}
+              <p className="text-[10px] font-black uppercase tracking-widest">
+                {isSchedulingMode ? '📅 MODO AGENDAMENTO ATIVO: Seu pedido será agendado!' : 'A loja está fechada. Apenas visualização.'}
+              </p>
             </div>
-            {nextOpeningTime && (
+            {nextOpeningTime && !isSchedulingMode && (
               <span className="text-[10px] font-bold bg-white text-red-600 px-2 py-1 rounded-lg border border-red-100 uppercase">
                 Abre {nextOpeningTime}
               </span>
+            )}
+            {isSchedulingMode && (
+              <button 
+                onClick={() => {
+                  setIsSchedulingMode(false);
+                  setHasSelectedMode(false);
+                  setCart([]);
+                }}
+                className="text-[10px] font-bold bg-white text-red-600 px-3 py-1 rounded-lg border border-red-100 uppercase hover:bg-red-50 transition-all active:scale-95"
+              >
+                Cancelar
+              </button>
             )}
           </div>
         )}
@@ -1487,7 +1645,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                </span>
                              );
                           })()}
-                          {!isStoreClosed && (
+                          {(!isStoreClosed || isSchedulingMode) && (
                             <button 
                               onClick={() => handleAddToCart(featuredProduct)} 
                               className={`px-4 py-2.5 rounded-xl text-white font-bold text-xs shadow-md active:scale-95 transition-all flex items-center gap-1.5 shrink-0 hover:opacity-90 ${isWaitstaff ? 'bg-secondary' : 'bg-primary'}`}
@@ -1571,7 +1729,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                      }
                      return product.price > 0 ? <span className="font-black text-primary text-sm sm:text-md">R$ {product.price.toFixed(2)}{product.isByWeight ? '/kg' : ''}</span> : <span />;
                   })()}
-                  {!isStoreClosed && (
+                  {(!isStoreClosed || isSchedulingMode) && (
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1885,6 +2043,66 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                 </div>
                              </div>
                           </>
+                        )}
+
+                        {isSchedulingMode && (
+                           <div className="p-5 bg-indigo-50/50 border border-indigo-100 rounded-3xl space-y-4 animate-scale-up">
+                              <div className="flex items-center gap-2 text-indigo-700">
+                                 <Clock size={18} />
+                                 <h4 className="font-black text-xs uppercase tracking-wider">Agendar Horário de Entrega/Retirada</h4>
+                              </div>
+                              
+                              <div className="space-y-3">
+                                 <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest ml-1">Selecione o Dia</label>
+                                    <select 
+                                       value={selectedScheduledDate} 
+                                       onChange={e => {
+                                         setSelectedScheduledDate(e.target.value);
+                                         setSelectedScheduledTime('');
+                                       }}
+                                       className="w-full px-4 py-3 bg-white border border-indigo-100 rounded-2xl outline-none text-sm font-bold text-slate-800"
+                                    >
+                                       <option value="">Selecione um dia...</option>
+                                       {getAvailableDaysForScheduling().map(day => (
+                                          <option key={day.dateStr} value={day.dateStr}>
+                                             {day.label}
+                                          </option>
+                                       ))}
+                                    </select>
+                                 </div>
+
+                                 {selectedScheduledDate && (() => {
+                                    const chosenDayObj = getAvailableDaysForScheduling().find(d => d.dateStr === selectedScheduledDate);
+                                    if (!chosenDayObj) return null;
+                                    const dayOfWeek = chosenDayObj.dayOfWeek;
+                                    const dayConfig = settings.operatingHours?.[dayOfWeek];
+                                    const displayHours = dayConfig ? `das ${dayConfig.openTime} às ${dayConfig.closeTime}` : '';
+                                    
+                                    return (
+                                       <div className="space-y-1.5 animate-scale-up">
+                                          <div className="flex justify-between items-center px-1">
+                                             <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Selecione o Horário</label>
+                                             {displayHours && (
+                                                <span className="text-[9px] font-black text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full uppercase">
+                                                   Funcionamento: {displayHours}
+                                                 </span>
+                                             )}
+                                          </div>
+                                          <div className="relative">
+                                             <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-400" size={18} />
+                                             <input 
+                                                type="time" 
+                                                value={selectedScheduledTime} 
+                                                onChange={e => setSelectedScheduledTime(e.target.value)}
+                                                className="w-full pl-12 pr-4 py-3 bg-white border border-indigo-100 rounded-2xl outline-none font-bold text-sm text-slate-800" 
+                                             />
+                                          </div>
+                                       </div>
+                                    );
+                                 })()}
+                              </div>
+                           </div>
                         )}
 
                         <div className="space-y-4 pt-4 border-t border-gray-100">

@@ -571,6 +571,12 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
                 <div className="flex-1 space-y-2 mb-5 border-t border-gray-50 pt-4 min-h-[100px] overflow-y-auto custom-scrollbar">
                   {/* Additional Info */}
                   <div className="flex flex-col gap-1 mb-3 pb-3 border-b border-gray-50 text-[10px] text-gray-500">
+                     {order.scheduledTime && (
+                        <div className="flex justify-between bg-indigo-50 p-1.5 rounded-lg border border-indigo-100 text-indigo-700 mb-1">
+                           <span className="font-extrabold uppercase tracking-wider">📅 Agendado:</span>
+                           <span className="font-black">{order.scheduledTime}</span>
+                        </div>
+                     )}
                      <div className="flex justify-between">
                         <span className="font-bold uppercase tracking-wider">Hora:</span>
                         <span>{new Date(order.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>

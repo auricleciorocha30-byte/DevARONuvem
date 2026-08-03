@@ -138,6 +138,7 @@ export interface Order {
   nfce_reference?: string;
   nfce_status?: string;
   customerCpf?: string;
+  scheduledTime?: string;
 }
 
 export interface CashMovement {
@@ -230,6 +231,7 @@ export interface StoreSettings {
   freeDeliveryToleranceKm?: number;
   deliveryFeeRules?: { upToKm: number; fee: number }[];
   digitalMenuPaymentMethods?: PaymentMethod[];
+  allowSchedulingWhenClosed?: boolean;
   
   // Integrações
   focusNfeToken?: string;

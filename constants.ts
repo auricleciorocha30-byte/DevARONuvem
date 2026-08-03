@@ -36,7 +36,8 @@ export const INITIAL_SETTINGS: StoreSettings = {
   isCouponActive: false,
   isCouponForAllProducts: true,
   applicableProductIds: [],
-  requirePosFinalization: false
+  requirePosFinalization: false,
+  allowSchedulingWhenClosed: false
 };
 
 export const INITIAL_PRODUCTS: Product[] = [

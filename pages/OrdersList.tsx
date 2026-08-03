@@ -52,6 +52,7 @@ interface GroupedOrder {
   deliveryFee?: number;
   nfceReference?: string;
   nfceStatus?: string;
+  scheduledTime?: string;
 }
 
 const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder, settings, updateOrder }) => {
@@ -135,7 +136,8 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                 discountAmount: order.discountAmount,
                 deliveryFee: order.deliveryFee,
                 nfceReference: order.nfce_reference,
-                nfceStatus: order.nfce_status
+                nfceStatus: order.nfce_status,
+                scheduledTime: order.scheduledTime
             });
         }
     });
@@ -523,8 +525,14 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
               <button onClick={() => handlePrint(group)} className="p-3 bg-gray-50 text-gray-400 hover:text-orange-500 rounded-xl transition-colors shrink-0"><Printer size={20} /></button>
             </div>
 
-            {(group.customerPhone || group.deliveryAddress || group.customerCpf) && (
+            {(group.customerPhone || group.deliveryAddress || group.customerCpf || group.scheduledTime) && (
               <div className="mb-4 p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-2">
+                 {group.scheduledTime && (
+                    <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-100 p-2.5 rounded-xl text-indigo-700 font-bold text-xs mb-1">
+                       <Clock size={14} className="animate-pulse" />
+                       <span>Agendado para: {group.scheduledTime}</span>
+                    </div>
+                 )}
                  {(group.customerPhone || group.customerCpf) && (
                     <div className="flex items-center justify-between">
                         <div className="flex flex-col gap-1">
