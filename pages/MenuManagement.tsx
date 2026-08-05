@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Product } from '../types';
-import { Plus, Search, Edit2, Trash2, Camera, Star, Tag, X, Loader2, Weight, Power, ListTree, ScanLine, FileText, Printer, Layers, Check } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Camera, Star, Tag, X, Loader2, Weight, Power, ListTree, ScanLine, FileText, Printer, Layers, Check, Upload, Percent } from 'lucide-react';
 import { Switch } from '../components/Switch';
 import { ComplementBuilder } from '../components/ComplementBuilder';
 import { supabase } from '../lib/supabase';
@@ -126,6 +126,190 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
   const [productTab, setProductTab] = useState<'INFO' | 'OPCOES'>('INFO');
 
   const [isSearchingBarcode, setIsSearchingBarcode] = useState(false);
+
+  const [showXmlImportModal, setShowXmlImportModal] = useState(false);
+  const [xmlText, setXmlText] = useState('');
+  const [parsedNfeItems, setParsedNfeItems] = useState<any[]>([]);
+  const [globalMarkup, setGlobalMarkup] = useState<number>(50);
+  const [stockUpdateMode, setStockUpdateMode] = useState<'ADD' | 'REPLACE'>('ADD');
+  const [isProcessingXml, setIsProcessingXml] = useState(false);
+
+  const handleParseXml = (text: string) => {
+    if (!text.trim()) {
+      alert("Por favor, forneça o conteúdo XML da Nota Fiscal.");
+      return;
+    }
+    try {
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(text, "text/xml");
+      
+      const parseError = xmlDoc.getElementsByTagName("parsererror");
+      if (parseError.length > 0) {
+        throw new Error("Formato de XML inválido. Verifique se o conteúdo colado é um XML de NF-e completo e válido.");
+      }
+
+      const detElements = xmlDoc.getElementsByTagName("det");
+      if (detElements.length === 0) {
+        throw new Error("Nenhum item de produto (<det>) foi encontrado no XML fornecido.");
+      }
+
+      const items: any[] = [];
+      for (let i = 0; i < detElements.length; i++) {
+        const det = detElements[i];
+        const prod = det.getElementsByTagName("prod")[0];
+        if (!prod) continue;
+
+        const cProd = prod.getElementsByTagName("cProd")[0]?.textContent || '';
+        let cEAN = prod.getElementsByTagName("cEAN")[0]?.textContent || '';
+        if (cEAN === 'SEM GTIN' || cEAN.trim() === '7890000000000' || !/^\d+$/.test(cEAN)) {
+          cEAN = '';
+        }
+
+        const xProd = prod.getElementsByTagName("xProd")[0]?.textContent || '';
+        const ncm = prod.getElementsByTagName("NCM")[0]?.textContent || '';
+        const cfop = prod.getElementsByTagName("CFOP")[0]?.textContent || '';
+        
+        let suggestedSalesCfop = '5102';
+        if (cfop.startsWith('14') || cfop.startsWith('24')) {
+          suggestedSalesCfop = '5405';
+        }
+
+        const qCom = parseFloat(prod.getElementsByTagName("qCom")[0]?.textContent || '0');
+        const vUnCom = parseFloat(prod.getElementsByTagName("vUnCom")[0]?.textContent || '0');
+
+        let icmsSituation = '102';
+        const icmsElements = det.getElementsByTagName("ICMS");
+        if (icmsElements.length > 0) {
+          const innerIcms = icmsElements[0];
+          const cstElement = innerIcms.getElementsByTagName("CST")[0] || innerIcms.getElementsByTagName("CSOSN")[0];
+          if (cstElement && cstElement.textContent) {
+            icmsSituation = cstElement.textContent;
+          }
+        }
+
+        const matchedProduct = products.find(p => {
+          if (cEAN && p.barcode === cEAN) return true;
+          return p.name.toLowerCase().trim() === xProd.toLowerCase().trim();
+        });
+
+        const salePrice = Number((vUnCom * (1 + globalMarkup / 100)).toFixed(2));
+
+        items.push({
+          id: Math.random().toString(36).substr(2, 9),
+          cProd,
+          barcode: cEAN,
+          name: xProd,
+          ncm,
+          cfop: suggestedSalesCfop,
+          quantity: qCom,
+          costPrice: vUnCom,
+          icms: icmsSituation,
+          matchedProductId: matchedProduct ? matchedProduct.id : undefined,
+          matchedProductName: matchedProduct ? matchedProduct.name : undefined,
+          selected: true,
+          salePrice: matchedProduct ? matchedProduct.price : salePrice,
+          category: matchedProduct ? matchedProduct.category : (categories[0] || 'Geral')
+        });
+      }
+
+      setParsedNfeItems(items);
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || "Erro ao processar XML.");
+    }
+  };
+
+  const handleMarkupChange = (newMarkup: number) => {
+    setGlobalMarkup(newMarkup);
+    setParsedNfeItems(prev => prev.map(item => {
+      if (!item.matchedProductId) {
+        return {
+          ...item,
+          salePrice: Number((item.costPrice * (1 + newMarkup / 100)).toFixed(2))
+        };
+      }
+      return item;
+    }));
+  };
+
+  const handleConfirmXmlImport = async () => {
+    const selectedItems = parsedNfeItems.filter(item => item.selected);
+    if (selectedItems.length === 0) {
+      alert("Nenhum item selecionado para importação.");
+      return;
+    }
+
+    setIsProcessingXml(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    try {
+      for (const item of selectedItems) {
+        try {
+          if (item.matchedProductId) {
+            const existing = products.find(p => p.id === item.matchedProductId);
+            if (existing) {
+              const updatedStock = stockUpdateMode === 'ADD' 
+                ? (existing.stock || 0) + item.quantity 
+                : item.quantity;
+
+              const productPayload: Partial<Product> = {
+                id: existing.id,
+                name: existing.name,
+                category: existing.category,
+                description: existing.description || 'Importado via NF-e',
+                imageUrl: existing.imageUrl || '',
+                isActive: existing.isActive,
+                price: item.salePrice,
+                costPrice: item.costPrice,
+                stock: updatedStock,
+                ncm: item.ncm || existing.ncm,
+                cfop: item.cfop || existing.cfop,
+                icms_situacao_tributaria: item.icms || existing.icms_situacao_tributaria,
+                barcode: existing.barcode || item.barcode || undefined
+              };
+
+              await saveProduct(productPayload);
+              successCount++;
+            }
+          } else {
+            const newProductPayload: Partial<Product> = {
+              name: item.name,
+              category: item.category,
+              description: 'Importado via NF-e',
+              imageUrl: '',
+              isActive: true,
+              price: item.salePrice,
+              costPrice: item.costPrice,
+              stock: item.quantity,
+              ncm: item.ncm,
+              cfop: item.cfop,
+              icms_situacao_tributaria: item.icms || '102',
+              barcode: item.barcode || undefined
+            };
+
+            await saveProduct(newProductPayload);
+            successCount++;
+          }
+        } catch (err) {
+          console.error(`Erro ao importar item ${item.name}:`, err);
+          errorCount++;
+        }
+      }
+
+      alert(`Importação concluída! ${successCount} produtos importados/atualizados com sucesso.${errorCount > 0 ? ` ${errorCount} falhas.` : ''}`);
+      setShowXmlImportModal(false);
+      setParsedNfeItems([]);
+      setXmlText('');
+      if (onCategoryChange) {
+         onCategoryChange();
+      }
+    } catch (globalErr: any) {
+      alert(`Erro geral na importação: ${globalErr.message || globalErr}`);
+    } finally {
+      setIsProcessingXml(false);
+    }
+  };
 
   const handleBarcodeLookup = async (code: string) => {
     if (!code || code.length < 8) return;
@@ -507,6 +691,16 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                 className="px-4 py-3 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors shadow-sm whitespace-nowrap"
             >
                 <ListTree size={18} /> Categorias
+            </button>
+            <button 
+                onClick={() => {
+                  setParsedNfeItems([]);
+                  setXmlText('');
+                  setShowXmlImportModal(true);
+                }}
+                className="px-4 py-3 bg-indigo-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors shadow-md whitespace-nowrap"
+            >
+                <FileText size={18} /> Importar Nota (XML)
             </button>
             <button 
                 onClick={() => { 
@@ -1042,6 +1236,312 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showXmlImportModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" id="xml-import-modal">
+          <div className="bg-white rounded-3xl max-w-5xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl border border-gray-100 animate-scale-up">
+            
+            {/* Header */}
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-indigo-50">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-indigo-500 rounded-2xl text-white">
+                  <FileText size={24} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-800">Importar Produtos de Nota Fiscal (XML)</h3>
+                  <p className="text-xs font-semibold text-slate-500">Cadastre novos produtos em lote e atualize preços de custo, estoque e dados fiscais via NF-e</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => {
+                  setShowXmlImportModal(false);
+                  setParsedNfeItems([]);
+                  setXmlText('');
+                }}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-white rounded-xl transition-all"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 p-6 overflow-y-auto custom-scrollbar space-y-6">
+              
+              {parsedNfeItems.length === 0 ? (
+                /* Source Selection Panel */
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    
+                    {/* Drag and Drop File Selector */}
+                    <div className="border-2 border-dashed border-indigo-200 bg-indigo-50/20 hover:bg-indigo-50/50 rounded-2xl p-8 flex flex-col items-center justify-center text-center transition-all cursor-pointer relative group">
+                      <input 
+                        type="file" 
+                        accept=".xml"
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (evt) => {
+                              const content = evt.target?.result as string;
+                              setXmlText(content);
+                              handleParseXml(content);
+                            };
+                            reader.readAsText(file);
+                          }
+                        }}
+                      />
+                      <div className="p-4 bg-indigo-50 text-indigo-600 rounded-full mb-3 group-hover:scale-110 transition-transform">
+                        <Upload size={32} />
+                      </div>
+                      <span className="text-sm font-bold text-indigo-950">Enviar Arquivo XML (.xml)</span>
+                      <p className="text-xs font-semibold text-indigo-500/70 mt-1">Selecione o arquivo da NF-e direto do seu computador ou celular</p>
+                    </div>
+
+                    {/* Text Area Parser */}
+                    <div className="flex flex-col space-y-2">
+                      <label className="text-xs font-bold text-slate-600 uppercase">Ou cole o conteúdo do XML abaixo:</label>
+                      <textarea 
+                        rows={6}
+                        value={xmlText}
+                        onChange={(e) => setXmlText(e.target.value)}
+                        placeholder="Cole aqui todo o texto contido no arquivo XML da nota de compra..."
+                        className="w-full p-3 text-xs font-mono border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 resize-none h-[140px]"
+                      />
+                      <button 
+                        onClick={() => handleParseXml(xmlText)}
+                        className="py-3 bg-indigo-600 text-white font-bold rounded-2xl shadow-md hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 text-xs uppercase tracking-wider"
+                      >
+                        <Check size={16} /> Processar XML Colado
+                      </button>
+                    </div>
+
+                  </div>
+                </div>
+              ) : (
+                /* Import Preview Panel */
+                <div className="space-y-6">
+                  
+                  {/* Global Import Settings */}
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Margem de Lucro Padrão (Novos Itens)</label>
+                      <div className="relative">
+                        <Percent className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                        <input 
+                          type="number"
+                          value={globalMarkup}
+                          onChange={(e) => handleMarkupChange(Math.max(0, parseFloat(e.target.value) || 0))}
+                          className="w-full pl-10 pr-3 py-2 border border-slate-200 rounded-xl outline-none font-bold text-sm text-slate-800 border-none bg-white h-10 shadow-sm"
+                        />
+                      </div>
+                      <span className="text-[10px] font-semibold text-slate-400 mt-1 block">Aplica (Preço de Custo + X%) como sugestão de venda para novos produtos</span>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Atualização do Estoque</label>
+                      <div className="grid grid-cols-2 gap-2 mt-1">
+                        <button 
+                          type="button"
+                          onClick={() => setStockUpdateMode('ADD')}
+                          className={`py-2 px-3 rounded-xl font-bold text-xs border transition-all h-10 ${
+                            stockUpdateMode === 'ADD' 
+                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' 
+                            : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                          }`}
+                        >
+                          Somar ao Estoque
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => setStockUpdateMode('REPLACE')}
+                          className={`py-2 px-3 rounded-xl font-bold text-xs border transition-all h-10 ${
+                            stockUpdateMode === 'REPLACE' 
+                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' 
+                            : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                          }`}
+                        >
+                          Substituir Estoque
+                        </button>
+                      </div>
+                      <span className="text-[10px] font-semibold text-slate-400 mt-1 block">
+                        {stockUpdateMode === 'ADD' 
+                          ? 'Soma a quantidade comprada ao estoque atual cadastrado.' 
+                          : 'Define o estoque exatamente para a quantidade comprada.'}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col justify-center">
+                      <div className="text-right">
+                        <span className="text-xs font-bold text-slate-500 block">Total de itens na Nota</span>
+                        <span className="text-2xl font-black text-indigo-600">{parsedNfeItems.length}</span>
+                        <span className="text-[10px] font-semibold text-slate-400 block">
+                          ({parsedNfeItems.filter(i => i.selected).length} selecionados para importar)
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Products Table */}
+                  <div className="border border-slate-100 rounded-2xl overflow-hidden bg-white shadow-sm max-h-[40vh] overflow-y-auto custom-scrollbar">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 text-slate-400 font-bold text-[10px] uppercase border-b border-slate-100">
+                          <th className="py-3 px-4 w-12 text-center">
+                            <input 
+                              type="checkbox"
+                              checked={parsedNfeItems.every(i => i.selected)}
+                              onChange={(e) => setParsedNfeItems(prev => prev.map(p => ({ ...p, selected: e.target.checked })))}
+                              className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
+                            />
+                          </th>
+                          <th className="py-3 px-4">Produto da Nota</th>
+                          <th className="py-3 px-4 text-center w-28">Estoque Compra</th>
+                          <th className="py-3 px-4 text-right w-28">Custo Unitário</th>
+                          <th className="py-3 px-4 text-right w-36">Preço de Venda</th>
+                          <th className="py-3 px-4 w-44">Categoria Destino</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
+                        {parsedNfeItems.map((item) => (
+                          <tr key={item.id} className={`hover:bg-slate-50/50 transition-colors ${!item.selected ? 'opacity-50' : ''}`}>
+                            {/* Checkbox */}
+                            <td className="py-4 px-4 text-center">
+                              <input 
+                                type="checkbox"
+                                checked={item.selected}
+                                onChange={(e) => setParsedNfeItems(prev => prev.map(p => p.id === item.id ? { ...p, selected: e.target.checked } : p))}
+                                className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
+                              />
+                            </td>
+
+                            {/* Info */}
+                            <td className="py-4 px-4 space-y-1">
+                              <div className="font-black text-slate-800 uppercase tracking-tight max-w-sm truncate" title={item.name}>
+                                {item.name}
+                              </div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {item.barcode && (
+                                  <span className="bg-slate-100 text-slate-500 font-mono text-[9px] px-1.5 py-0.5 rounded">
+                                    EAN: {item.barcode}
+                                  </span>
+                                )}
+                                <span className="bg-indigo-50 text-indigo-500 font-semibold text-[9px] px-1.5 py-0.5 rounded">
+                                  NCM: {item.ncm} | CFOP: {item.cfop}
+                                </span>
+                                <span className="bg-slate-50 text-slate-400 font-semibold text-[9px] px-1.5 py-0.5 rounded">
+                                  CST: {item.icms}
+                                </span>
+                              </div>
+                              
+                              {/* Match Status Badge */}
+                              <div className="pt-1">
+                                {item.matchedProductId ? (
+                                  <span className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full inline-flex items-center gap-1 uppercase">
+                                    <Check size={10} /> Associado a: {item.matchedProductName}
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full inline-flex items-center gap-1 uppercase">
+                                    ✚ Novo Produto (Será criado)
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Buy Qty */}
+                            <td className="py-4 px-4 text-center font-bold text-slate-600">
+                              {item.quantity}
+                            </td>
+
+                            {/* Cost Price */}
+                            <td className="py-4 px-4 text-right font-bold text-slate-600">
+                              R$ {item.costPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+
+                            {/* Selling Price */}
+                            <td className="py-4 px-4 text-right">
+                              <div className="flex items-center justify-end">
+                                <PriceInput 
+                                  value={item.salePrice}
+                                  onChange={(val) => setParsedNfeItems(prev => prev.map(p => p.id === item.id ? { ...p, salePrice: val } : p))}
+                                  className="w-24 p-1.5 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 text-right font-bold bg-white"
+                                />
+                              </div>
+                            </td>
+
+                            {/* Category selector */}
+                            <td className="py-4 px-4">
+                              <select 
+                                value={item.category}
+                                onChange={(e) => setParsedNfeItems(prev => prev.map(p => p.id === item.id ? { ...p, category: e.target.value } : p))}
+                                className="w-full p-1.5 border border-slate-200 rounded-lg bg-white outline-none font-bold"
+                                disabled={item.matchedProductId != null}
+                              >
+                                {categories.map(cat => (
+                                  <option key={cat} value={cat}>{cat}</option>
+                                ))}
+                              </select>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                </div>
+              )}
+
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-gray-100 flex gap-3 bg-slate-50">
+              {parsedNfeItems.length > 0 && (
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    setParsedNfeItems([]);
+                    setXmlText('');
+                  }} 
+                  className="px-6 py-3 border border-slate-200 hover:bg-slate-100 rounded-xl text-slate-500 font-bold transition-colors text-xs uppercase"
+                >
+                  Voltar / Outra Nota
+                </button>
+              )}
+              <div className="flex-1" />
+              <button 
+                type="button" 
+                onClick={() => {
+                  setShowXmlImportModal(false);
+                  setParsedNfeItems([]);
+                  setXmlText('');
+                }} 
+                className="px-6 py-3 text-slate-400 font-bold hover:text-slate-600 text-xs uppercase"
+              >
+                Cancelar
+              </button>
+              {parsedNfeItems.length > 0 && (
+                <button 
+                  type="button" 
+                  disabled={isProcessingXml}
+                  onClick={handleConfirmXmlImport} 
+                  className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 text-xs uppercase transition-all"
+                >
+                  {isProcessingXml ? (
+                    <>
+                      <Loader2 className="animate-spin" size={16} /> Processando Importação...
+                    </>
+                  ) : (
+                    <>
+                      Confirmar Importação de {parsedNfeItems.filter(i => i.selected).length} itens
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+
           </div>
         </div>
       )}
