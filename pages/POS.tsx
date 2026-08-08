@@ -34,7 +34,9 @@ import {
   MessageCircle,
   Zap,
   Globe,
-  Percent
+  Percent,
+  RotateCcw,
+  Undo2
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Product, Order, OrderItem, StoreSettings, Waitstaff, PaymentMethod, Customer, OrderStatus, CartComplementItem, ComplementCategory } from '../types';
@@ -1235,6 +1237,17 @@ export default function POS({ storeId, user, settings, orders, products: propPro
   const [bleedAmount, setBleedAmount] = useState('');
   const [bleedReason, setBleedReason] = useState('');
 
+  // Devolução (Refund / Return)
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+  const [returnSearchQuery, setReturnSearchQuery] = useState('');
+  const [foundOrders, setFoundOrders] = useState<Order[]>([]);
+  const [isSearchingOrders, setIsSearchingOrders] = useState(false);
+  const [selectedReturnOrder, setSelectedReturnOrder] = useState<Order | null>(null);
+  const [returnQuantities, setReturnQuantities] = useState<Record<string, number>>({});
+  const [returnReason, setReturnReason] = useState('');
+  const [restockItems, setRestockItems] = useState(true);
+  const [isProcessingReturn, setIsProcessingReturn] = useState(false);
+
   const formatCurrency = (val: number | undefined | null) => {
     if (val === undefined || val === null || isNaN(val)) return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(0);
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
@@ -2413,6 +2426,160 @@ export default function POS({ storeId, user, settings, orders, products: propPro
       }
   };
 
+  const loadRecentOrdersForReturn = async () => {
+    setIsSearchingOrders(true);
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('store_id', storeId)
+        .order('createdAt', { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      if (data) {
+        const parsedOrders = data.map((o: any) => ({
+          ...o,
+          items: typeof o.items === 'string' ? JSON.parse(o.items) : o.items
+        }));
+        setFoundOrders(parsedOrders);
+      }
+    } catch (err: any) {
+      console.error("Erro ao carregar pedidos recentes:", err);
+    } finally {
+      setIsSearchingOrders(false);
+    }
+  };
+
+  const handleSearchOrdersForReturn = async (query: string) => {
+    if (!query.trim()) {
+      loadRecentOrdersForReturn();
+      return;
+    }
+    setIsSearchingOrders(true);
+    try {
+      let builder = supabase
+        .from('orders')
+        .select('*')
+        .eq('store_id', storeId);
+
+      if (/^\d+$/.test(query)) {
+        builder = builder.or(`displayId.ilike.%${query}%,customerName.ilike.%${query}%,customerCpf.ilike.%${query}%`);
+      } else {
+        builder = builder.or(`customerName.ilike.%${query}%,customerCpf.ilike.%${query}%`);
+      }
+
+      const { data, error } = await builder
+        .order('createdAt', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      if (data) {
+        const parsedOrders = data.map((o: any) => ({
+          ...o,
+          items: typeof o.items === 'string' ? JSON.parse(o.items) : o.items
+        }));
+        setFoundOrders(parsedOrders);
+      }
+    } catch (err: any) {
+      console.error("Erro ao buscar pedidos:", err);
+    } finally {
+      setIsSearchingOrders(false);
+    }
+  };
+
+  const handleProcessReturn = async () => {
+    if (!selectedReturnOrder) return;
+
+    const itemsToReturn = Object.entries(returnQuantities).filter(([_, qty]) => qty > 0);
+    if (itemsToReturn.length === 0) {
+      alert("Por favor, selecione a quantidade de pelo menos um item para devolução.");
+      return;
+    }
+
+    setIsProcessingReturn(true);
+    try {
+      let totalReturnedAmount = 0;
+      const updatedItems = selectedReturnOrder.items.map(item => {
+        const qtyToReturn = returnQuantities[item.productId] || 0;
+        if (qtyToReturn > 0) {
+          totalReturnedAmount += qtyToReturn * item.price;
+        }
+        return {
+          ...item,
+          returnedQuantity: (item.returnedQuantity || 0) + qtyToReturn
+        };
+      });
+
+      // Update stocks if restockItems is true
+      if (restockItems) {
+        for (const [productId, qty] of itemsToReturn) {
+          const product = products.find(p => p.id === productId);
+          if (product && product.stock != null) {
+            const newStock = product.stock + qty;
+            const { error: stockError } = await supabase
+              .from('products')
+              .eq('id', productId)
+              .update({ stock: newStock });
+            
+            if (stockError) throw stockError;
+
+            // Update local state instantly
+            setProducts(prev => prev.map(p => {
+              if (p.id === productId && p.stock != null) {
+                return { ...p, stock: newStock };
+              }
+              return p;
+            }));
+          }
+        }
+      }
+
+      // Check if all items are fully returned
+      const isFullReturn = updatedItems.every(item => item.quantity === (item.returnedQuantity || 0));
+
+      // Build return documentation note
+      const dateStr = new Date().toLocaleDateString('pt-BR');
+      const timeStr = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      const returnNote = `\n[DEVOLUÇÃO REALIZADA em ${dateStr} às ${timeStr} por ${user.name}: R$ ${totalReturnedAmount.toFixed(2)} devolvidos. Motivo: ${returnReason || 'Não informado'}]`;
+      const newNotes = (selectedReturnOrder.notes || '') + returnNote;
+
+      const { error: orderUpdateError } = await supabase
+        .from('orders')
+        .eq('id', selectedReturnOrder.id)
+        .update({
+          items: JSON.stringify(updatedItems),
+          notes: newNotes,
+          status: isFullReturn ? 'CANCELADO' : selectedReturnOrder.status
+        });
+
+      if (orderUpdateError) throw orderUpdateError;
+
+      // Register the return in cash movements if there was a cash refund or to keep register logs
+      if (currentSession?.id) {
+        await supabase.from('cash_movements').insert([{
+          store_id: storeId,
+          type: 'SANGRIA',
+          amount: totalReturnedAmount,
+          description: `Devolução Pedido #${selectedReturnOrder.displayId || selectedReturnOrder.id}: ${returnReason || 'Não informado'}`,
+          waitstaffName: user.name,
+          createdAt: Date.now(),
+          session_id: currentSession.id
+        }]);
+      }
+
+      alert("Devolução realizada com sucesso!");
+      setIsReturnModalOpen(false);
+      setSelectedReturnOrder(null);
+      setReturnQuantities({});
+      setReturnReason('');
+    } catch (err: any) {
+      console.error("Erro ao realizar devolução:", err);
+      alert("Erro ao realizar devolução: " + err.message);
+    } finally {
+      setIsProcessingReturn(false);
+    }
+  };
+
   const handleCloseRegister = async () => {
     if (isContingencyMode || contingencyOrders.length > 0) {
         alert("Sincronize os pedidos e desative o Modo Contingência antes de fechar o caixa.");
@@ -2960,6 +3127,19 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                   title="Sangria">
                   <Minus size={18} />
                   <span className="text-xs font-bold">Sangria</span>
+               </button>
+               <button onClick={() => {
+                  loadRecentOrdersForReturn();
+                  setIsReturnModalOpen(true);
+               }} className="p-2 text-rose-600 hover:bg-rose-50 rounded-xl flex items-center gap-2 px-3 md:px-4 border border-rose-100 shrink-0" 
+                  style={{ 
+                      color: settings.primaryColor ? '#ffffff' : undefined,
+                      borderColor: settings.primaryColor ? 'rgba(255,255,255,0.2)' : undefined,
+                      backgroundColor: settings.primaryColor ? 'rgba(255,255,255,0.1)' : undefined
+                  }}
+                  title="Devolução">
+                  <RotateCcw size={18} />
+                  <span className="text-xs font-bold">Devolução</span>
                </button>
                <button onClick={handleCloseRegister} className="p-2 text-green-600 hover:bg-green-50 rounded-xl flex items-center gap-2 px-3 md:px-4 border border-green-100 shrink-0" 
                   style={{ 
@@ -4589,6 +4769,299 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                 Não Imprimir
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {isReturnModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-3xl max-w-5xl w-full h-[85vh] flex flex-col overflow-hidden shadow-2xl border border-gray-100 animate-scale-up">
+            
+            {/* Header */}
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-rose-50">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-rose-500 rounded-2xl text-white">
+                  <RotateCcw size={24} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-800">Devolução de Vendas (Estorno)</h3>
+                  <p className="text-xs font-semibold text-slate-500">Localize vendas passadas para realizar devoluções totais ou parciais de itens e recompor estoque</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => {
+                  setIsReturnModalOpen(false);
+                  setSelectedReturnOrder(null);
+                  setReturnQuantities({});
+                  setReturnSearchQuery('');
+                  setReturnReason('');
+                }}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-white rounded-xl transition-all"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-hidden flex flex-col md:flex-row min-h-0 bg-slate-50/50">
+              
+              {/* Left Side - Search & Orders List */}
+              <div className="w-full md:w-1/2 flex flex-col border-r border-gray-100 p-6 bg-white">
+                <label className="text-xs font-bold text-slate-600 uppercase mb-2">Localizar Pedido / Venda</label>
+                <div className="flex gap-2 mb-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                    <input 
+                      type="text"
+                      placeholder="Nº Pedido, nome do cliente ou CPF..."
+                      value={returnSearchQuery}
+                      onChange={(e) => setReturnSearchQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSearchOrdersForReturn(returnSearchQuery);
+                      }}
+                      className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-rose-500 text-sm"
+                    />
+                  </div>
+                  <button 
+                    onClick={() => handleSearchOrdersForReturn(returnSearchQuery)}
+                    className="px-4 py-2.5 bg-rose-600 text-white font-bold rounded-xl text-xs uppercase hover:bg-rose-700 transition-colors"
+                  >
+                    Buscar
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                  {isSearchingOrders ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-2">
+                      <Loader2 className="animate-spin" size={24} />
+                      <span className="text-xs font-semibold">Buscando pedidos...</span>
+                    </div>
+                  ) : foundOrders.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-slate-400 text-center">
+                      <AlertCircle size={32} className="mb-2 text-slate-300" />
+                      <span className="text-xs font-bold">Nenhum pedido encontrado</span>
+                      <p className="text-[11px] text-slate-400 max-w-xs mt-1">Insira outro termo de busca ou verifique se o pedido realmente existe neste caixa.</p>
+                    </div>
+                  ) : (
+                    foundOrders.map((order) => {
+                      const isSelected = selectedReturnOrder?.id === order.id;
+                      const orderDate = new Date(order.createdAt).toLocaleString('pt-BR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      });
+
+                      return (
+                        <button
+                          key={order.id}
+                          onClick={() => {
+                            setSelectedReturnOrder(order);
+                            const initialQtys: Record<string, number> = {};
+                            order.items.forEach(item => {
+                              initialQtys[item.productId] = 0;
+                            });
+                            setReturnQuantities(initialQtys);
+                          }}
+                          className={`w-full p-4 rounded-2xl border text-left transition-all flex flex-col gap-2 ${
+                            isSelected 
+                              ? 'border-rose-500 bg-rose-50/40 shadow-sm' 
+                              : 'border-slate-100 hover:border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex justify-between items-start w-full">
+                            <div>
+                              <span className="text-xs font-black text-slate-800">Pedido #{order.displayId || order.id.slice(0, 8)}</span>
+                              <span className="ml-2 px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full text-[9px] font-bold uppercase">{order.type}</span>
+                            </div>
+                            <span className="text-[10px] font-bold text-slate-400">{orderDate}</span>
+                          </div>
+
+                          <div className="text-[11px] text-slate-500 space-y-0.5">
+                            <div>Cliente: <span className="font-bold text-slate-700">{order.customerName || 'Consumidor Final'}</span></div>
+                            {order.customerCpf && <div>CPF: <span className="font-mono">{order.customerCpf}</span></div>}
+                            <div>Total: <span className="font-extrabold text-slate-800">R$ {order.total.toFixed(2)}</span></div>
+                          </div>
+
+                          <div className="flex justify-between items-center w-full pt-1 border-t border-slate-100/50">
+                            <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full ${
+                              order.status === 'CANCELADO' 
+                                ? 'bg-red-50 text-red-600' 
+                                : order.status === 'ENTREGUE' || order.status === 'PAGO'
+                                ? 'bg-green-50 text-green-600'
+                                : 'bg-blue-50 text-blue-600'
+                            }`}>
+                              {order.status}
+                            </span>
+                            {order.paymentMethod && (
+                              <span className="text-[9px] font-bold text-slate-400 uppercase">{order.paymentMethod}</span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Right Side - Details & Return Selector */}
+              <div className="w-full md:w-1/2 flex flex-col p-6 overflow-y-auto custom-scrollbar">
+                {!selectedReturnOrder ? (
+                  <div className="flex-1 flex flex-col items-center justify-center text-slate-400 text-center py-12">
+                    <div className="p-4 bg-slate-100 rounded-full text-slate-300 mb-4">
+                      <Undo2 size={40} />
+                    </div>
+                    <span className="text-sm font-bold text-slate-600">Nenhum pedido selecionado</span>
+                    <p className="text-xs text-slate-400 max-w-xs mt-1">Clique em um pedido na lista à esquerda para carregar seus itens e configurar a devolução.</p>
+                  </div>
+                ) : (
+                  <div className="flex-1 flex flex-col gap-5">
+                    
+                    {/* Selected Order Summary */}
+                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-1">
+                      <div className="flex justify-between">
+                        <span className="text-xs font-bold text-slate-400 uppercase">Resumo da Venda</span>
+                        {selectedReturnOrder.status === 'CANCELADO' && (
+                          <span className="text-[10px] font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">ESTA VENDA JÁ FOI CANCELADA</span>
+                        )}
+                      </div>
+                      <span className="text-sm font-black text-slate-800">Pedido #{selectedReturnOrder.displayId || selectedReturnOrder.id}</span>
+                      <span className="text-xs text-slate-500">Cliente: <span className="font-bold">{selectedReturnOrder.customerName || 'Consumidor Final'}</span></span>
+                      {selectedReturnOrder.notes && (
+                        <div className="mt-1.5 p-2 bg-white/80 border border-slate-100 rounded-lg text-[10px] text-slate-500 font-mono max-h-20 overflow-y-auto">
+                          Histórico: {selectedReturnOrder.notes}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Items Selector */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-black text-slate-600 uppercase block">Selecione os Itens para Devolver</label>
+                      <div className="space-y-2 border border-slate-100 rounded-2xl p-4 bg-white shadow-sm max-h-60 overflow-y-auto custom-scrollbar">
+                        {selectedReturnOrder.items.map((item) => {
+                          const maxToReturn = item.quantity - (item.returnedQuantity || 0);
+                          const currentReturnQty = returnQuantities[item.productId] || 0;
+
+                          return (
+                            <div key={item.productId} className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0 text-xs gap-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="font-bold text-slate-800 truncate uppercase">{item.name}</div>
+                                <div className="text-[10px] text-slate-400 flex gap-2">
+                                  <span>Preço: R$ {item.price.toFixed(2)}</span>
+                                  <span>Qtd original: {item.quantity}</span>
+                                  {item.returnedQuantity && item.returnedQuantity > 0 && (
+                                    <span className="text-rose-500 font-bold">Já devolvido: {item.returnedQuantity}</span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => setReturnQuantities(prev => ({
+                                    ...prev,
+                                    [item.productId]: Math.max(0, currentReturnQty - 1)
+                                  }))}
+                                  disabled={currentReturnQty <= 0}
+                                  className="p-1.5 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors disabled:opacity-50"
+                                >
+                                  <Minus size={12} />
+                                </button>
+                                <span className="w-6 text-center font-black text-slate-800 text-sm">{currentReturnQty}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setReturnQuantities(prev => ({
+                                    ...prev,
+                                    [item.productId]: Math.min(maxToReturn, currentReturnQty + 1)
+                                  }))}
+                                  disabled={currentReturnQty >= maxToReturn}
+                                  className="p-1.5 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors disabled:opacity-50"
+                                >
+                                  <Plus size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Refund summary block */}
+                    <div className="p-4 bg-rose-50/50 rounded-2xl border border-rose-100 flex justify-between items-center">
+                      <div>
+                        <span className="text-[10px] font-bold text-rose-500 uppercase block">Total a Estornar</span>
+                        <span className="text-lg font-black text-rose-700">
+                          R$ {Object.entries(returnQuantities).reduce((acc, [prodId, qty]) => {
+                            const item = selectedReturnOrder.items.find(i => i.productId === prodId);
+                            return acc + (qty * (item?.price || 0));
+                          }, 0).toFixed(2)}
+                        </span>
+                      </div>
+
+                      <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded-xl shadow-sm border border-slate-100 text-[11px] font-bold text-slate-600">
+                        <input 
+                          type="checkbox" 
+                          checked={restockItems} 
+                          onChange={(e) => setRestockItems(e.target.checked)} 
+                          className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500" 
+                        />
+                        Retornar ao Estoque
+                      </label>
+                    </div>
+
+                    {/* Reason text area */}
+                    <div className="flex flex-col space-y-1">
+                      <label className="text-xs font-bold text-slate-600 uppercase">Motivo da Devolução</label>
+                      <textarea 
+                        rows={2}
+                        value={returnReason}
+                        onChange={(e) => setReturnReason(e.target.value)}
+                        placeholder="Ex: Produto com defeito, arrependimento de compra, erro no lançamento..."
+                        className="w-full p-3 text-xs border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-rose-500 resize-none"
+                      />
+                    </div>
+
+                  </div>
+                )}
+              </div>
+
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-gray-100 flex gap-3 bg-slate-50 justify-end">
+              <button 
+                type="button" 
+                onClick={() => {
+                  setIsReturnModalOpen(false);
+                  setSelectedReturnOrder(null);
+                  setReturnQuantities({});
+                  setReturnSearchQuery('');
+                  setReturnReason('');
+                }} 
+                className="px-6 py-3 border border-slate-200 bg-white hover:bg-slate-100 rounded-xl text-slate-500 font-bold transition-colors text-xs uppercase"
+              >
+                Cancelar / Fechar
+              </button>
+              {selectedReturnOrder && (
+                <button 
+                  type="button" 
+                  disabled={isProcessingReturn || Object.values(returnQuantities).every(q => q === 0)}
+                  onClick={handleProcessReturn} 
+                  className="px-8 py-3 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 text-xs uppercase transition-all"
+                >
+                  {isProcessingReturn ? (
+                    <>
+                      <Loader2 className="animate-spin" size={16} /> Processando...
+                    </>
+                  ) : (
+                    <>
+                      Confirmar Devolução
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+
           </div>
         </div>
       )}
