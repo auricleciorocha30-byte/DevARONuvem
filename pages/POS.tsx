@@ -36,7 +36,9 @@ import {
   Globe,
   Percent,
   RotateCcw,
-  Undo2
+  Undo2,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Product, Order, OrderItem, StoreSettings, Waitstaff, PaymentMethod, Customer, OrderStatus, CartComplementItem, ComplementCategory } from '../types';
@@ -203,6 +205,45 @@ export default function POS({ storeId, user, settings, orders, products: propPro
   const [isLookingUpCommand, setIsLookingUpCommand] = useState(false);
   const [visibleCount, setVisibleCount] = useState(10);
   const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  // Category list scrolling & drag-to-scroll
+  const categoriesRef = useRef<HTMLDivElement>(null);
+  const isDown = useRef(false);
+  const startX = useRef(0);
+  const scrollLeftState = useRef(0);
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!categoriesRef.current) return;
+    isDown.current = true;
+    startX.current = e.pageX - categoriesRef.current.offsetLeft;
+    scrollLeftState.current = categoriesRef.current.scrollLeft;
+  };
+
+  const handleMouseLeave = () => {
+    isDown.current = false;
+  };
+
+  const handleMouseUp = () => {
+    isDown.current = false;
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDown.current || !categoriesRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - categoriesRef.current.offsetLeft;
+    const walk = (x - startX.current) * 1.5; // Drag sensitivity
+    categoriesRef.current.scrollLeft = scrollLeftState.current - walk;
+  };
+
+  const scrollCategories = (direction: 'left' | 'right') => {
+    if (categoriesRef.current) {
+      const scrollAmount = 250;
+      categoriesRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      });
+    }
+  };
 
   useEffect(() => {
     setVisibleCount(10); // Reset count when products or search change
@@ -3244,23 +3285,50 @@ export default function POS({ storeId, user, settings, orders, products: propPro
         {/* ... (rest of the component) */}
 
         <div className="bg-white border-b shadow-sm shrink-0 z-10 sticky top-0">
-          <div className="p-2 md:p-3 flex gap-2 md:gap-4 overflow-x-auto no-scrollbar">
-            {categories.map(cat => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-3 md:px-4 py-1.5 md:py-2 rounded-full text-xs md:text-sm font-bold whitespace-nowrap transition-colors ${
-                  selectedCategory === cat 
-                    ? 'text-white' 
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-                style={{
-                  backgroundColor: selectedCategory === cat ? (settings.primaryColor || '#2563eb') : undefined
-                }}
-              >
-                {cat}
-              </button>
-            ))}
+          <div className="relative flex items-center px-10">
+            <button
+              type="button"
+              onClick={() => scrollCategories('left')}
+              className="absolute left-2 z-20 p-1.5 bg-white border border-slate-200 rounded-full shadow-md text-slate-600 hover:bg-slate-50 hover:scale-105 transition-all shrink-0 flex items-center justify-center cursor-pointer"
+              title="Anterior"
+            >
+              <ChevronLeft size={16} />
+            </button>
+
+            <div 
+              ref={categoriesRef}
+              onMouseDown={handleMouseDown}
+              onMouseLeave={handleMouseLeave}
+              onMouseUp={handleMouseUp}
+              onMouseMove={handleMouseMove}
+              className="p-2 md:p-3 flex gap-2 md:gap-4 overflow-x-auto no-scrollbar select-none cursor-grab active:cursor-grabbing w-full scroll-smooth"
+            >
+              {categories.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-3 md:px-4 py-1.5 md:py-2 rounded-full text-xs md:text-sm font-bold whitespace-nowrap transition-colors ${
+                    selectedCategory === cat 
+                      ? 'text-white' 
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                  style={{
+                    backgroundColor: selectedCategory === cat ? (settings.primaryColor || '#2563eb') : undefined
+                  }}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => scrollCategories('right')}
+              className="absolute right-2 z-20 p-1.5 bg-white border border-slate-200 rounded-full shadow-md text-slate-600 hover:bg-slate-50 hover:scale-105 transition-all shrink-0 flex items-center justify-center cursor-pointer"
+              title="Próximo"
+            >
+              <ChevronRight size={16} />
+            </button>
           </div>
 
           <div className="px-2 md:px-4 pb-2 md:pb-3 flex gap-2">
