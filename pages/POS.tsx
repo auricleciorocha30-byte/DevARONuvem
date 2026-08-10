@@ -1266,7 +1266,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
 
   // Register Closing
   const [isClosingRegister, setIsClosingRegister] = useState(false);
-  const [dailySales, setDailySales] = useState<{ total: number, byMethod: Record<string, number>, count: number, bleeds: number, products: any[] } | null>(null);
+  const [dailySales, setDailySales] = useState<{ total: number, byMethod: Record<string, number>, count: number, bleeds: number, bleedsList?: any[], products: any[] } | null>(null);
   
   // Session State
   const [currentSession, setCurrentSession] = useState<any | null>(null);
@@ -2719,12 +2719,12 @@ export default function POS({ storeId, user, settings, orders, products: propPro
         });
 
         return acc;
-      }, { total: 0, byMethod: {} as Record<string, number>, count: 0, bleeds: bleedsTotal, products: [] as any[] });
+      }, { total: 0, byMethod: {} as Record<string, number>, count: 0, bleeds: bleedsTotal, bleedsList: movements, products: [] as any[] });
       
       setDailySales(sales);
     } catch (err) {
       console.error(err);
-      setDailySales({ total: 0, byMethod: {}, count: 0, bleeds: 0, products: [] });
+      setDailySales({ total: 0, byMethod: {}, count: 0, bleeds: 0, bleedsList: [], products: [] });
     }
   };
 
@@ -3071,6 +3071,16 @@ export default function POS({ storeId, user, settings, orders, products: propPro
             <span>Total Sangrias</span>
             <span>- ${formatCurrency(dailySales.bleeds)}</span>
         </div>
+        ${dailySales.bleedsList && dailySales.bleedsList.length > 0 ? `
+        <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
+        <p style="margin: 5px 0; color: black !important;"><strong>Motivos de Sangrias:</strong></p>
+        ${dailySales.bleedsList.map(m => `
+            <div style="display: flex; justify-content: space-between; font-size: 11px; margin: 1px 0; color: black !important;">
+                <span style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 5px;">${m.description || 'Sem motivo'}</span>
+                <span>- ${formatCurrency(m.amount)}</span>
+            </div>
+        `).join('')}
+        ` : ''}
         <div style="border-top: 2px dashed black; margin: 5px 0;"></div>
         <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: 900; color: black !important;">
             <span>TOTAL EM CAIXA</span>
@@ -4651,6 +4661,18 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                         <span className="font-medium">Total Sangrias</span>
                         <span className="font-bold text-lg">- {formatCurrency(dailySales.bleeds)}</span>
                     </div>
+
+                    {dailySales.bleedsList && dailySales.bleedsList.length > 0 && (
+                        <div className="bg-orange-50/30 p-3 rounded-xl border border-orange-100/50 space-y-1.5 max-h-28 overflow-y-auto">
+                            <p className="text-[10px] font-bold text-orange-600 uppercase tracking-wider">Motivos de Sangria:</p>
+                            {dailySales.bleedsList.map((m: any, index: number) => (
+                                <div key={index} className="flex justify-between text-xs text-orange-900">
+                                    <span className="truncate max-w-[220px]" title={m.description}>{m.description || 'Sem motivo'}</span>
+                                    <span className="font-semibold">-{formatCurrency(m.amount)}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
 
                     <div className="flex justify-between items-center p-3 bg-gray-50 text-gray-800 rounded-xl">
                         <span className="font-medium">Troco Inicial</span>
