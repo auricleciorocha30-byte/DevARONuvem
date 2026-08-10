@@ -395,6 +395,15 @@ function StoreContext() {
     imageUrl: p.imageUrl || p.imageurl || p.image_url || '',
     isActive: p.isActive ?? p.isactive ?? p.is_active ?? true,
     featuredDay: p.featuredDay ?? p.featuredday ?? p.featured_day,
+    featuredDays: (() => {
+      const field = p.featuredDays ?? p.featureddays ?? p.featured_days;
+      if (!field) return undefined;
+      try {
+        return typeof field === 'string' ? JSON.parse(field) : field;
+      } catch (e) {
+        return undefined;
+      }
+    })(),
     isByWeight: p.isByWeight ?? p.isbyweight ?? p.is_by_weight ?? false,
     showInMenu: p.showInMenu ?? p.showinmenu ?? p.show_in_menu ?? true,
     barcode: p.barcode || undefined,
@@ -1096,6 +1105,9 @@ function StoreContext() {
           }
           if (payload.comboItems !== undefined) {
              payload.comboItems = payload.comboItems ? JSON.stringify(payload.comboItems) : null;
+          }
+          if (payload.featuredDays !== undefined) {
+             payload.featuredDays = payload.featuredDays ? JSON.stringify(payload.featuredDays) : null;
           }
           if (payload.isCombo !== undefined) {
              payload.isCombo = payload.isCombo ? 1 : 0;

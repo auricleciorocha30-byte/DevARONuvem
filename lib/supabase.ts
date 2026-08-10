@@ -157,7 +157,8 @@ const SCHEMA_STATEMENTS = [
     complements TEXT,
     isCombo INTEGER DEFAULT 0,
     comboItems TEXT,
-    costPrice REAL DEFAULT 0
+    costPrice REAL DEFAULT 0,
+    featuredDays TEXT
   )`,
   `CREATE TABLE IF NOT EXISTS waitstaff (
     id TEXT PRIMARY KEY,
@@ -262,7 +263,7 @@ const TABLE_COLUMNS: { [key: string]: string[] } = {
     'id', 'store_id', 'name', 'description', 'price', 'category', 'imageUrl',
     'isActive', 'featuredDay', 'isByWeight', 'barcode', 'stock', 'showInMenu',
     'fractions', 'units', 'fractionPrice', 'ncm', 'cfop', 'icms_situacao_tributaria', 'complements',
-    'isCombo', 'comboItems', 'costPrice'
+    'isCombo', 'comboItems', 'costPrice', 'featuredDays'
   ],
   waitstaff: [
     'id', 'store_id', 'name', 'password', 'role', 'phone'
@@ -287,7 +288,7 @@ const TABLE_COLUMNS: { [key: string]: string[] } = {
 };
 
 let schemaInitializedVersion = '';
-const CURRENT_SCHEMA_VERSION = 'v6';
+const CURRENT_SCHEMA_VERSION = 'v7';
 let initializationPromise: Promise<void> | null = null;
 
 async function ensureSchema() {
@@ -400,6 +401,9 @@ async function ensureSchema() {
           }
           if (!productColumns.includes('comboItems')) {
               try { await client.execute(`ALTER TABLE products ADD COLUMN comboItems TEXT`); } catch (e) { console.warn(e); }
+          }
+          if (!productColumns.includes('featuredDays')) {
+              try { await client.execute(`ALTER TABLE products ADD COLUMN featuredDays TEXT`); } catch (e) { console.warn(e); }
           }
 
           const cashMovementsTableInfo = await client.execute(`PRAGMA table_info(cash_movements)`);
@@ -582,6 +586,9 @@ class TursoBridge {
             }
             if (!productColumns.includes('comboItems')) {
                 try { await this.executeSqlCustom(url, token, `ALTER TABLE products ADD COLUMN comboItems TEXT`); } catch (e) { console.warn(e); }
+            }
+            if (!productColumns.includes('featuredDays')) {
+                try { await this.executeSqlCustom(url, token, `ALTER TABLE products ADD COLUMN featuredDays TEXT`); } catch (e) { console.warn(e); }
             }
 
             const cashMovementsTableInfo = await this.executeSqlCustom(url, token, `PRAGMA table_info(cash_movements)`);
@@ -917,6 +924,12 @@ class TursoBridge {
         if (this.tableName === 'products' && typeof processedRow.complements === 'string') {
           try { processedRow.complements = JSON.parse(processedRow.complements); } catch (e) {}
         }
+        if (this.tableName === 'products' && typeof processedRow.comboItems === 'string') {
+          try { processedRow.comboItems = JSON.parse(processedRow.comboItems); } catch (e) {}
+        }
+        if (this.tableName === 'products' && typeof processedRow.featuredDays === 'string') {
+          try { processedRow.featuredDays = JSON.parse(processedRow.featuredDays); } catch (e) {}
+        }
         if (this.tableName === 'orders' && typeof processedRow.items === 'string') {
           try { processedRow.items = JSON.parse(processedRow.items); } catch (e) {}
         }
@@ -981,6 +994,9 @@ class TursoBridge {
         }
         if (this.tableName === 'products' && valCopy.comboItems && typeof valCopy.comboItems === 'object') {
              valCopy.comboItems = JSON.stringify(valCopy.comboItems);
+        }
+        if (this.tableName === 'products' && valCopy.featuredDays && typeof valCopy.featuredDays === 'object') {
+             valCopy.featuredDays = JSON.stringify(valCopy.featuredDays);
         }
         if (this.tableName === 'products' && typeof valCopy.isCombo === 'boolean') {
              valCopy.isCombo = valCopy.isCombo ? 1 : 0;
@@ -1095,6 +1111,9 @@ class TursoBridge {
       }
       if (this.tableName === 'products' && valCopy.comboItems && typeof valCopy.comboItems === 'object') {
            valCopy.comboItems = JSON.stringify(valCopy.comboItems);
+      }
+      if (this.tableName === 'products' && valCopy.featuredDays && typeof valCopy.featuredDays === 'object') {
+           valCopy.featuredDays = JSON.stringify(valCopy.featuredDays);
       }
       if (this.tableName === 'products' && typeof valCopy.isCombo === 'boolean') {
            valCopy.isCombo = valCopy.isCombo ? 1 : 0;
