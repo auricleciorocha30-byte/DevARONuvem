@@ -285,7 +285,7 @@ export default function SuperAdminPanel() {
     try {
       const { data, error } = await supabase
         .from('store_profiles')
-        .select('id, name, slug, isActive, isactive, createdat, createdAt, address, whatsapp, dbUrl, dbAuthToken')
+        .select('id, name, slug, isActive, isactive, createdat, createdAt, address, whatsapp, dbUrl, dbAuthToken, logoUrl, logourl, settings')
         .order('createdAt', { ascending: false });
       
       if (data) {
@@ -301,13 +301,15 @@ export default function SuperAdminPanel() {
               parsedSettings = s.settings;
           }
           
+          const mergedSettings = { ...INITIAL_SETTINGS, ...parsedSettings };
+          
           return {
             ...s,
             id: s.id,
             isActive: s.isactive ?? s.isActive ?? true,
-            logoUrl: s.logourl ?? s.logoUrl ?? '',
+            logoUrl: mergedSettings.logoUrl || s.logourl || s.logoUrl || '',
             createdAt: Number(s.createdat ?? s.createdAt ?? Date.now()),
-            settings: parsedSettings
+            settings: mergedSettings
           };
         });
         setStores(mapped);
@@ -366,13 +368,19 @@ export default function SuperAdminPanel() {
         return;
       }
 
+      const parsedSettings = typeof fullStoreData.settings === 'string'
+        ? (() => { try { return JSON.parse(fullStoreData.settings); } catch (e) { return {}; } })()
+        : (fullStoreData.settings || {});
+        
+      const mergedSettings = { ...INITIAL_SETTINGS, ...parsedSettings };
+
       const fullStore = {
         ...fullStoreData,
         id: fullStoreData.id,
         isActive: fullStoreData.isactive ?? fullStoreData.isActive ?? true,
-        logoUrl: fullStoreData.logourl ?? fullStoreData.logoUrl ?? '',
+        logoUrl: mergedSettings.logoUrl || fullStoreData.logourl || fullStoreData.logoUrl || '',
         createdAt: Number(fullStoreData.createdat ?? fullStoreData.createdAt ?? Date.now()),
-        settings: fullStoreData.settings
+        settings: mergedSettings
       } as StoreProfile;
 
       setEditingStore(fullStore);
@@ -469,7 +477,7 @@ export default function SuperAdminPanel() {
         slug: editProfileData.slug,
         address: editProfileData.address,
         whatsapp: editProfileData.whatsapp,
-        logourl: editProfileData.logoUrl,
+        logoUrl: editProfileData.logoUrl,
         settings: JSON.stringify(updatedSettings),
         dbUrl: editProfileData.dbUrl,
         dbAuthToken: editProfileData.dbAuthToken
@@ -572,9 +580,9 @@ export default function SuperAdminPanel() {
       slug: slug,
       address: formData.address,
       whatsapp: formData.whatsapp,
-      logourl: formData.logoUrl || INITIAL_SETTINGS.logoUrl,
-      isactive: true,
-      createdat: Date.now(),
+      logoUrl: formData.logoUrl || INITIAL_SETTINGS.logoUrl,
+      isActive: true,
+      createdAt: Date.now(),
       dbUrl: formData.dbUrl ? formData.dbUrl.trim() : '',
       dbAuthToken: formData.dbAuthToken ? formData.dbAuthToken.trim() : '',
       settings: JSON.stringify({ 

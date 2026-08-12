@@ -954,8 +954,21 @@ function StoreContext() {
 
   const handleUpdateSettings = async (newSettings: StoreSettings) => {
     if (currentStore) {
-      await supabase.from('store_profiles').eq('id', currentStore.id).update({ settings: JSON.stringify(newSettings) });
-      const updatedStore = { ...currentStore, settings: newSettings };
+      await supabase.from('store_profiles').eq('id', currentStore.id).update({ 
+        settings: JSON.stringify(newSettings),
+        logoUrl: newSettings.logoUrl,
+        name: newSettings.storeName,
+        address: newSettings.address,
+        whatsapp: newSettings.whatsapp
+      });
+      const updatedStore = { 
+        ...currentStore, 
+        settings: newSettings,
+        logoUrl: newSettings.logoUrl || currentStore.logoUrl,
+        name: newSettings.storeName || currentStore.name,
+        address: newSettings.address || currentStore.address,
+        whatsapp: newSettings.whatsapp || currentStore.whatsapp
+      };
       setCurrentStore(updatedStore);
       
       // Update cache so reloads don't use stale data
