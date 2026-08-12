@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Product, CartComplementItem, ComplementCategory } from '../types';
-import { X, Plus, Minus } from 'lucide-react';
+import { X, Plus, Minus, ZoomIn } from 'lucide-react';
 
 interface Props {
   product: Product;
@@ -24,6 +24,7 @@ export const ComplementsModal: React.FC<Props> = ({
   getPromotionalPrice
 }) => {
   const complements = product.complements || [];
+  const [zoomedImage, setZoomedImage] = useState<{ url: string; name: string } | null>(null);
   
   const isValid = useMemo(() => {
     return complements.every(cat => {
@@ -102,7 +103,22 @@ export const ComplementsModal: React.FC<Props> = ({
                               </div>
                             )}
                             {item.imageUrl && (
-                              <img src={item.imageUrl} alt={item.name} className="w-12 h-12 rounded-lg object-cover bg-white shadow-sm shrink-0 border border-gray-100" />
+                              <div className="relative group/img shrink-0 overflow-hidden rounded-lg">
+                                <img 
+                                  src={item.imageUrl} 
+                                  alt={item.name} 
+                                  className="w-12 h-12 rounded-lg object-cover bg-white shadow-sm border border-gray-100 cursor-zoom-in group-hover/img:scale-105 transition-transform" 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setZoomedImage({ url: item.imageUrl, name: item.name });
+                                  }}
+                                />
+                                <div 
+                                  className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity pointer-events-none"
+                                >
+                                  <ZoomIn size={12} className="text-white drop-shadow-sm" />
+                                </div>
+                              </div>
                             )}
                             <div className="flex-1">
                               <span className="font-bold text-gray-700 block">{item.name}</span>
@@ -139,7 +155,7 @@ export const ComplementsModal: React.FC<Props> = ({
            })}
         </div>
 
-        <div className="p-6 border-t bg-gray-50 sm:rounded-b-[3rem]">
+         <div className="p-6 border-t bg-gray-50 sm:rounded-b-[3rem]">
           <div className="flex items-center gap-4 mb-4 justify-between">
             <div className="flex items-center gap-4 bg-white border rounded-2xl p-2 shadow-sm">
               <button 
@@ -169,6 +185,36 @@ export const ComplementsModal: React.FC<Props> = ({
           </div>
         </div>
       </div>
+
+      {/* Lightbox / Zoomed Image Overlay */}
+      {zoomedImage && (
+        <div 
+          className="fixed inset-0 z-[300] bg-black/90 backdrop-blur-lg flex items-center justify-center p-4 cursor-zoom-out animate-fade-in"
+          onClick={() => setZoomedImage(null)}
+        >
+          <button 
+            onClick={() => setZoomedImage(null)}
+            className="absolute top-6 right-6 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors z-50 backdrop-blur-md border border-white/10"
+          >
+            <X size={24} />
+          </button>
+
+          <div 
+            className="relative bg-white/5 p-2 rounded-[2rem] border border-white/10 shadow-2xl overflow-hidden max-w-[95vw] sm:max-w-md w-full animate-scale-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img 
+              src={zoomedImage.url} 
+              alt={zoomedImage.name} 
+              className="max-h-[60vh] w-full object-contain rounded-2xl mx-auto bg-black/40"
+            />
+            <div className="mt-4 px-4 pb-2 text-center">
+              <h4 className="text-white font-bold text-base">{zoomedImage.name}</h4>
+              <p className="text-white/40 text-[10px] uppercase tracking-widest mt-1">Toque fora ou no fechar para retornar</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
