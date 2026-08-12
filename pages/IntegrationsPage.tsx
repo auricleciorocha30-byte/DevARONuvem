@@ -541,7 +541,7 @@ export default function IntegrationsPage({ settings, onSave, storeId }: Props) {
             <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
               <span className="text-[10px] font-black uppercase tracking-widest text-blue-700 block mb-1">Status de Atualização</span>
               <p className="text-[10px] text-blue-900 leading-relaxed">
-                <strong>Simples Nacional:</strong> Para empresas sob o regime do Simples Nacional (como a G & C Conveniência), o envio desses campos na NFC-e é <strong>opcional até Dezembro de 2026</strong>, tornando-se obrigatório apenas em Janeiro de 2027. O sistema já está totalmente compatível e pronto para transmitir os campos assim que você decidir ativar ou quando a obrigatoriedade for iniciada.
+                <strong>Simples Nacional:</strong> Para empresas sob o regime do Simples Nacional (como as optantes por esse regime), o envio desses campos na NFC-e é <strong>opcional até Dezembro de 2026</strong>, tornando-se obrigatório apenas em Janeiro de 2027. O sistema já está totalmente compatível e pronto para transmitir os campos assim que você decidir ativar ou quando a obrigatoriedade for iniciada.
               </p>
             </div>
           </div>
