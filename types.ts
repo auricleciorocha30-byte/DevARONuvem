@@ -238,6 +238,9 @@ export interface StoreSettings {
   focusNfeToken?: string;
   focusNfeEnvironment?: 'production' | 'homologation';
   focusNfeCertificate?: string;
+  focusNfeTaxReformActive?: boolean;
+  focusNfeIbsAliquot?: number;
+  focusNfeCbsAliquot?: number;
   onlinePaymentProvider?: 'mercado_pago';
   onlinePaymentAccessToken?: string;
   onlinePaymentPublicKey?: string;

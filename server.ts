@@ -302,6 +302,60 @@ async function startServer() {
     } catch (error) { res.status(500).json({ error: `Erro ao cancelar. ${error instanceof Error ? error.message : String(error)}` }); }
   });
 
+  apiRouter.get('/focus-nfe/backups', async (req, res) => {
+    const { token, environment, cnpj } = req.query;
+    if (!token || !cnpj) return res.status(400).json({ error: 'Dados incompletos.' });
+    const cleanCnpj = String(cnpj).replace(/\D/g, '');
+    const baseUrl = (environment as string) === 'production' ? 'https://api.focusnfe.com.br' : 'https://homologacao.focusnfe.com.br';
+    try {
+      const resp = await fetch(`${baseUrl}/v2/backups/${cleanCnpj}.json`, {
+        headers: { 'Authorization': `Basic ${Buffer.from(token + ':').toString('base64')}` }
+      });
+      let data;
+      const text = await resp.text();
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.error('Focus NFe backups gave non-JSON response:', text);
+        if (text.includes('HTTP Basic: Access denied')) {
+           return res.status(401).json({ error: `Acesso negado: O token configurado é inválido para este ambiente.` });
+        }
+        return res.status(resp.status).json({ error: `Erro na Focus NFe (backups): ${text.substring(0, 100)}` });
+      }
+      res.status(resp.status).json(data);
+    } catch (error) {
+      console.error('Focus NFe Backup Error:', error);
+      res.status(500).json({ error: `Erro ao buscar backups. ${error instanceof Error ? error.message : String(error)}` });
+    }
+  });
+
+  apiRouter.get('/focus-nfe/download-backup', async (req, res) => {
+    const { token, environment, path: backupPath } = req.query;
+    if (!token || !backupPath) return res.status(400).json({ error: 'Dados incompletos.' });
+    const baseUrl = (environment as string) === 'production' ? 'https://api.focusnfe.com.br' : 'https://homologacao.focusnfe.com.br';
+    const fullUrl = `${baseUrl}${backupPath}`;
+    try {
+      const resp = await fetch(fullUrl, {
+        headers: { 'Authorization': `Basic ${Buffer.from(token + ':').toString('base64')}` }
+      });
+      if (!resp.ok) {
+        return res.status(resp.status).json({ error: `Erro ao baixar da Focus NFe: ${resp.statusText}` });
+      }
+      
+      const contentType = resp.headers.get('content-type') || 'application/zip';
+      const contentDisposition = resp.headers.get('content-disposition') || `attachment; filename="backup.zip"`;
+      
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Disposition', contentDisposition);
+      
+      const buffer = await resp.arrayBuffer();
+      res.send(Buffer.from(buffer));
+    } catch (error) {
+      console.error('Download Backup Error:', error);
+      res.status(500).json({ error: `Erro ao transferir arquivo: ${error instanceof Error ? error.message : String(error)}` });
+    }
+  });
+
 
 
   // Catch-all for API router to log 404s within the API prefix

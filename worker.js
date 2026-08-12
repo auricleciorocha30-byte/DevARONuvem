@@ -382,6 +382,64 @@ export default {
       }
     }
 
+    // FOCUS NFE BACKUPS
+    if (url.pathname === "/api/focus-nfe/backups" && request.method === "GET") {
+      try {
+        const token = url.searchParams.get("token");
+        const environment = url.searchParams.get("environment");
+        const cnpj = url.searchParams.get("cnpj");
+        if (!token || !cnpj) return new Response(JSON.stringify({ error: 'Dados incompletos.' }), { status: 400, headers: corsHeaders });
+        const cleanCnpj = String(cnpj).replace(/\D/g, '');
+        const baseUrl = environment === 'production' ? 'https://api.focusnfe.com.br' : 'https://homologacao.focusnfe.com.br';
+        const resp = await fetch(`${baseUrl}/v2/backups/${cleanCnpj}.json`, {
+          headers: { 'Authorization': `Basic ${btoa(token + ':')}` }
+        });
+        const text = await resp.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          if (text.includes('HTTP Basic: Access denied')) {
+            return new Response(JSON.stringify({ error: `Acesso negado: O token configurado é inválido para este ambiente.` }), { status: 401, headers: corsHeaders });
+          }
+          return new Response(JSON.stringify({ error: `Erro na Focus NFe: ${text.substring(0, 100)}` }), { status: resp.status, headers: corsHeaders });
+        }
+        return new Response(JSON.stringify(data), { status: resp.status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } catch (error) {
+        return new Response(JSON.stringify({ error: 'Erro ao buscar backups.' }), { status: 500, headers: corsHeaders });
+      }
+    }
+
+    // FOCUS NFE DOWNLOAD BACKUP
+    if (url.pathname === "/api/focus-nfe/download-backup" && request.method === "GET") {
+      try {
+        const token = url.searchParams.get("token");
+        const environment = url.searchParams.get("environment");
+        const backupPath = url.searchParams.get("path");
+        if (!token || !backupPath) return new Response(JSON.stringify({ error: 'Dados incompletos.' }), { status: 400, headers: corsHeaders });
+        const baseUrl = environment === 'production' ? 'https://api.focusnfe.com.br' : 'https://homologacao.focusnfe.com.br';
+        const resp = await fetch(`${baseUrl}${backupPath}`, {
+          headers: { 'Authorization': `Basic ${btoa(token + ':')}` }
+        });
+        if (!resp.ok) {
+          return new Response(JSON.stringify({ error: `Erro ao baixar da Focus NFe.` }), { status: resp.status, headers: corsHeaders });
+        }
+        const blob = await resp.blob();
+        const contentType = resp.headers.get('content-type') || 'application/zip';
+        const contentDisposition = resp.headers.get('content-disposition') || `attachment; filename="backup.zip"`;
+        return new Response(blob, {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': contentType,
+            'Content-Disposition': contentDisposition
+          }
+        });
+      } catch (error) {
+        return new Response(JSON.stringify({ error: 'Erro ao transferir arquivo.' }), { status: 500, headers: corsHeaders });
+      }
+    }
+
     // BARCODE LOOKUP
     if (url.pathname.startsWith("/api/barcode-lookup/") && request.method === "GET") {
       try {

@@ -12,7 +12,12 @@ import {
   Key,
   Lock,
   Upload,
-  Loader2
+  Loader2,
+  Download,
+  RefreshCw,
+  Calendar,
+  DownloadCloud,
+  FileArchive
 } from 'lucide-react';
 import { StoreSettings } from '../types';
 
@@ -28,6 +33,9 @@ export default function IntegrationsPage({ settings, onSave, storeId }: Props) {
     focusNfeToken: settings.focusNfeToken || '',
     focusNfeEnvironment: settings.focusNfeEnvironment || 'homologation',
     focusNfeCertificate: settings.focusNfeCertificate || '',
+    focusNfeTaxReformActive: settings.focusNfeTaxReformActive ?? false,
+    focusNfeIbsAliquot: settings.focusNfeIbsAliquot ?? 0.10,
+    focusNfeCbsAliquot: settings.focusNfeCbsAliquot ?? 0.90,
     onlinePaymentProvider: settings.onlinePaymentProvider || 'mercado_pago',
     onlinePaymentAccessToken: settings.onlinePaymentAccessToken || '',
     onlinePaymentPublicKey: settings.onlinePaymentPublicKey || '',
@@ -36,6 +44,64 @@ export default function IntegrationsPage({ settings, onSave, storeId }: Props) {
     mercadoPagoWebhookSecret: settings.mercadoPagoWebhookSecret || '',
   });
 
+  const [backups, setBackups] = useState<any[] | null>(null);
+  const [isLoadingBackups, setIsLoadingBackups] = useState(false);
+  const [backupError, setBackupError] = useState<string | null>(null);
+  const [downloadingPath, setDownloadingPath] = useState<string | null>(null);
+
+  const fetchBackups = async () => {
+    if (!settings.focusNfeToken || !settings.cnpj) return;
+    setIsLoadingBackups(true);
+    setBackupError(null);
+    try {
+      const response = await fetch(`/api/focus-nfe/backups?token=${encodeURIComponent(settings.focusNfeToken)}&environment=${encodeURIComponent(settings.focusNfeEnvironment || 'homologation')}&cnpj=${encodeURIComponent(settings.cnpj)}`);
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || 'Erro ao consultar backups na API.');
+      }
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        setBackups(data);
+      } else if (data && typeof data === 'object' && data.error) {
+        throw new Error(data.error);
+      } else {
+        setBackups([]);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setBackupError(err.message || 'Erro de conexão ao buscar backups.');
+    } finally {
+      setIsLoadingBackups(false);
+    }
+  };
+
+  const handleDownload = async (path: string, fileName: string) => {
+    if (!settings.focusNfeToken) return;
+    setDownloadingPath(path);
+    try {
+      const url = `/api/focus-nfe/download-backup?token=${encodeURIComponent(settings.focusNfeToken)}&environment=${encodeURIComponent(settings.focusNfeEnvironment || 'homologation')}&path=${encodeURIComponent(path)}`;
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao iniciar o download do arquivo.');
+    } finally {
+      setDownloadingPath(null);
+    }
+  };
+
+  const formatBackupMonth = (mesStr: string) => {
+    if (mesStr && mesStr.length === 6) {
+      const year = mesStr.substring(0, 4);
+      const month = mesStr.substring(4, 6);
+      return `${month}/${year}`;
+    }
+    return mesStr;
+  };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -390,6 +456,193 @@ export default function IntegrationsPage({ settings, onSave, storeId }: Props) {
               <span className="flex items-center gap-1 text-[10px] font-bold text-blue-600 uppercase tracking-widest">
                 <CheckCircle2 size={14} /> Ativo
               </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* PAINEL DE GESTÃO FISCAL & REFORMA TRIBUTÁRIA */}
+      <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 space-y-8 animate-fade-in">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-gray-50">
+          <div className="flex items-center gap-4">
+            <div className="p-4 bg-orange-100 text-orange-600 rounded-2xl">
+              <FileText size={32} />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-gray-800">Módulo de Gestão Fiscal & Reforma Tributária</h3>
+              <p className="text-xs text-gray-500">
+                Consulte e exporte backups fiscais da Focus NFe e configure as alíquotas da Reforma Tributária (IBS/CBS)
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* COLUNA ESQUERDA: REFORMA TRIBUTÁRIA */}
+          <div className="space-y-6">
+            <div>
+              <h4 className="text-base font-bold text-gray-800 flex items-center gap-2 mb-2">
+                <Shield className="text-orange-500" size={18} />
+                Reforma Tributária (IBS e CBS)
+              </h4>
+              <p className="text-xs text-gray-500 leading-relaxed mb-4">
+                A Reforma Tributária (PEC 45/2019) introduz a Contribuição sobre Bens e Serviços (CBS - Federal) e o Imposto sobre Bens e Serviços (IBS - Estadual/Municipal). 
+                Durante o período de transição (iniciado em Janeiro de 2026), as alíquotas de teste aplicáveis são de <strong>0,10% para IBS</strong> e <strong>0,90% para CBS</strong> de forma facultativa para empresas do Simples Nacional.
+              </p>
+            </div>
+
+            <div className="p-5 bg-orange-50/50 rounded-2xl border border-orange-100 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-orange-950 block">Ativar Envio de IBS / CBS</span>
+                  <span className="text-[10px] text-orange-800 leading-none">Inclui o Grupo de Tributação sobre Bens e Serviços no XML</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, focusNfeTaxReformActive: !formData.focusNfeTaxReformActive })}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${formData.focusNfeTaxReformActive ? 'bg-orange-600' : 'bg-gray-200'}`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.focusNfeTaxReformActive ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+              </div>
+
+              {formData.focusNfeTaxReformActive && (
+                <div className="grid grid-cols-2 gap-4 pt-2 border-t border-orange-100/50">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-orange-900 mb-1">
+                      Alíquota IBS (%)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.focusNfeIbsAliquot}
+                      onChange={(e) => setFormData({ ...formData, focusNfeIbsAliquot: parseFloat(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 bg-white border border-orange-200 rounded-xl outline-none text-xs text-orange-950 font-bold focus:border-orange-500 transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-orange-900 mb-1">
+                      Alíquota CBS (%)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.focusNfeCbsAliquot}
+                      onChange={(e) => setFormData({ ...formData, focusNfeCbsAliquot: parseFloat(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 bg-white border border-orange-200 rounded-xl outline-none text-xs text-orange-950 font-bold focus:border-orange-500 transition-all"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
+              <span className="text-[10px] font-black uppercase tracking-widest text-blue-700 block mb-1">Status de Atualização</span>
+              <p className="text-[10px] text-blue-900 leading-relaxed">
+                <strong>Simples Nacional:</strong> Para empresas sob o regime do Simples Nacional (como a G & C Conveniência), o envio desses campos na NFC-e é <strong>opcional até Dezembro de 2026</strong>, tornando-se obrigatório apenas em Janeiro de 2027. O sistema já está totalmente compatível e pronto para transmitir os campos assim que você decidir ativar ou quando a obrigatoriedade for iniciada.
+              </p>
+            </div>
+          </div>
+
+          {/* COLUNA DIREITA: CONSULTA & EXPORTAÇÃO FISCAL (BACKUPS) */}
+          <div className="space-y-6">
+            <div>
+              <h4 className="text-base font-bold text-gray-800 flex items-center gap-2 mb-2">
+                <DownloadCloud className="text-green-600" size={18} />
+                Consultar & Exportar Backups (XML / DANFEs)
+              </h4>
+              <p className="text-xs text-gray-500 leading-relaxed mb-4">
+                A Focus NFe gera pacotes de backup mensais em arquivos compactados contendo todos os XMLs assinados e PDFs das DANFEs geradas. Os emissores de notas fiscais têm a obrigação legal de armazenar os XMLs por no mínimo 5 anos.
+              </p>
+            </div>
+
+            {(!settings.focusNfeToken || !settings.cnpj) ? (
+              <div className="p-6 bg-gray-50 border border-gray-100 rounded-3xl flex flex-col items-center text-center space-y-3">
+                <AlertCircle className="text-gray-400" size={32} />
+                <div className="space-y-1">
+                  <span className="text-xs font-bold text-gray-700 block">Configurações Incompletas</span>
+                  <p className="text-[10px] text-gray-500 max-w-sm">
+                    Para consultar e baixar os backups, você precisa configurar o <strong>Token da Focus NFe</strong> nesta página e o <strong>CNPJ</strong> nas Configurações da Loja, e salvar as alterações.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={fetchBackups}
+                    disabled={isLoadingBackups}
+                    className="flex-1 flex items-center justify-center gap-2 py-3 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-2xl font-bold text-xs transition-all shadow-md active:scale-98"
+                  >
+                    {isLoadingBackups ? (
+                      <RefreshCw className="animate-spin" size={16} />
+                    ) : (
+                      <RefreshCw size={16} />
+                    )}
+                    {backups ? 'Atualizar Lista de Backups' : 'Consultar Backups Focus NFe'}
+                  </button>
+                </div>
+
+                {backupError && (
+                  <div className="p-4 bg-red-50 text-red-700 rounded-2xl border border-red-100 text-xs flex gap-2">
+                    <AlertCircle className="shrink-0" size={16} />
+                    <span>{backupError}</span>
+                  </div>
+                )}
+
+                {isLoadingBackups && (
+                  <div className="py-8 flex flex-col items-center justify-center gap-2 text-gray-400">
+                    <Loader2 className="animate-spin text-green-600" size={24} />
+                    <span className="text-[10px] font-bold uppercase tracking-widest">Buscando backups por CNPJ...</span>
+                  </div>
+                )}
+
+                {backups && backups.length === 0 && !isLoadingBackups && (
+                  <div className="py-8 text-center text-gray-400 border border-dashed border-gray-100 rounded-2xl text-xs">
+                    Nenhum backup de arquivos fiscais gerado pela Focus NFe foi encontrado para o CNPJ {settings.cnpj}.
+                  </div>
+                )}
+
+                {backups && backups.length > 0 && !isLoadingBackups && (
+                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                    {backups.map((bk, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100/70 border border-gray-100 rounded-xl transition-all">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="text-gray-400" size={16} />
+                          <span className="text-xs font-bold text-gray-700">{formatBackupMonth(bk.mes)}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          {bk.xmls && (
+                            <button
+                              type="button"
+                              onClick={() => handleDownload(bk.xmls, `xml_backup_${bk.mes}.zip`)}
+                              disabled={downloadingPath !== null}
+                              className="flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 hover:bg-green-100 rounded-lg text-[10px] font-bold transition-all"
+                            >
+                              <FileArchive size={12} />
+                              XMLs (.zip)
+                            </button>
+                          )}
+                          {bk.danfes && (
+                            <button
+                              type="button"
+                              onClick={() => handleDownload(bk.danfes, `danfe_backup_${bk.mes}.zip`)}
+                              disabled={downloadingPath !== null}
+                              className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-[10px] font-bold transition-all"
+                            >
+                              <Download size={12} />
+                              DANFEs (.zip)
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
