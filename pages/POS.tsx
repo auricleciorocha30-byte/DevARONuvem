@@ -1481,6 +1481,49 @@ export default function POS({ storeId, user, settings, orders, products: propPro
     }
   };
 
+  const validateProposedCart = (proposedCart: any[]): { valid: boolean; error?: string } => {
+    const requiredStock = new Map<string, number>();
+
+    for (const item of proposedCart) {
+      const targetId = item.originalProductId || item.productId;
+      const prodObj = products.find(p => p.id === targetId);
+      if (!prodObj) continue;
+
+      const qty = item.quantity;
+
+      if (prodObj.isCombo && prodObj.comboItems) {
+        const subItems = getComboItems(prodObj.comboItems);
+        for (const comboOf of subItems) {
+          const subProductId = comboOf.productId;
+          const needed = Number(comboOf.quantity || 1) * qty;
+          requiredStock.set(subProductId, (requiredStock.get(subProductId) || 0) + needed);
+        }
+      } else {
+        requiredStock.set(targetId, (requiredStock.get(targetId) || 0) + qty);
+      }
+
+      if (item.complements && item.complements.length > 0) {
+        for (const cp of item.complements) {
+          requiredStock.set(cp.itemId, (requiredStock.get(cp.itemId) || 0) + (Number(cp.quantity || 0) * qty));
+        }
+      }
+    }
+
+    for (const [productId, requiredQty] of requiredStock.entries()) {
+      const product = products.find(p => p.id === productId);
+      if (product && product.stock != null) {
+        if (requiredQty > product.stock) {
+          return {
+            valid: false,
+            error: `Estoque insuficiente para o produto "${product.name}"! Disponível: ${product.stock} ${product.isByWeight ? 'KG' : 'un'}, Necessário no carrinho: ${requiredQty} un.`
+          };
+        }
+      }
+    }
+
+    return { valid: true };
+  };
+
   const addToCart = (product: Product, quantity: number, complementsToAdd?: CartComplementItem[]) => {
     setCart(prev => {
       let cartItemId = product.id;
@@ -1502,34 +1545,37 @@ export default function POS({ storeId, user, settings, orders, products: propPro
       let itemPrice = promoPrice !== null ? promoPrice : rawPrice;
 
       const existing = prev.find(item => item.productId === cartItemId);
-      const currentQty = existing ? existing.quantity : 0;
       
-      if (product.stock != null && (currentQty + quantity) > product.stock) {
-        alert(`Estoque insuficiente! Disponível: ${product.stock} ${product.isByWeight ? 'KG' : 'un'}`);
-        return prev;
-      }
-
+      let proposedCart: any[] = [];
       if (existing) {
-        return prev.map(item => 
+        proposedCart = prev.map(item => 
           item.productId === cartItemId 
             ? { ...item, quantity: item.quantity + quantity } 
             : item
         );
+      } else {
+        proposedCart = [...prev, {
+          productId: cartItemId,
+          name: itemName,
+          price: itemPrice,
+          quantity: quantity,
+          description: product.description,
+          isByWeight: product.isByWeight,
+          isFractional: false,
+          originalProductId: product.id,
+          complements: complementsToAdd,
+          isCombo: product.isCombo,
+          comboItems: product.comboItems
+        }];
       }
-      
-      return [...prev, {
-        productId: cartItemId,
-        name: itemName,
-        price: itemPrice,
-        quantity: quantity,
-        description: product.description,
-        isByWeight: product.isByWeight,
-        isFractional: false,
-        originalProductId: product.id,
-        complements: complementsToAdd,
-        isCombo: product.isCombo,
-        comboItems: product.comboItems
-      }];
+
+      const validation = validateProposedCart(proposedCart);
+      if (!validation.valid) {
+        alert(validation.error);
+        return prev;
+      }
+
+      return proposedCart;
     });
     setWeightModal({ isOpen: false, product: null });
   };
@@ -1537,32 +1583,38 @@ export default function POS({ storeId, user, settings, orders, products: propPro
   const updateQuantity = (productId: string, delta: number) => {
     const canCancel = user.role === 'GERENTE' || settings.canWaitstaffCancelItems;
 
-    setCart(prev => prev.map(item => {
-      if (item.productId === productId) {
-        let newQty = item.quantity + delta;
-        newQty = Math.round(newQty * 1000) / 1000;
-        newQty = Math.max(0, newQty);
-        
-        if (delta < 0 && item.isPersisted && !canCancel) {
-            if (newQty < (item.originalQuantity || 0)) {
-                alert('Você não tem permissão para cancelar itens já lançados.');
-                return item;
-            }
-        }
+    setCart(prev => {
+      const itemToUpdate = prev.find(item => item.productId === productId);
+      if (!itemToUpdate) return prev;
 
-        if (delta > 0) {
-            const targetId = item.originalProductId || item.productId;
-            const product = products.find(p => p.id === targetId);
-            if (product && product.stock != null && newQty > product.stock) {
-                alert(`Estoque insuficiente! Disponível: ${product.stock} ${product.isByWeight ? 'KG' : 'un'}`);
-                return item;
-            }
-        }
-        
-        return { ...item, quantity: newQty };
+      let newQty = itemToUpdate.quantity + delta;
+      newQty = Math.round(newQty * 1000) / 1000;
+      newQty = Math.max(0, newQty);
+      
+      if (delta < 0 && itemToUpdate.isPersisted && !canCancel) {
+          if (newQty < (itemToUpdate.originalQuantity || 0)) {
+              alert('Você não tem permissão para cancelar itens já lançados.');
+              return prev;
+          }
       }
-      return item;
-    }).filter(item => item.quantity > 0));
+
+      const proposedCart = prev.map(item => {
+        if (item.productId === productId) {
+          return { ...item, quantity: newQty };
+        }
+        return item;
+      }).filter(item => item.quantity > 0);
+
+      if (delta > 0) {
+        const validation = validateProposedCart(proposedCart);
+        if (!validation.valid) {
+          alert(validation.error);
+          return prev;
+        }
+      }
+
+      return proposedCart;
+    });
   };
 
   const subtotal = cart.reduce((acc, item) => acc + ((item.price || 0) * (item.quantity || 0)), 0);
