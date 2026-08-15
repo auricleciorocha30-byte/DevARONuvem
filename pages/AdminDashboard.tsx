@@ -295,15 +295,44 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
         });
       });
 
+    let cashbackTotal = 0;
+    let couponDiscountsTotal = 0;
+
+    filteredOrders
+      .filter(o => o.status !== 'CANCELADO' && o.status !== 'PREPARANDO')
+      .forEach(order => {
+        couponDiscountsTotal += Number(order.discountAmount || 0);
+        if (order.paymentDetails) {
+          try {
+            const payments = JSON.parse(order.paymentDetails);
+            if (Array.isArray(payments)) {
+              payments.forEach((p: any) => {
+                if (p.method === 'CASHBACK') {
+                  cashbackTotal += Number(p.amount || 0);
+                }
+              });
+            }
+          } catch (e) {
+            console.error("Error parsing paymentDetails for cashback:", e);
+          }
+        } else if (order.paymentMethod === 'CASHBACK') {
+          cashbackTotal += Number(order.total || 0);
+        }
+      });
+
     const productsProfitDetails = Array.from(itemMap.values()).sort((a, b) => b.profit - a.profit);
-    const profitTotal = totalSales - costTotal;
-    const profitMarginTotal = totalSales > 0 ? (profitTotal / totalSales) * 100 : 0;
+    const faturamentoLiquido = totalSales - cashbackTotal;
+    const profitTotal = faturamentoLiquido - costTotal;
+    const profitMarginTotal = faturamentoLiquido > 0 ? (profitTotal / faturamentoLiquido) * 100 : 0;
 
     return {
       costTotal,
       profitTotal,
       profitMarginTotal,
-      productsProfitDetails
+      productsProfitDetails,
+      cashbackTotal,
+      couponDiscountsTotal,
+      faturamentoLiquido
     };
   }, [filteredOrders, products, totalSales]);
 
@@ -506,10 +535,10 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
                                                     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 40px; color: #111; }
                                                     h1 { font-size: 24px; margin-bottom: 5px; }
                                                     p { font-size: 14px; color: #666; margin-bottom: 30px; }
-                                                    .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
-                                                    .summary-card { background: #f9fafb; padding: 15px; border-radius: 10px; border: 1px solid #eee; }
-                                                    .summary-label { font-size: 11px; color: #666; font-weight: bold; text-transform: uppercase; }
-                                                    .summary-value { font-size: 20px; font-weight: bold; margin-top: 5px; }
+                                                    .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }
+                                                    .summary-card { background: #f9fafb; padding: 12px; border-radius: 8px; border: 1px solid #eee; }
+                                                    .summary-label { font-size: 10px; color: #666; font-weight: bold; text-transform: uppercase; }
+                                                    .summary-value { font-size: 16px; font-weight: bold; margin-top: 4px; }
                                                     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
                                                     th, td { text-align: left; padding: 12px; border-bottom: 1px solid #eee; font-size: 13px; }
                                                     th { background: #f3f4f6; font-weight: bold; text-transform: uppercase; font-size: 10px; color: #666; }
@@ -517,6 +546,7 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
                                                     .text-green { color: #10b981; font-weight: bold; }
                                                     .text-red { color: #ef4444; }
                                                     .margin-badge { background: #e6fbf4; color: #10b981; padding: 3px 8px; border-radius: 5px; font-weight: bold; font-size: 11px; }
+                                                    .explanation-box { background: #fef3c7; color: #92400e; padding: 12px; border-radius: 8px; font-size: 11px; margin-bottom: 25px; border: 1px dashed #f59e0b; line-height: 1.4; }
                                                 </style>
                                             </head>
                                             <body>
@@ -528,14 +558,22 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
                                                         <div class="summary-label">Faturamento Bruto</div>
                                                         <div class="summary-value">R$ ${totalSales.toFixed(2)}</div>
                                                     </div>
+                                                    <div class="summary-card border-amber-200 bg-amber-50/20">
+                                                        <div class="summary-label">Cashback Utilizado</div>
+                                                        <div class="summary-value text-red">R$ ${profitData.cashbackTotal.toFixed(2)}</div>
+                                                    </div>
                                                     <div class="summary-card">
-                                                        <div class="summary-label">Custo Total de Aquisição</div>
+                                                        <div class="summary-label">Custo de Aquisição</div>
                                                         <div class="summary-value">R$ ${profitData.costTotal.toFixed(2)}</div>
                                                     </div>
                                                     <div class="summary-card">
-                                                        <div class="summary-label">Lucro Líquido Estimado</div>
+                                                        <div class="summary-label">Lucro Líquido Real</div>
                                                         <div class="summary-value text-green">R$ ${profitData.profitTotal.toFixed(2)}</div>
                                                     </div>
+                                                </div>
+
+                                                <div class="explanation-box">
+                                                    * Os descontos de cupons e promoções aplicados aos itens totalizaram <strong>R$ ${profitData.couponDiscountsTotal.toFixed(2)}</strong> neste período e já foram deduzidos diretamente do faturamento de cada pedido. O Cashback utilizado funcionou como meio de pagamento e foi deduzido no Faturamento Líquido e Lucro Líquido Real.
                                                 </div>
 
                                                 <table>
@@ -578,6 +616,41 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
                     )}
                 </div>
                 <p className="text-xs text-gray-500 mb-4 no-print">Análise detalhada de custos, receitas e lucratividade real por produto.</p>
+                
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 no-print">
+                    <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex flex-col">
+                        <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Faturamento Bruto</span>
+                        <span className="text-lg font-black text-gray-700 mt-1">R$ {totalSales.toFixed(2)}</span>
+                    </div>
+                    <div className="bg-amber-50/40 p-4 rounded-2xl border border-amber-100/50 flex flex-col">
+                        <span className="text-[10px] font-black uppercase text-amber-600 tracking-widest">Cashback Utilizado</span>
+                        <span className="text-lg font-black text-amber-700 mt-1">R$ {profitData.cashbackTotal.toFixed(2)}</span>
+                    </div>
+                    <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex flex-col">
+                        <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Custo de Aquisição</span>
+                        <span className="text-lg font-black text-gray-700 mt-1">R$ {profitData.costTotal.toFixed(2)}</span>
+                    </div>
+                    <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 flex flex-col">
+                        <span className="text-[10px] font-black uppercase text-emerald-600 tracking-widest">Lucro Líquido Real</span>
+                        <span className="text-lg font-black text-emerald-700 mt-1">
+                            R$ {profitData.profitTotal.toFixed(2)} <span className="text-xs font-bold text-emerald-600">({profitData.profitMarginTotal.toFixed(1)}%)</span>
+                        </span>
+                    </div>
+                </div>
+
+                <div className="bg-amber-50/30 border border-amber-200/50 text-amber-800 text-xs p-4 rounded-2xl mb-6 flex flex-col gap-2 no-print leading-relaxed">
+                    <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                        <span className="inline-block w-2 h-2 rounded-full bg-amber-500"></span>
+                        Demonstrativo de Promoções e Fidelidade:
+                    </div>
+                    <p>
+                        • <strong>Descontos de Promoções/Cupons</strong>: Totalizaram <strong>R$ {profitData.couponDiscountsTotal.toFixed(2)}</strong> no período filtrado. Como as promoções reduzem o preço unitário do produto ao ser lançado no carrinho, elas já estão deduzidas diretamente de forma automática do faturamento do pedido.
+                    </p>
+                    <p>
+                        • <strong>Cashback</strong>: Totalizou <strong>R$ {profitData.cashbackTotal.toFixed(2)}</strong> de saldo utilizado como pagamento pelos clientes. Ele funciona como um desconto de fidelidade oferecido pela loja, sendo por isso deduzido integralmente do faturamento líquido e do Lucro Líquido Real da loja.
+                    </p>
+                </div>
+
                 <div className="overflow-x-auto max-h-[400px] overflow-y-auto custom-scrollbar print:h-auto print:max-h-none print:overflow-visible">
                     <table className="w-full text-left border-collapse relative print:static">
                         <thead className="sticky top-0 z-10 bg-white print:static">

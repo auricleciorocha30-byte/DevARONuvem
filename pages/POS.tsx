@@ -1271,7 +1271,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
 
   // Register Closing
   const [isClosingRegister, setIsClosingRegister] = useState(false);
-  const [dailySales, setDailySales] = useState<{ total: number, byMethod: Record<string, number>, count: number, bleeds: number, bleedsList?: any[], products: any[] } | null>(null);
+  const [dailySales, setDailySales] = useState<{ total: number, byMethod: Record<string, number>, count: number, bleeds: number, estornos?: number, bleedsList?: any[], estornosList?: any[], products: any[] } | null>(null);
   
   // Session State
   const [currentSession, setCurrentSession] = useState<any | null>(null);
@@ -2558,20 +2558,58 @@ export default function POS({ storeId, user, settings, orders, products: propPro
 
       // Update stocks if restockItems is true
       if (restockItems) {
+        const stockRestoration = new Map<string, number>();
         for (const [productId, qty] of itemsToReturn) {
-          const product = products.find(p => p.id === productId);
+          const item = selectedReturnOrder.items.find(i => i.productId === productId);
+          if (!item) continue;
+
+          // Main product or combo sub-items
+          const productObj = products.find(p => p.id === productId);
+          if (productObj && productObj.isCombo && productObj.comboItems) {
+            let subItems: any[] = [];
+            try {
+              subItems = typeof productObj.comboItems === 'string' ? JSON.parse(productObj.comboItems) : productObj.comboItems;
+            } catch (e) {
+              console.error("Error parsing comboItems in return:", e);
+            }
+            if (Array.isArray(subItems)) {
+              for (const comboOf of subItems) {
+                const subProductId = comboOf.productId;
+                const subCurrent = stockRestoration.get(subProductId) || 0;
+                const qtyToAdd = Number(comboOf.quantity || 1) * qty;
+                stockRestoration.set(subProductId, subCurrent + qtyToAdd);
+              }
+            }
+          } else {
+            const current = stockRestoration.get(productId) || 0;
+            stockRestoration.set(productId, current + qty);
+          }
+
+          // Restore complements stock if they exist
+          if (item.complements && item.complements.length > 0) {
+            for (const cp of item.complements) {
+              const cpCurrent = stockRestoration.get(cp.itemId) || 0;
+              const qtyToAdd = Number(cp.quantity || 1) * qty;
+              stockRestoration.set(cp.itemId, cpCurrent + qtyToAdd);
+            }
+          }
+        }
+
+        // Apply restoration in DB and update local state
+        for (const [prodId, quantity] of stockRestoration.entries()) {
+          const product = products.find(p => p.id === prodId);
           if (product && product.stock != null) {
-            const newStock = product.stock + qty;
+            const newStock = product.stock + quantity;
             const { error: stockError } = await supabase
               .from('products')
-              .eq('id', productId)
+              .eq('id', prodId)
               .update({ stock: newStock });
             
             if (stockError) throw stockError;
 
             // Update local state instantly
             setProducts(prev => prev.map(p => {
-              if (p.id === productId && p.stock != null) {
+              if (p.id === prodId && p.stock != null) {
                 return { ...p, stock: newStock };
               }
               return p;
@@ -2604,7 +2642,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
       if (currentSession?.id) {
         await supabase.from('cash_movements').insert([{
           store_id: storeId,
-          type: 'SANGRIA',
+          type: 'ESTORNO',
           amount: totalReturnedAmount,
           description: `Devolução Pedido #${selectedReturnOrder.displayId || selectedReturnOrder.id}: ${returnReason || 'Não informado'}`,
           waitstaffName: user.name,
@@ -2649,8 +2687,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
           .from('cash_movements')
           .select('*')
           .eq('store_id', storeId)
-          .eq('session_id', sessionId)
-          .eq('type', 'SANGRIA');
+          .eq('session_id', sessionId);
 
         orders = sessionOrders || [];
         movements = sessionMovements || [];
@@ -2670,14 +2707,14 @@ export default function POS({ storeId, user, settings, orders, products: propPro
           .from('cash_movements')
           .select('*')
           .eq('store_id', storeId)
-          .gte('createdAt', startOfDay)
-          .eq('type', 'SANGRIA');
+          .gte('createdAt', startOfDay);
 
         orders = todayOrders || [];
         movements = todayMovements || [];
       }
 
-      const bleedsTotal = movements.reduce((acc, m) => acc + (m.amount || 0), 0);
+      const bleedsTotal = movements.filter(m => m.type === 'SANGRIA').reduce((acc, m) => acc + (m.amount || 0), 0);
+      const estornosTotal = movements.filter(m => m.type === 'ESTORNO').reduce((acc, m) => acc + (m.amount || 0), 0);
 
       const sales = (orders as Order[] || []).reduce((acc, order) => {
         if (order.status === 'CANCELADO') return acc;
@@ -2708,28 +2745,31 @@ export default function POS({ storeId, user, settings, orders, products: propPro
         });
 
         (order.items || []).forEach(item => {
+            const activeQty = (item.quantity || 0) - (item.returnedQuantity || 0);
+            if (activeQty <= 0) return;
+
             const existing = acc.products.find(p => p.productId === item.productId);
             if (existing) {
-                existing.quantity += item.quantity;
-                existing.total += item.price * item.quantity;
+                existing.quantity += activeQty;
+                existing.total += item.price * activeQty;
             } else {
                 acc.products.push({
                     productId: item.productId,
                     name: item.name,
-                    quantity: item.quantity,
-                    total: item.price * item.quantity,
+                    quantity: activeQty,
+                    total: item.price * activeQty,
                     isByWeight: item.isByWeight
                 });
             }
         });
 
         return acc;
-      }, { total: 0, byMethod: {} as Record<string, number>, count: 0, bleeds: bleedsTotal, bleedsList: movements, products: [] as any[] });
+      }, { total: 0, byMethod: {} as Record<string, number>, count: 0, bleeds: bleedsTotal, estornos: estornosTotal, bleedsList: movements.filter(m => m.type === 'SANGRIA'), estornosList: movements.filter(m => m.type === 'ESTORNO'), products: [] as any[] });
       
       setDailySales(sales);
     } catch (err) {
       console.error(err);
-      setDailySales({ total: 0, byMethod: {}, count: 0, bleeds: 0, bleedsList: [], products: [] });
+      setDailySales({ total: 0, byMethod: {}, count: 0, bleeds: 0, estornos: 0, bleedsList: [], estornosList: [], products: [] });
     }
   };
 
@@ -2737,7 +2777,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
     if (!currentSession) return;
     
     try {
-      const closedAmount = (dailySales?.total || 0) + currentSession.initial_amount - (dailySales?.bleeds || 0);
+      const closedAmount = (dailySales?.total || 0) + currentSession.initial_amount - (dailySales?.bleeds || 0) - (dailySales?.estornos || 0);
       
       await supabase
         .from('register_sessions')
@@ -3040,7 +3080,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
       if (!dailySales) return;
       
       const initial = currentSession?.initial_amount || 0;
-      const totalInBox = dailySales.total + initial - dailySales.bleeds;
+      const totalInBox = dailySales.total + initial - dailySales.bleeds - (dailySales.estornos || 0);
       const printWidth = settings.printWidthPx ? `${settings.printWidthPx}px` : (settings.thermalPrinterWidth === '58mm' ? '180px' : '280px');
       const winWidth = settings.printWidthPx ? settings.printWidthPx + 50 : (settings.thermalPrinterWidth === '58mm' ? 300 : 400);
 
@@ -3085,6 +3125,21 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                 <span>- ${formatCurrency(m.amount)}</span>
             </div>
         `).join('')}
+        ` : ''}
+        ${dailySales.estornos && dailySales.estornos > 0 ? `
+        <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
+        <div style="display: flex; justify-content: space-between; color: black !important;">
+            <span>Total Estornos</span>
+            <span>- ${formatCurrency(dailySales.estornos)}</span>
+        </div>
+        <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
+        <p style="margin: 5px 0; color: black !important;"><strong>Detalhes de Estornos:</strong></p>
+        ${dailySales.estornosList ? dailySales.estornosList.map(m => `
+            <div style="display: flex; justify-content: space-between; font-size: 11px; margin: 1px 0; color: black !important;">
+                <span style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 5px;">${m.description || 'Sem motivo'}</span>
+                <span>- ${formatCurrency(m.amount)}</span>
+            </div>
+        `).join('') : ''}
         ` : ''}
         <div style="border-top: 2px dashed black; margin: 5px 0;"></div>
         <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: 900; color: black !important;">
@@ -4679,6 +4734,27 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                         </div>
                     )}
 
+                    {dailySales.estornos && dailySales.estornos > 0 ? (
+                        <>
+                            <div className="flex justify-between items-center p-3 bg-red-50 text-red-800 rounded-xl">
+                                <span className="font-medium">Total Estornos (Devoluções)</span>
+                                <span className="font-bold text-lg">- {formatCurrency(dailySales.estornos)}</span>
+                            </div>
+
+                            {dailySales.estornosList && dailySales.estornosList.length > 0 && (
+                                <div className="bg-red-50/30 p-3 rounded-xl border border-red-100/50 space-y-1.5 max-h-28 overflow-y-auto">
+                                    <p className="text-[10px] font-bold text-red-600 uppercase tracking-wider">Histórico de Estornos:</p>
+                                    {dailySales.estornosList.map((m: any, index: number) => (
+                                        <div key={index} className="flex justify-between text-xs text-red-900">
+                                            <span className="truncate max-w-[220px]" title={m.description}>{m.description || 'Sem motivo'}</span>
+                                            <span className="font-semibold">-{formatCurrency(m.amount)}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </>
+                    ) : null}
+
                     <div className="flex justify-between items-center p-3 bg-gray-50 text-gray-800 rounded-xl">
                         <span className="font-medium">Troco Inicial</span>
                         <span className="font-bold text-lg">{formatCurrency(currentSession?.initial_amount || 0)}</span>
@@ -4686,7 +4762,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
 
                     <div className="flex justify-between items-center p-3 bg-green-50 text-green-800 rounded-xl border border-green-100">
                         <span className="font-bold uppercase">Total em Caixa</span>
-                        <span className="font-bold text-xl">{formatCurrency(dailySales.total - dailySales.bleeds + (currentSession?.initial_amount || 0))}</span>
+                        <span className="font-bold text-xl">{formatCurrency(dailySales.total - dailySales.bleeds - (dailySales.estornos || 0) + (currentSession?.initial_amount || 0))}</span>
                     </div>
                 </div>
 
