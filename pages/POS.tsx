@@ -2564,7 +2564,8 @@ export default function POS({ storeId, user, settings, orders, products: propPro
           if (!item) continue;
 
           // Main product or combo sub-items
-          const productObj = products.find(p => p.id === productId);
+          const targetProductId = item.originalProductId || item.productId;
+          const productObj = products.find(p => p.id === targetProductId);
           if (productObj && productObj.isCombo && productObj.comboItems) {
             let subItems: any[] = [];
             try {
@@ -2581,8 +2582,8 @@ export default function POS({ storeId, user, settings, orders, products: propPro
               }
             }
           } else {
-            const current = stockRestoration.get(productId) || 0;
-            stockRestoration.set(productId, current + qty);
+            const current = stockRestoration.get(targetProductId) || 0;
+            stockRestoration.set(targetProductId, current + qty);
           }
 
           // Restore complements stock if they exist
