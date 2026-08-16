@@ -67,7 +67,6 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
-  const [isCleaning, setIsCleaning] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [productSearch, setProductSearch] = useState('');
 
@@ -195,24 +194,6 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
       }
     };
     reader.readAsText(file);
-  };
-
-  const handleManualCleanup = async () => {
-    const days = localSettings.dataRetentionDays || 40;
-    if (!window.confirm(`Deseja executar a limpeza manual de dados agora? Isso removerá permanentemente todos os pedidos, sessões de caixa fechadas e movimentações de caixa anteriores a ${days} dias para liberar espaço no banco de dados.`)) {
-      return;
-    }
-
-    setIsCleaning(true);
-    try {
-      await (supabase as any).cleanupOldData(storeId, days);
-      alert(`Limpeza concluída com sucesso! Históricos antigos anteriores a ${days} dias foram removidos.`);
-    } catch (err: any) {
-      console.error("Erro na limpeza manual:", err);
-      alert("Falha ao executar a limpeza manual: " + err.message);
-    } finally {
-      setIsCleaning(false);
-    }
   };
 
   const handleConnectUsbPrinter = async () => {
@@ -932,7 +913,7 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
 
           <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
             <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
-              <Database size={16} /> Manutenção e Limpeza de Dados
+              <Database size={16} /> Manutenção de Dados
             </h2>
             <div className="space-y-6">
               {/* Backup & Restore */}
@@ -953,50 +934,6 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                 </button>
               </div>
               <input type="file" ref={importFileRef} onChange={handleRestore} className="hidden" accept=".json" />
-
-              {/* Retention Policy Setting */}
-              <div className="p-5 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
-                    Retenção de Histórico de Dados
-                  </label>
-                  <p className="text-xs text-gray-500 mb-3 leading-relaxed">
-                    Define por quantos dias o sistema guardará os históricos de pedidos finalizados, sangrias e caixas fechados no banco de dados. Um período menor mantém o banco de dados leve, rápido e econômico.
-                  </p>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="number"
-                      min="15"
-                      max="365"
-                      value={localSettings.dataRetentionDays || 40}
-                      onChange={(e) => setLocalSettings({...localSettings, dataRetentionDays: Math.max(15, Number(e.target.value))})}
-                      className="w-24 px-4 py-2 bg-white rounded-xl border border-gray-200 outline-none text-center font-bold text-gray-700 focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                    />
-                    <span className="text-sm font-bold text-gray-600">Dias de histórico ativo</span>
-                  </div>
-                </div>
-
-                <div className="border-t border-gray-200/60 pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div>
-                    <span className="block text-xs font-bold text-gray-700">Limpeza do Histórico</span>
-                    <span className="text-[11px] text-gray-500">
-                      O cashback dos clientes é salvo diretamente no cadastro ativo de cada cliente e é preservado com segurança.
-                    </span>
-                  </div>
-                  <button
-                    onClick={handleManualCleanup}
-                    disabled={isCleaning}
-                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50 transition-colors rounded-xl text-xs font-bold"
-                  >
-                    {isCleaning ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <Trash2 size={14} />
-                    )}
-                    Limpar Históricos Agora
-                  </button>
-                </div>
-              </div>
             </div>
           </section>
         </div>

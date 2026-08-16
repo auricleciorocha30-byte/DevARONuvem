@@ -166,6 +166,7 @@ export default function SuperAdminPanel() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isCleaning, setIsCleaning] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -403,6 +404,7 @@ export default function SuperAdminPanel() {
         maxOrdersPerMonth: fullStore.settings?.maxOrdersPerMonth,
         maxProducts: fullStore.settings?.maxProducts,
         maxUsers: fullStore.settings?.maxUsers,
+        dataRetentionDays: fullStore.settings?.dataRetentionDays,
         lockedFeatures: fullStore.settings?.lockedFeatures || []
       });
       setIsManagingContent(true);
@@ -466,6 +468,7 @@ export default function SuperAdminPanel() {
         maxOrdersPerMonth: editProfileData.maxOrdersPerMonth,
         maxProducts: editProfileData.maxProducts,
         maxUsers: editProfileData.maxUsers,
+        dataRetentionDays: editProfileData.dataRetentionDays,
         lockedFeatures: editProfileData.lockedFeatures
     };
 
@@ -489,6 +492,36 @@ export default function SuperAdminPanel() {
       fetchStores();
     }
     setIsSaving(false);
+  };
+
+  const handleManualCleanup = async () => {
+    const days = editProfileData.dataRetentionDays || 40;
+    if (!editingStore) return;
+    if (!window.confirm(`Deseja executar a limpeza manual de dados agora para a loja "${editingStore.name}"? Isso removerá permanentemente todos os pedidos, sessões de caixa fechadas e movimentações de caixa anteriores a ${days} dias para liberar espaço no banco de dados.`)) {
+      return;
+    }
+
+    setIsCleaning(true);
+    try {
+      if ((editingStore as any).dbUrl && (editingStore as any).dbAuthToken) {
+          (supabase as any).connectToStore((editingStore as any).dbUrl, (editingStore as any).dbAuthToken);
+      } else {
+          (supabase as any).disconnectStore();
+      }
+
+      await (supabase as any).cleanupOldData(editingStore.id, days);
+      alert(`Limpeza concluída com sucesso! Históricos antigos anteriores a ${days} dias foram removidos para a loja "${editingStore.name}".`);
+    } catch (err: any) {
+      console.error("Erro na limpeza manual:", err);
+      alert("Falha ao executar a limpeza manual: " + err.message);
+    } finally {
+      setIsCleaning(false);
+      if ((editingStore as any).dbUrl && (editingStore as any).dbAuthToken) {
+          (supabase as any).connectToStore((editingStore as any).dbUrl, (editingStore as any).dbAuthToken);
+      } else {
+          (supabase as any).disconnectStore();
+      }
+    }
   };
 
   const handleAddCategory = async () => {
@@ -909,6 +942,33 @@ export default function SuperAdminPanel() {
                                     <span className="text-sm font-bold text-slate-700">Emissão de Notas Fiscais</span>
                                 </label>
                             </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4 pt-4 border-t border-slate-100">
+                        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                            <Trash2 size={16} className="text-red-500" /> Limpeza e Manutenção de Históricos
+                        </h3>
+                        <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                            <div className="space-y-1">
+                                <span className="block text-xs font-bold text-slate-700">Limpeza de Dados Antigos</span>
+                                <span className="block text-[11px] text-slate-400 leading-relaxed max-w-xl">
+                                    Remove permanentemente pedidos finalizados, sessões de caixa fechadas e movimentações de caixa anteriores a <strong>{editProfileData.dataRetentionDays || 40} dias</strong> para liberar espaço e otimizar a performance desta unidade. O saldo de cashback dos clientes será preservado intacto.
+                                </span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={handleManualCleanup}
+                                disabled={isCleaning}
+                                className="flex items-center justify-center gap-2 px-6 py-4 bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50 transition-colors rounded-xl text-xs font-bold whitespace-nowrap self-stretch md:self-auto"
+                            >
+                                {isCleaning ? (
+                                    <Loader2 size={16} className="animate-spin" />
+                                ) : (
+                                    <Trash2 size={16} />
+                                )}
+                                Limpar Históricos Agora
+                            </button>
                         </div>
                     </div>
 
