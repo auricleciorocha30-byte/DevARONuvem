@@ -532,6 +532,25 @@ function StoreContext() {
   useEffect(() => {
     if (!currentStore) return;
 
+    // Load products and categories from cache immediately for instant startup
+    const cachedProducts = localStorage.getItem(`products_cache_${currentStore.id}`);
+    const cachedCategories = localStorage.getItem(`categories_cache_${currentStore.id}`);
+    
+    if (cachedProducts) {
+      try {
+        setProducts(JSON.parse(cachedProducts).map(mapProductFromDb));
+      } catch (e) {
+        console.error("Error parsing cached products:", e);
+      }
+    }
+    if (cachedCategories) {
+      try {
+        setCategories(JSON.parse(cachedCategories));
+      } catch (e) {
+        console.error("Error parsing cached categories:", e);
+      }
+    }
+
     const fetchMetadata = async () => {
       if (!navigator.onLine) return;
 
@@ -546,6 +565,7 @@ function StoreContext() {
         } else if (pRes.data) {
           const mappedP = pRes.data.map(mapProductFromDb);
           setProducts(mappedP);
+          localStorage.setItem(`products_cache_${currentStore.id}`, JSON.stringify(pRes.data));
         }
 
         if (cRes.error) {
@@ -553,6 +573,7 @@ function StoreContext() {
         } else if (cRes.data) {
           const cats = cRes.data.map((c: any) => c.name);
           setCategories(cats);
+          localStorage.setItem(`categories_cache_${currentStore.id}`, JSON.stringify(cRes.data));
         }
       } catch (err: any) {
           console.error("Error fetching metadata:", err);
