@@ -256,7 +256,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
               const productPayload: Partial<Product> = {
                 id: existing.id,
                 name: existing.name,
-                category: existing.category,
+                category: item.category || existing.category,
                 description: existing.description || 'Importado via NF-e',
                 imageUrl: existing.imageUrl || '',
                 isActive: existing.isActive,
@@ -1478,7 +1478,6 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                                 value={item.category}
                                 onChange={(e) => setParsedNfeItems(prev => prev.map(p => p.id === item.id ? { ...p, category: e.target.value } : p))}
                                 className="w-full p-1.5 border border-slate-200 rounded-lg bg-white outline-none font-bold"
-                                disabled={item.matchedProductId != null}
                               >
                                 {categories.map(cat => (
                                   <option key={cat} value={cat}>{cat}</option>
