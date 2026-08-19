@@ -5,6 +5,7 @@ import {
   ShoppingCart, 
   X, 
   ChevronLeft, 
+  ChevronRight, 
   Plus as PlusIcon, 
   Minus as MinusIcon, 
   CheckCircle, 
@@ -459,6 +460,22 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
+  const [expandedImages, setExpandedImages] = useState<string[] | null>(null);
+  const [expandedImageIndex, setExpandedImageIndex] = useState<number>(0);
+
+  const handleExpandProductImages = (product: Product, startIndex: number = 0) => {
+    const images: string[] = [];
+    if (product.imageUrl && product.imageUrl.trim() !== '') {
+      images.push(product.imageUrl);
+    }
+    if (product.imageUrl2 && product.imageUrl2.trim() !== '') {
+      images.push(product.imageUrl2);
+    }
+    if (images.length > 0) {
+      setExpandedImages(images);
+      setExpandedImageIndex(startIndex);
+    }
+  };
 
   const showAlert = (msg: string) => setErrorMsg(msg);
   const showSuccessAlert = (msg: string) => setSuccessMsg(msg);
@@ -1604,7 +1621,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                             src={featuredProduct.imageUrl} 
                             className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-700 cursor-pointer" 
                             alt={featuredProduct.name} 
-                            onClick={(e) => { e.stopPropagation(); setExpandedImage(featuredProduct.imageUrl!); }}
+                            onClick={(e) => { e.stopPropagation(); handleExpandProductImages(featuredProduct, 0); }}
                             loading="lazy"
                             onError={(e) => {
                                 (e.target as HTMLImageElement).style.display = 'none';
@@ -1683,7 +1700,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                       src={product.imageUrl} 
                       className={`w-full h-full object-cover cursor-pointer transition-opacity duration-300 absolute inset-0 ${product.imageUrl2 ? 'group-hover:opacity-0' : ''}`} 
                       alt={product.name} 
-                      onClick={(e) => { e.stopPropagation(); setExpandedImage(product.imageUrl!); }}
+                      onClick={(e) => { e.stopPropagation(); handleExpandProductImages(product, 0); }}
                       loading="lazy"
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none';
@@ -1692,9 +1709,9 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                     {product.imageUrl2 && product.imageUrl2.trim() !== '' && (
                       <img 
                         src={product.imageUrl2} 
-                        className="w-full h-full object-cover cursor-pointer absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" 
+                        className="w-full h-full object-cover cursor-pointer absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none md:pointer-events-auto" 
                         alt={`${product.name} - Secundária`} 
-                        onClick={(e) => { e.stopPropagation(); setExpandedImage(product.imageUrl2!); }}
+                        onClick={(e) => { e.stopPropagation(); handleExpandProductImages(product, 1); }}
                         loading="lazy"
                       />
                     )}
@@ -2589,20 +2606,70 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
         />
       )}
 
-      {expandedImage && (
+      {(expandedImage || expandedImages) && (
         <div 
           className="fixed inset-0 z-[300] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
-          onClick={() => setExpandedImage(null)}
+          onClick={() => {
+            setExpandedImage(null);
+            setExpandedImages(null);
+          }}
         >
-           <div className="relative max-w-2xl w-full max-h-[90vh] flex items-center justify-center">
-              <button 
-                onClick={(e) => { e.stopPropagation(); setExpandedImage(null); }} 
-                className="absolute -top-10 text-white hover:text-gray-300 right-0 p-2 bg-black/50 rounded-full"
-              >
-                  <X size={24} />
-              </button>
-              <img src={expandedImage || undefined} className="w-full h-auto max-h-[85vh] object-contain rounded-2xl shadow-2xl animate-scale-up" alt="Produto" />
-           </div>
+          <div className="relative max-w-2xl w-full max-h-[90vh] flex flex-col items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            {/* Close button */}
+            <button 
+              onClick={() => {
+                setExpandedImage(null);
+                setExpandedImages(null);
+              }} 
+              className="absolute -top-12 text-white hover:text-gray-300 right-0 p-2.5 bg-black/50 hover:bg-black/70 rounded-full transition-colors z-50 shadow-md"
+              title="Fechar"
+            >
+              <X size={24} />
+            </button>
+
+            {/* Content box */}
+            <div className="relative w-full flex items-center justify-center">
+              {/* Image element */}
+              <img 
+                src={expandedImages ? expandedImages[expandedImageIndex] : (expandedImage || undefined)} 
+                className="w-full h-auto max-h-[80vh] object-contain rounded-2xl shadow-2xl animate-scale-up" 
+                alt="Produto" 
+              />
+
+              {/* Navigation arrows for multiple images */}
+              {expandedImages && expandedImages.length > 1 && (
+                <>
+                  <button
+                    onClick={() => setExpandedImageIndex(prev => (prev - 1 + expandedImages.length) % expandedImages.length)}
+                    className="absolute left-4 p-3 bg-black/60 hover:bg-black/80 text-white rounded-full transition-colors shadow-lg z-10 hover:scale-105 active:scale-95"
+                    title="Anterior"
+                  >
+                    <ChevronLeft size={24} />
+                  </button>
+                  <button
+                    onClick={() => setExpandedImageIndex(prev => (prev + 1) % expandedImages.length)}
+                    className="absolute right-4 p-3 bg-black/60 hover:bg-black/80 text-white rounded-full transition-colors shadow-lg z-10 hover:scale-105 active:scale-95"
+                    title="Próxima"
+                  >
+                    <ChevronRight size={24} />
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Slide Indicators/dots for multiple images */}
+            {expandedImages && expandedImages.length > 1 && (
+              <div className="flex gap-2.5 mt-4 bg-black/40 px-3.5 py-1.5 rounded-full backdrop-blur-md">
+                {expandedImages.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setExpandedImageIndex(idx)}
+                    className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${idx === expandedImageIndex ? 'bg-orange-500 scale-125' : 'bg-white/40 hover:bg-white/75'}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
       
