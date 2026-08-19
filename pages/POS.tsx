@@ -3547,15 +3547,25 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                 >
                   <div className="aspect-square rounded-lg overflow-hidden mb-2 bg-gray-50 relative shrink-0">
                     {product.imageUrl && product.imageUrl.trim() !== '' ? (
-                      <img 
-                        src={product.imageUrl} 
-                        alt={product.name} 
-                        className="w-full h-full object-cover transition-transform group-hover:scale-110" 
-                        loading="lazy"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                        }}
-                      />
+                      <>
+                        <img 
+                          src={product.imageUrl} 
+                          alt={product.name} 
+                          className={`w-full h-full object-cover transition-opacity duration-300 absolute inset-0 ${product.imageUrl2 ? 'group-hover:opacity-0' : 'group-hover:scale-110'}`} 
+                          loading="lazy"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                        {product.imageUrl2 && product.imageUrl2.trim() !== '' && (
+                          <img 
+                            src={product.imageUrl2} 
+                            alt={`${product.name} - Secundária`} 
+                            className="w-full h-full object-cover absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" 
+                            loading="lazy"
+                          />
+                        )}
+                      </>
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-200">
                         <Package size={24} />

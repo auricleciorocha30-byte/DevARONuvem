@@ -142,6 +142,7 @@ const SCHEMA_STATEMENTS = [
     price REAL,
     category TEXT,
     imageUrl TEXT,
+    imageUrl2 TEXT,
     isActive INTEGER DEFAULT 1,
     featuredDay INTEGER,
     isByWeight INTEGER DEFAULT 0,
@@ -265,7 +266,7 @@ const TABLE_COLUMNS: { [key: string]: string[] } = {
     'id', 'store_id', 'name'
   ],
   products: [
-    'id', 'store_id', 'name', 'description', 'price', 'category', 'imageUrl',
+    'id', 'store_id', 'name', 'description', 'price', 'category', 'imageUrl', 'imageUrl2',
     'isActive', 'featuredDay', 'isByWeight', 'barcode', 'stock', 'showInMenu',
     'fractions', 'units', 'fractionPrice', 'ncm', 'cfop', 'icms_situacao_tributaria', 'complements',
     'isCombo', 'comboItems', 'costPrice', 'featuredDays'
@@ -409,6 +410,9 @@ async function ensureSchema() {
           }
           if (!productColumns.includes('featuredDays')) {
               try { await client.execute(`ALTER TABLE products ADD COLUMN featuredDays TEXT`); } catch (e) { console.warn(e); }
+          }
+          if (!productColumns.includes('imageUrl2')) {
+              try { await client.execute(`ALTER TABLE products ADD COLUMN imageUrl2 TEXT`); } catch (e) { console.warn(e); }
           }
 
           const cashMovementsTableInfo = await client.execute(`PRAGMA table_info(cash_movements)`);
@@ -594,6 +598,9 @@ class TursoBridge {
             }
             if (!productColumns.includes('featuredDays')) {
                 try { await this.executeSqlCustom(url, token, `ALTER TABLE products ADD COLUMN featuredDays TEXT`); } catch (e) { console.warn(e); }
+            }
+            if (!productColumns.includes('imageUrl2')) {
+                try { await this.executeSqlCustom(url, token, `ALTER TABLE products ADD COLUMN imageUrl2 TEXT`); } catch (e) { console.warn(e); }
             }
 
             const cashMovementsTableInfo = await this.executeSqlCustom(url, token, `PRAGMA table_info(cash_movements)`);

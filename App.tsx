@@ -393,6 +393,7 @@ function StoreContext() {
     costPrice: p.costPrice != null ? Number(p.costPrice) : (p.cost_price != null ? Number(p.cost_price) : 0),
     category: p.category || 'Geral',
     imageUrl: p.imageUrl || p.imageurl || p.image_url || '',
+    imageUrl2: p.imageUrl2 || p.imageurl2 || p.image_url2 || '',
     isActive: p.isActive ?? p.isactive ?? p.is_active ?? true,
     featuredDay: p.featuredDay ?? p.featuredday ?? p.featured_day,
     featuredDays: (() => {

@@ -259,6 +259,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                 category: item.category || existing.category,
                 description: existing.description || 'Importado via NF-e',
                 imageUrl: existing.imageUrl || '',
+                imageUrl2: existing.imageUrl2 || '',
                 isActive: existing.isActive,
                 price: item.salePrice,
                 costPrice: item.costPrice,
@@ -278,6 +279,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
               category: item.category,
               description: 'Importado via NF-e',
               imageUrl: '',
+              imageUrl2: '',
               isActive: true,
               price: item.salePrice,
               costPrice: item.costPrice,
@@ -405,7 +407,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
     return () => observer.disconnect();
   }, [filtered, loadMoreRef.current]);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'imageUrl' | 'imageUrl2' = 'imageUrl') => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
@@ -436,7 +438,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
           ctx?.drawImage(img, 0, 0, width, height);
           
           const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-          setEditingProduct(prev => prev ? {...prev, imageUrl: dataUrl} : prev);
+          setEditingProduct(prev => prev ? {...prev, [field]: dataUrl} : prev);
         };
         img.src = reader.result as string;
       };
@@ -458,6 +460,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
             costPrice: Number(editingProduct.costPrice) || 0,
             category: editingProduct.category || categories[0] || 'Geral',
             imageUrl: editingProduct.imageUrl || 'https://picsum.photos/400/300',
+            imageUrl2: editingProduct.imageUrl2 || '',
             isActive: editingProduct.isActive !== false,
             showInMenu: editingProduct.showInMenu !== false,
             featuredDay: (editingProduct.featuredDay === -1 || editingProduct.featuredDay === undefined) ? undefined : Number(editingProduct.featuredDay),
@@ -748,7 +751,22 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                 )}
             </div>
 
-            <img src={product.imageUrl || undefined} className="w-full h-40 object-cover" alt={product.name} loading="lazy" />
+            <div className="relative w-full h-40 overflow-hidden bg-slate-50">
+              <img 
+                src={product.imageUrl || undefined} 
+                className={`w-full h-full object-cover transition-opacity duration-300 absolute inset-0 ${product.imageUrl2 ? 'group-hover:opacity-0' : ''}`} 
+                alt={product.name} 
+                loading="lazy" 
+              />
+              {product.imageUrl2 && (
+                <img 
+                  src={product.imageUrl2} 
+                  className="absolute inset-0 w-full h-full object-cover opacity-0 group-hover:opacity-100 transition-opacity duration-300" 
+                  alt={`${product.name} - Secundária`} 
+                  loading="lazy" 
+                />
+              )}
+            </div>
             <div className="p-4">
               <div className="flex justify-between items-start">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-orange-600 bg-orange-50 px-2 py-1 rounded">
@@ -952,21 +970,59 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                   </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-                  <div className="flex flex-row sm:flex-col gap-2 w-full sm:w-auto">
-                    <div className="w-24 h-24 bg-gray-100 rounded-xl flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-200 cursor-pointer overflow-hidden relative shrink-0">
-                      {editingProduct?.imageUrl ? ( <img src={editingProduct.imageUrl || undefined} className="w-full h-full object-cover" alt="Preview" /> ) : ( <> <Camera size={24} /> <span className="text-[10px]">Galeria</span> </> )}
-                      <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" onChange={handleImageUpload} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Foto Principal */}
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
+                  <span className="block text-xs font-bold text-slate-500 uppercase">Foto Principal</span>
+                  <div className="flex gap-2">
+                    <div className="w-20 h-20 bg-white rounded-xl flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-200 cursor-pointer overflow-hidden relative shrink-0 shadow-sm">
+                      {editingProduct?.imageUrl ? ( <img src={editingProduct.imageUrl || undefined} className="w-full h-full object-cover" alt="Preview 1" /> ) : ( <> <Camera size={20} /> <span className="text-[9px] font-bold uppercase">Galeria</span> </> )}
+                      <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" onChange={(e) => handleImageUpload(e, 'imageUrl')} />
                     </div>
-                    <div className="h-24 sm:h-8 flex-1 sm:w-24 bg-gray-100 rounded-lg flex flex-col sm:flex-row items-center justify-center text-gray-500 border border-gray-200 cursor-pointer relative hover:bg-gray-200 transition-colors">
-                      <Camera size={14} className="mb-1 sm:mb-0 sm:mr-1" /> <span className="text-[10px] font-bold uppercase text-center">Tirar<br className="hidden sm:block"/>Foto</span>
-                      <input type="file" capture="environment" className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" onChange={handleImageUpload} />
+                    <div className="w-20 h-20 bg-white rounded-xl flex flex-col items-center justify-center text-gray-500 border border-gray-200 cursor-pointer relative hover:bg-gray-50 transition-colors shadow-sm text-center p-1">
+                      <Camera size={18} className="mb-1" /> <span className="text-[9px] font-bold uppercase leading-tight">Tirar<br/>Foto</span>
+                      <input type="file" capture="environment" className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" onChange={(e) => handleImageUpload(e, 'imageUrl')} />
                     </div>
+                    {editingProduct?.imageUrl && (
+                      <button 
+                        type="button" 
+                        onClick={() => setEditingProduct({...editingProduct, imageUrl: ''})} 
+                        className="text-[10px] text-red-500 hover:text-red-700 font-bold self-end"
+                      >
+                        Remover
+                      </button>
+                    )}
                   </div>
-                <div className="flex-1 w-full">
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nome do Produto *</label>
-                    <input required type="text" value={editingProduct?.name || ''} onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})} className="w-full p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500" />
                 </div>
+
+                {/* Foto Secundária */}
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
+                  <span className="block text-xs font-bold text-slate-500 uppercase">Foto Secundária (Opcional)</span>
+                  <div className="flex gap-2">
+                    <div className="w-20 h-20 bg-white rounded-xl flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-200 cursor-pointer overflow-hidden relative shrink-0 shadow-sm">
+                      {editingProduct?.imageUrl2 ? ( <img src={editingProduct.imageUrl2 || undefined} className="w-full h-full object-cover" alt="Preview 2" /> ) : ( <> <Camera size={20} /> <span className="text-[9px] font-bold uppercase">Galeria</span> </> )}
+                      <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" onChange={(e) => handleImageUpload(e, 'imageUrl2')} />
+                    </div>
+                    <div className="w-20 h-20 bg-white rounded-xl flex flex-col items-center justify-center text-gray-500 border border-gray-200 cursor-pointer relative hover:bg-gray-50 transition-colors shadow-sm text-center p-1">
+                      <Camera size={18} className="mb-1" /> <span className="text-[9px] font-bold uppercase leading-tight">Tirar<br/>Foto</span>
+                      <input type="file" capture="environment" className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" onChange={(e) => handleImageUpload(e, 'imageUrl2')} />
+                    </div>
+                    {editingProduct?.imageUrl2 && (
+                      <button 
+                        type="button" 
+                        onClick={() => setEditingProduct({...editingProduct, imageUrl2: ''})} 
+                        className="text-[10px] text-red-500 hover:text-red-700 font-bold self-end"
+                      >
+                        Remover
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nome do Produto *</label>
+                <input required type="text" value={editingProduct?.name || ''} onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})} className="w-full p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 text-sm" />
               </div>
               
               <div>

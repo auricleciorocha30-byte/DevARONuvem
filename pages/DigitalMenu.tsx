@@ -1678,16 +1678,27 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
             >
               <div className="relative shrink-0 flex items-center justify-center w-24 h-24 sm:w-28 sm:h-28 bg-gray-50 rounded-xl overflow-hidden">
                 {product.imageUrl && product.imageUrl.trim() !== '' ? (
-                  <img 
-                    src={product.imageUrl} 
-                    className="w-full h-full object-cover cursor-pointer transition-transform group-hover:scale-105" 
-                    alt={product.name} 
-                    onClick={(e) => { e.stopPropagation(); setExpandedImage(product.imageUrl!); }}
-                    loading="lazy"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
+                  <>
+                    <img 
+                      src={product.imageUrl} 
+                      className={`w-full h-full object-cover cursor-pointer transition-opacity duration-300 absolute inset-0 ${product.imageUrl2 ? 'group-hover:opacity-0' : ''}`} 
+                      alt={product.name} 
+                      onClick={(e) => { e.stopPropagation(); setExpandedImage(product.imageUrl!); }}
+                      loading="lazy"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                    {product.imageUrl2 && product.imageUrl2.trim() !== '' && (
+                      <img 
+                        src={product.imageUrl2} 
+                        className="w-full h-full object-cover cursor-pointer absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" 
+                        alt={`${product.name} - Secundária`} 
+                        onClick={(e) => { e.stopPropagation(); setExpandedImage(product.imageUrl2!); }}
+                        loading="lazy"
+                      />
+                    )}
+                  </>
                 ) : (
                   <Package size={24} className="text-gray-300" />
                 )}

@@ -64,6 +64,7 @@ export interface Product {
   price: number;
   category: string;
   imageUrl: string;
+  imageUrl2?: string;
   isActive: boolean;
   showInMenu?: boolean;
   featuredDay?: number;
