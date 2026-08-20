@@ -472,6 +472,12 @@ function StoreContext() {
     if (document.hidden) return; 
     if (!navigator.onLine) return;
 
+    // Se a automação de funcionamento estiver ativa e a loja estiver fechada, desativa o sincronismo periódico
+    if (settings?.shiftAutomation && !settings?.isStoreOpen) {
+      console.log("Sincronismo periódico suspenso: Estabelecimento fora do horário de funcionamento.");
+      return;
+    }
+
     setIsSyncing(true);
     const syncStartTime = Date.now();
     try {
@@ -528,7 +534,7 @@ function StoreContext() {
       setLastSyncTime(syncStartTime);
     } catch (err) { console.warn('Erro Sync', err); }
     finally { setIsSyncing(false); }
-  }, [currentStore, mapOrderFromDb]);
+  }, [currentStore, mapOrderFromDb, settings?.shiftAutomation, settings?.isStoreOpen]);
 
   useEffect(() => {
     if (!currentStore) return;
