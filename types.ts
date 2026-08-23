@@ -213,6 +213,7 @@ export interface StoreSettings {
   thermalPrinterWidth: '80mm' | '58mm';
   printWidthPx?: number;
   address?: string;
+  cep?: string;
   whatsapp?: string;
   couponName?: string;
   couponDiscount?: number;

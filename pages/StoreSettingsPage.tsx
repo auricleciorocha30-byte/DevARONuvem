@@ -83,6 +83,26 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
     setLocalSettings(settings);
   }, [settings]);
 
+  const handleCepLookup = async (cepValue: string) => {
+    const clean = cepValue.replace(/\D/g, '');
+    if (clean.length === 8) {
+      try {
+        const res = await fetch(`https://viacep.com.br/ws/${clean}/json/`);
+        const data = await res.json();
+        if (!data.erro) {
+          const fullAddr = `${data.logradouro || ''}, ${data.bairro || ''} - ${data.localidade || ''}/${data.uf || ''} (CEP: ${data.cep})`;
+          setLocalSettings(prev => ({
+            ...prev,
+            cep: data.cep,
+            address: prev.address ? prev.address : fullAddr
+          }));
+        }
+      } catch (e) {
+        console.warn("Erro ao buscar CEP:", e);
+      }
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -270,6 +290,24 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                 <div className="relative">
                   <Store className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
                   <input type="text" placeholder="00.000.000/0000-00" value={localSettings.cnpj || ''} onChange={(e) => setLocalSettings({...localSettings, cnpj: e.target.value})} className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none" />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase ml-2">CEP (Busca Automática)</label>
+                <div className="relative">
+                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                  <input 
+                    type="text" 
+                    placeholder="00000-000" 
+                    maxLength={9}
+                    value={localSettings.cep || ''} 
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setLocalSettings({...localSettings, cep: val});
+                      handleCepLookup(val);
+                    }} 
+                    className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none" 
+                  />
                 </div>
               </div>
               <div className="space-y-1">
