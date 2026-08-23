@@ -69,6 +69,7 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
   const [isImporting, setIsImporting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [productSearch, setProductSearch] = useState('');
+  const [cashbackProductSearch, setCashbackProductSearch] = useState('');
 
   const allPaymentMethods = [
     { id: 'PIX', label: 'PIX' },
@@ -242,7 +243,17 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
     }
   };
 
+  const toggleCashbackProductSelection = (productId: string) => {
+    const current = localSettings.cashbackProductIds || [];
+    if (current.includes(productId)) {
+        setLocalSettings({...localSettings, cashbackProductIds: current.filter(id => id !== productId)});
+    } else {
+        setLocalSettings({...localSettings, cashbackProductIds: [...current, productId]});
+    }
+  };
+
   const filteredProducts = products.filter(p => p.name.toLowerCase().includes(productSearch.toLowerCase()));
+  const filteredCashbackProducts = products.filter(p => p.name.toLowerCase().includes(cashbackProductSearch.toLowerCase()));
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-12 text-zinc-900">
@@ -660,6 +671,95 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                       className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 outline-none text-sm font-bold" 
                     />
                   </div>
+                  
+                  <div className="p-3 bg-gray-50 rounded-xl space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Aplicar Cashback em:</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setLocalSettings({...localSettings, cashbackScope: 'all'})}
+                        className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all ${
+                          (localSettings.cashbackScope || 'all') === 'all'
+                            ? 'bg-emerald-50 border-emerald-500 text-emerald-700'
+                            : 'bg-white border-gray-100 text-gray-600 hover:border-gray-200'
+                        }`}
+                      >
+                        Loja Toda
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setLocalSettings({...localSettings, cashbackScope: 'selected'})}
+                        className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all ${
+                          localSettings.cashbackScope === 'selected'
+                            ? 'bg-emerald-50 border-emerald-500 text-emerald-700'
+                            : 'bg-white border-gray-100 text-gray-600 hover:border-gray-200'
+                        }`}
+                      >
+                        Produtos Selecionados
+                      </button>
+                    </div>
+                  </div>
+
+                  {localSettings.cashbackScope === 'selected' && (
+                    <div className="space-y-3 animate-scale-up border-l-2 border-emerald-500 pl-3">
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                          <input 
+                            type="text" 
+                            placeholder="Buscar produtos para cashback..." 
+                            value={cashbackProductSearch}
+                            onChange={(e) => setCashbackProductSearch(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 bg-white rounded-xl border border-gray-100 outline-none text-xs" 
+                          />
+                        </div>
+                        {localSettings.cashbackProductIds && localSettings.cashbackProductIds.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setLocalSettings({...localSettings, cashbackProductIds: []})}
+                            className="flex items-center gap-1 px-3 bg-red-50 text-red-600 rounded-xl border border-red-100 hover:bg-red-100 transition-colors font-bold text-[10px]"
+                            title="Remover todos selecionados"
+                          >
+                            <X size={14} /> Limpar
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto custom-scrollbar pr-1 bg-white p-2 rounded-xl border border-gray-100">
+                        {filteredCashbackProducts.length === 0 ? (
+                          <p className="text-center text-xs text-gray-400 py-4">Nenhum produto encontrado</p>
+                        ) : (
+                          filteredCashbackProducts.map(product => {
+                            const isSelected = localSettings.cashbackProductIds?.includes(product.id);
+                            return (
+                              <div 
+                                key={product.id}
+                                onClick={() => toggleCashbackProductSelection(product.id)}
+                                className={`flex items-center justify-between gap-3 p-2 rounded-lg border cursor-pointer transition-all ${
+                                  isSelected ? 'border-emerald-500 bg-emerald-50/50' : 'border-gray-50 bg-white hover:border-gray-200'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                  <div className="relative shrink-0">
+                                    <img src={product.imageUrl || undefined} className="w-8 h-8 rounded object-cover" />
+                                    {isSelected && (
+                                      <div className="absolute -top-1 -right-1 bg-emerald-500 text-white p-0.5 rounded-full shadow-sm">
+                                        <Check size={8} />
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-xs font-bold text-gray-800 truncate">{product.name}</p>
+                                    <p className="text-[10px] text-gray-400">R$ {product.price.toFixed(2)}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

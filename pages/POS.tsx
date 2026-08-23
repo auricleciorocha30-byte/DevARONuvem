@@ -2422,7 +2422,20 @@ export default function POS({ storeId, user, settings, orders, products: propPro
         if (settings.isCashbackActive && selectedCustomer && selectedCustomer.isLoyaltyParticipant !== false && order.total && !originalOrderHadCustomer) {
             const cashbackUsed = payments.find(p => p.method === 'CASHBACK')?.amount || 0;
             const cashbackPercentage = Number(settings.cashbackPercentage) || 0;
-            const cashbackEarned = Number(order.total) * (cashbackPercentage / 100);
+            
+            let cashbackEligibleTotal = Number(order.total);
+            if (settings.cashbackScope === 'selected') {
+              const eligibleProductIds = settings.cashbackProductIds || [];
+              const eligibleItemsTotal = cart.reduce((sum, item) => {
+                const targetId = item.originalProductId || item.productId;
+                if (eligibleProductIds.includes(targetId)) {
+                  return sum + (Number(item.price || 0) * Number(item.quantity || 0));
+                }
+                return sum;
+              }, 0);
+              cashbackEligibleTotal = Math.min(Number(order.total), eligibleItemsTotal);
+            }
+            const cashbackEarned = cashbackEligibleTotal * (cashbackPercentage / 100);
             
             if (cashbackEarned > 0 || cashbackUsed > 0) {
                 try {
@@ -3025,12 +3038,29 @@ export default function POS({ storeId, user, settings, orders, products: propPro
         })()}
         ${order.changeFor ? `<p style="margin: 1px 0; color: black !important;">Pago em Dinheiro: ${formatCurrency(order.changeFor)}</p><p style="margin: 1px 0; color: black !important;">Troco: ${formatCurrency(order.changeFor - order.total)}</p>` : ''}
         <div style="border-top: 2px dashed black; margin: 10px 0;"></div>
-        ${settings.isCashbackActive && order.customerId && ((Number(order.total) || 0) * (Number(settings.cashbackPercentage || 0) / 100)) > 0 ? `
-        <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 14px; margin: 5px 0; color: black !important;">
-          <span>CASHBACK GANHO:</span>
-          <span>${formatCurrency((Number(order.total) || 0) * (Number(settings.cashbackPercentage || 0) / 100))}</span>
-        </div>
-        ` : ''}
+        ${(() => {
+          if (!settings.isCashbackActive || !order.customerId) return '';
+          let cashbackEligibleTotal = Number(order.total);
+          if (settings.cashbackScope === 'selected') {
+            const eligibleProductIds = settings.cashbackProductIds || [];
+            const eligibleItemsTotal = (order.items || []).reduce((sum: number, item: any) => {
+              const targetId = item.originalProductId || item.productId;
+              if (eligibleProductIds.includes(targetId)) {
+                return sum + (Number(item.price || 0) * Number(item.quantity || 0));
+              }
+              return sum;
+            }, 0);
+            cashbackEligibleTotal = Math.min(Number(order.total), eligibleItemsTotal);
+          }
+          const cashbackEarned = cashbackEligibleTotal * ((Number(settings.cashbackPercentage) || 0) / 100);
+          if (cashbackEarned <= 0) return '';
+          return `
+          <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 14px; margin: 5px 0; color: black !important;">
+            <span>CASHBACK GANHO:</span>
+            <span>${formatCurrency(cashbackEarned)}</span>
+          </div>
+          `;
+        })()}
         <p style="text-align: center; margin: 0; font-weight: 900; color: black !important;">OBRIGADO PELA PREFERENCIA!</p>
         <p style="text-align: center; margin: 0; font-weight: 900; font-size: 8px; color: black !important; margin-top: 5px;">SISTEMA DevARO</p>
         <br /><br />

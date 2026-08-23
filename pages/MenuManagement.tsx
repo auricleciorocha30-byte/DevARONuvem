@@ -80,6 +80,8 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
   const [selectedComboProductId, setSelectedComboProductId] = useState('');
   const [selectedComboQtyCount, setSelectedComboQtyCount] = useState(1);
+  const [comboProductSearch, setComboProductSearch] = useState('');
+  const [comboIncludedSearch, setComboIncludedSearch] = useState('');
 
   const addComboItem = () => {
     if (!selectedComboProductId) return;
@@ -1081,19 +1083,31 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
                     <div className="sm:col-span-7">
                       <label className="block text-[10px] font-bold uppercase text-gray-500 mb-1">Selecionar Produto</label>
-                      <select 
-                        value={selectedComboProductId} 
-                        onChange={(e) => setSelectedComboProductId(e.target.value)}
-                        className="w-full p-2 border border-gray-200 rounded-lg bg-white outline-none text-xs"
-                      >
-                        <option value="">Selecione um produto...</option>
-                        {products
-                          .filter(p => !p.isCombo && p.id !== editingProduct?.id)
-                          .map(p => (
-                            <option key={p.id} value={p.id}>{p.name} - R$ {p.price.toFixed(2)}</option>
-                          ))
-                        }
-                      </select>
+                      <div className="space-y-1">
+                        <div className="relative">
+                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={12} />
+                          <input 
+                            type="text" 
+                            placeholder="Buscar produto para incluir..." 
+                            value={comboProductSearch}
+                            onChange={(e) => setComboProductSearch(e.target.value)}
+                            className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg outline-none text-xs bg-white" 
+                          />
+                        </div>
+                        <select 
+                          value={selectedComboProductId} 
+                          onChange={(e) => setSelectedComboProductId(e.target.value)}
+                          className="w-full p-2 border border-gray-200 rounded-lg bg-white outline-none text-xs"
+                        >
+                          <option value="">Selecione um produto...</option>
+                          {products
+                            .filter(p => !p.isCombo && p.id !== editingProduct?.id && (!comboProductSearch || p.name.toLowerCase().includes(comboProductSearch.toLowerCase())))
+                            .map(p => (
+                              <option key={p.id} value={p.id}>{p.name} - R$ {p.price.toFixed(2)}</option>
+                            ))
+                          }
+                        </select>
+                      </div>
                     </div>
 
                     <div className="sm:col-span-3">
@@ -1103,16 +1117,19 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                         min="1" 
                         value={selectedComboQtyCount} 
                         onChange={(e) => setSelectedComboQtyCount(Math.max(1, parseInt(e.target.value) || 1))}
-                        className="w-full p-2 border border-gray-200 rounded-lg outline-none text-xs" 
+                        className="w-full p-2 border border-gray-200 rounded-lg outline-none text-xs bg-white" 
                       />
                     </div>
 
                     <div className="sm:col-span-2">
                       <button 
                         type="button" 
-                        onClick={addComboItem}
+                        onClick={() => {
+                          addComboItem();
+                          setComboProductSearch(''); // Clear search on addition
+                        }}
                         disabled={!selectedComboProductId}
-                        className="w-full p-2 bg-amber-600 text-white font-bold rounded-lg hover:bg-amber-700 transition-colors flex items-center justify-center text-xs disabled:opacity-50"
+                        className="w-full p-2 bg-amber-600 text-white font-bold rounded-lg hover:bg-amber-700 transition-colors flex items-center justify-center text-xs disabled:opacity-50 h-[34px]"
                       >
                         Incluir
                       </button>
@@ -1123,22 +1140,40 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                   {(!editingProduct.comboItems || editingProduct.comboItems.length === 0) ? (
                     <p className="text-xs text-center text-gray-400 py-2">Nenhum produto incluído neste combo ainda.</p>
                   ) : (
-                    <div className="space-y-1.5 max-h-[160px] overflow-y-auto">
-                      {editingProduct.comboItems.map((item) => (
-                        <div key={item.productId} className="flex items-center justify-between bg-white px-3 py-2 rounded-xl border border-amber-100 text-xs shadow-sm">
-                          <div>
-                            <span className="font-semibold text-gray-700">{item.name}</span>
-                            <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded">x{item.quantity}</span>
-                          </div>
-                          <button 
-                            type="button" 
-                            onClick={() => removeComboItem(item.productId)}
-                            className="text-red-500 hover:text-red-700 p-1 rounded transition-colors"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2 bg-amber-100/50 p-2 rounded-xl border border-amber-200">
+                        <span className="text-[10px] font-bold text-amber-800 uppercase">Itens no Combo</span>
+                        <div className="relative w-48">
+                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-amber-600" size={12} />
+                          <input 
+                            type="text" 
+                            placeholder="Buscar itens inclusos..." 
+                            value={comboIncludedSearch}
+                            onChange={(e) => setComboIncludedSearch(e.target.value)}
+                            className="w-full pl-8 pr-2 py-1 bg-white border border-amber-200 rounded-lg outline-none text-[10px] text-amber-900" 
+                          />
                         </div>
-                      ))}
+                      </div>
+
+                      <div className="space-y-1.5 max-h-[160px] overflow-y-auto custom-scrollbar">
+                        {editingProduct.comboItems
+                          .filter(item => !comboIncludedSearch || (item.name || '').toLowerCase().includes(comboIncludedSearch.toLowerCase()))
+                          .map((item) => (
+                            <div key={item.productId} className="flex items-center justify-between bg-white px-3 py-2 rounded-xl border border-amber-100 text-xs shadow-sm">
+                              <div>
+                                <span className="font-semibold text-gray-700">{item.name}</span>
+                                <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded">x{item.quantity}</span>
+                              </div>
+                              <button 
+                                type="button" 
+                                onClick={() => removeComboItem(item.productId)}
+                                className="text-red-500 hover:text-red-700 p-1 rounded transition-colors"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          ))}
+                      </div>
                     </div>
                   )}
                 </div>

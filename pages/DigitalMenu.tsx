@@ -1193,7 +1193,20 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
             // For DELIVERY/PICKUP, we handle it here to ensure the customer receives their points.
             if (!isTableOrCommand) {
                 const cashbackPercentage = Number(settings.cashbackPercentage) || 0;
-                const cashbackEarned = Number(finalTotal) * (cashbackPercentage / 100);
+                
+                let cashbackEligibleTotal = Number(finalTotal);
+                if (settings.cashbackScope === 'selected') {
+                    const eligibleProductIds = settings.cashbackProductIds || [];
+                    const eligibleItemsTotal = cart.reduce((sum, item) => {
+                        const targetId = item.originalProductId || item.productId;
+                        if (eligibleProductIds.includes(targetId)) {
+                            return sum + (Number(item.price || 0) * Number(item.quantity || 0));
+                        }
+                        return sum;
+                    }, 0);
+                    cashbackEligibleTotal = Math.min(Number(finalTotal), eligibleItemsTotal);
+                }
+                const cashbackEarned = cashbackEligibleTotal * (cashbackPercentage / 100);
 
                 if (amountToUse > 0 || cashbackEarned > 0) {
                     // Fetch latest points to avoid race conditions

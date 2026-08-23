@@ -220,6 +220,8 @@ export interface StoreSettings {
   isCouponActive?: boolean;
   isCouponForAllProducts?: boolean;
   applicableProductIds?: string[];
+  cashbackScope?: 'all' | 'selected';
+  cashbackProductIds?: string[];
   productSpecificDiscounts?: Record<string, number>;
   lastUpdate?: number;
   pixQrCodeUrl?: string;
