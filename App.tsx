@@ -23,7 +23,8 @@ import {
   MessageCircle,
   AlertTriangle,
   Truck,
-  CheckCircle2
+  CheckCircle2,
+  Tag
 } from 'lucide-react';
 import { supabase } from './lib/supabase.ts';
 import { Product, Order, StoreSettings, Waitstaff, OrderStatus, StoreProfile } from './types.ts';
@@ -45,6 +46,7 @@ const DeliveryPanel = React.lazy(() => import('./pages/DeliveryPanel.tsx'));
 const KitchenBoard = React.lazy(() => import('./pages/KitchenBoard.tsx'));
 const SuperAdminPanel = React.lazy(() => import('./pages/SuperAdminPanel.tsx'));
 const IntegrationsPage = React.lazy(() => import('./pages/IntegrationsPage.tsx'));
+const LabelGenerator = React.lazy(() => import('./pages/LabelGenerator.tsx').then(module => ({ default: module.LabelGenerator })));
 
 const SOUNDS = {
   NEW_ORDER: 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3',
@@ -1200,6 +1202,7 @@ function StoreContext() {
         <Route path="clientes" element={<CustomerManagement storeId={currentStore?.id} />} />
         <Route path="integracoes" element={<IntegrationsPage settings={settings} onSave={handleUpdateSettings} storeId={currentStore?.id} />} />
         <Route path="configuracoes" element={<StoreSettingsPage settings={settings} products={products} onSave={handleUpdateSettings} storeId={currentStore?.id} />} />
+        <Route path="etiquetas" element={<LabelGenerator products={products} orders={orders} settings={settings} />} />
       </Route>
 
       <Route path="*" element={<Navigate to={storeSlug ? `/cardapio${lojaParam}` : "/"} />} />
@@ -1220,6 +1223,7 @@ function AdminLayout({ settings, onLogout }: { settings: StoreSettings, onLogout
     { to: `/cardapio-admin${lojaParam}`, label: 'Menu', icon: <PlusCircle size={20} /> },
     { to: `/equipe${lojaParam}`, label: 'Time', icon: <Users size={20} /> },
     { to: `/clientes${lojaParam}`, label: 'Clientes', icon: <UserRound size={20} /> },
+    { to: `/etiquetas${lojaParam}`, label: 'Etiquetas', icon: <Tag size={20} /> },
     { to: `/integracoes${lojaParam}`, label: 'Integrações', icon: <Zap size={20} /> },
     { to: `/configuracoes${lojaParam}`, label: 'Ajustes', icon: <Settings size={20} /> },
   ];
