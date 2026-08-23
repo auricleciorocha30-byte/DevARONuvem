@@ -1646,7 +1646,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                     </div>
                     <div className="flex-1 min-w-0 flex flex-col justify-between py-1 px-1">
                        <div className="min-w-0">
-                          {settings?.isCashbackActive && <div className="mb-2"><span className="bg-green-100 text-green-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center w-fit gap-1"><DollarSign size={10}/> Cashback Ativo</span></div>}
+                          {settings?.isCashbackActive && (!settings.cashbackScope || settings.cashbackScope === 'all' || (settings.cashbackScope === 'selected' && settings.cashbackProductIds?.includes(featuredProduct.id))) && <div className="mb-2"><span className="bg-green-100 text-green-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center w-fit gap-1"><DollarSign size={10}/> Cashback Ativo</span></div>}
                           <h3 className="text-base sm:text-lg font-bold text-slate-800 leading-tight mb-1">{featuredProduct.name}</h3>
                           <p className="text-[11px] text-slate-500 line-clamp-2 leading-snug">{featuredProduct.description}</p>
                        </div>
@@ -1736,7 +1736,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
               </div>
               <div className="flex-1 min-w-0 flex flex-col justify-between h-full py-1">
                 <div className="min-w-0">
-                  {settings?.isCashbackActive && <div className="mb-1.5"><span className="bg-green-100 text-green-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center w-fit gap-1"><DollarSign size={10}/> Cashback Ativo</span></div>}
+                  {settings?.isCashbackActive && (!settings.cashbackScope || settings.cashbackScope === 'all' || (settings.cashbackScope === 'selected' && settings.cashbackProductIds?.includes(product.id))) && <div className="mb-1.5"><span className="bg-green-100 text-green-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center w-fit gap-1"><DollarSign size={10}/> Cashback Ativo</span></div>}
                   <h3 className="font-bold text-sm md:text-base leading-tight text-slate-800 mb-1">{product.name}</h3>
                   <p className="text-[11px] text-slate-500 whitespace-normal line-clamp-2 leading-relaxed">{product.description}</p>
                   {product.isCombo && getComboItems(product.comboItems).length > 0 && (
