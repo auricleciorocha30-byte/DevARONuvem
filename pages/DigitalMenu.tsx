@@ -2273,14 +2273,14 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                         <h3 className="text-3xl font-brand font-bold text-primary">
                           {verifiedPaymentStatus === 'success' ? 'Pagamento Aprovado!' : 
                            verifiedPaymentStatus === 'failure' ? 'Pagamento Recusado' : 
-                           verifiedPaymentStatus === 'pending' ? 'Pagamento Pendente' : 
+                           verifiedPaymentStatus === 'pending' ? 'Aguardando Pagamento' : 
                            'Pedido Enviado!'}
                         </h3>
                         <p className="text-gray-500 mt-2 font-medium">
                           {verifiedPaymentStatus === 'success' ? 'Recebemos seu pagamento e já estamos preparando seu pedido.' : 
                            verifiedPaymentStatus === 'failure' ? 'Houve um problema com seu pagamento. Por favor, pague no balcão ou na entrega.' :
                            verifiedPaymentStatus === 'pending' ? 'Estamos aguardando a confirmação do pagamento.' :
-                           'Já estamos preparando seu pedido.'}
+                           'Já recebemos seu pedido e estamos preparando tudo para você.'}
                         </p>
                      </div>
                      <div className="bg-gray-50 p-6 rounded-3xl border border-gray-100 text-left space-y-2">
@@ -2310,13 +2310,37 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                         </div>
                      )}
                      
-                     {(orderType === 'ENTREGA' || orderType === 'BALCAO') && customerPhone && (
-                       <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100 text-left space-y-2">
-                         <div className="flex items-center gap-2 text-blue-600 mb-1">
-                           <Search size={16} />
-                           <span className="text-sm font-bold">Acompanhe seu pedido</span>
+                     {(orderType === 'ENTREGA' || orderType === 'BALCAO') && (
+                       <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100 text-left space-y-4">
+                         <div className="flex items-center gap-2 text-blue-600">
+                           <Search size={20} />
+                           <span className="text-base font-bold">Acompanhe seu pedido</span>
                          </div>
-                         <p className="text-xs text-blue-800 leading-snug">Você pode consultar o status do seu pedido a qualquer momento clicando no ícone de lupa <Search size={12} className="inline" /> no topo da tela e informando seu telefone <strong>{customerPhone}</strong>.</p>
+                         <p className="text-sm text-blue-800 leading-snug">
+                           Você pode consultar o status {orderType === 'ENTREGA' ? 'da sua entrega' : 'da sua retirada'} a qualquer momento clicando no ícone de lupa <Search size={14} className="inline mx-1" /> no topo da tela{customerPhone ? ` e informando seu telefone ` : '.'}{customerPhone && <strong>{customerPhone}</strong>}
+                         </p>
+                         
+                         <div className="bg-white/60 p-4 rounded-xl border border-blue-100/50 mt-2">
+                           <div className="flex items-center gap-2 text-blue-900 mb-1">
+                             <Wallet size={16} />
+                             <span className="font-bold text-sm">Status do Pagamento</span>
+                           </div>
+                           <p className="text-sm text-blue-800">
+                             {orderType === 'BALCAO' ? (
+                               verifiedPaymentStatus === 'success' || (payment === 'CASHBACK' && customerPoints >= finalTotal) ? 
+                               'Pagamento já realizado. Quando estiver pronto, é somente retirar no local!' : 
+                               verifiedPaymentStatus === 'pending' ?
+                               'Aguardando o pagamento online. Realize o pagamento pelo código Pix acima para liberar seu pedido.' :
+                               'Pagamento pendente. Por favor, realize o pagamento no local da retirada.'
+                             ) : (
+                               verifiedPaymentStatus === 'success' || (payment === 'CASHBACK' && customerPoints >= finalTotal) ? 
+                               'Pagamento já realizado online. Agora é só aguardar e receber seu pedido!' : 
+                               verifiedPaymentStatus === 'pending' ?
+                               'Aguardando o pagamento online. Realize o pagamento pelo código Pix acima para liberar sua entrega.' :
+                               'Pagamento pendente. Por favor, faça o pagamento no momento da entrega.'
+                             )}
+                           </p>
+                         </div>
                        </div>
                      )}
                      
