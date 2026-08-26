@@ -2330,13 +2330,13 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                verifiedPaymentStatus === 'success' || (payment === 'CASHBACK' && customerPoints >= finalTotal) ? 
                                'Pagamento já realizado. Quando estiver pronto, é somente retirar no local!' : 
                                verifiedPaymentStatus === 'pending' ?
-                               'Aguardando o pagamento online. Realize o pagamento pelo código Pix acima para liberar seu pedido.' :
+                               'Aguardando o pagamento online. Realize o pagamento selecionado no estabelecimento.' :
                                'Pagamento pendente. Por favor, realize o pagamento no local da retirada.'
                              ) : (
                                verifiedPaymentStatus === 'success' || (payment === 'CASHBACK' && customerPoints >= finalTotal) ? 
                                'Pagamento já realizado online. Agora é só aguardar e receber seu pedido!' : 
                                verifiedPaymentStatus === 'pending' ?
-                               'Aguardando o pagamento online. Realize o pagamento pelo código Pix acima para liberar sua entrega.' :
+                               'Aguardando o pagamento online. Realize o pagamento selecionado quando sua entrega chegar.' :
                                'Pagamento pendente. Por favor, faça o pagamento no momento da entrega.'
                              )}
                            </p>
