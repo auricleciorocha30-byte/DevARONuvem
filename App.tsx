@@ -172,6 +172,7 @@ function StoreContext() {
   }, [adminUser, currentStore, location.pathname]);
 
   const playAudio = (url: string) => {
+    if (location.pathname.startsWith('/cardapio') || location.pathname.startsWith('/pagamento-ok')) return;
     const audio = new Audio(url);
     audio.crossOrigin = "anonymous";
     audio.play().catch(e => console.warn('Som bloqueado:', e));
