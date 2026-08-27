@@ -194,11 +194,19 @@ export default function POS({ storeId, user, settings, orders, products: propPro
   }, [products]);
 
   const filteredProducts = useMemo(() => {
-    return products.filter(p => {
+    const filtered = products.filter(p => {
       const matchesSearch = (p.name || '').toLowerCase().includes(search.toLowerCase()) || 
                             (p.barcode || '').includes(search);
       const matchesCategory = selectedCategory === 'Todos' || p.category === selectedCategory;
       return matchesSearch && matchesCategory && p.isActive;
+    });
+
+    return filtered.sort((a, b) => {
+      const aOutOfStock = a.stock != null && a.stock <= 0;
+      const bOutOfStock = b.stock != null && b.stock <= 0;
+      if (aOutOfStock && !bOutOfStock) return -1;
+      if (!aOutOfStock && bOutOfStock) return 1;
+      return 0;
     });
   }, [products, search, selectedCategory]);
 
@@ -4572,7 +4580,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
             <div className="p-6 border-t bg-gray-50 flex gap-2">
               <button 
                 onClick={handleCheckout}
-                disabled={isProcessing || remaining > 0.01}
+                disabled={isProcessing || (remaining > 0.01 && !(orderType === 'ENTREGA' && deliveryDetails.payOnDelivery))}
                 className="flex-1 py-4 bg-green-600 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-green-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isProcessing ? <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div> : <CheckCircle2 size={24} />}
