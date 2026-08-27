@@ -44,8 +44,9 @@ import {
   CheckCircle2,
   Percent,
   Package,
-  Calendar
-, Share2 } from 'lucide-react';
+  Calendar,
+  Share2
+} from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Product, StoreSettings, Order, OrderItem, OrderType, PaymentMethod, Waitstaff, CartComplementItem, ComplementCategory } from '../types';
 import InstallPrompt from '../components/InstallPrompt';
@@ -435,6 +436,27 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
     setIsCartOpen(false);
   };
 
+  const handleShare = async () => {
+    const shareData = {
+      title: settings.storeName || 'Cardápio Digital',
+      text: `Confira o nosso cardápio digital para fazer seu pedido de ${orderType === 'BALCAO' ? 'retirada' : 'entrega'}!`,
+      url: window.location.href,
+    };
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        alert('Link do cardápio copiado para a área de transferência!');
+      }
+    } catch (err) {
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        alert('Link do cardápio copiado para a área de transferência!');
+      } catch (e) {}
+    }
+  };
+
   const [manualTable, setManualTable] = useState(effectiveTable || '');
   const [payment, setPayment] = useState<PaymentMethod | 'CASHBACK' | ''>('');
   const [combinedPayment, setCombinedPayment] = useState<PaymentMethod | ''>('');
@@ -733,14 +755,22 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   
   const featuredProducts = useMemo(() => {
     const today = new Date().getDay();
-    return products.filter(p => {
+    const list = products.filter(p => {
       const isFeatured = p.featuredDays?.includes(today) || p.featuredDay === today;
       return isFeatured && p.isActive && p.showInMenu !== false;
+    });
+    // Sort out of stock to the top
+    return [...list].sort((a, b) => {
+      const aNoStock = a.stock != null && a.stock <= 0;
+      const bNoStock = b.stock != null && b.stock <= 0;
+      if (aNoStock && !bNoStock) return -1;
+      if (!aNoStock && bNoStock) return 1;
+      return 0;
     });
   }, [products]);
 
   const filteredProducts = useMemo(() => {
-    const filtered = products.filter(p => {
+    const list = products.filter(p => {
       if (p.showInMenu === false) return false;
       const matchesCategory = activeCategory === 'Todos' || p.category === activeCategory;
       const matchesSearch = (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -748,12 +778,12 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                            (p.barcode && String(p.barcode).includes(searchTerm));
       return matchesCategory && matchesSearch;
     });
-
-    return filtered.sort((a, b) => {
-      const aOutOfStock = a.stock != null && a.stock <= 0;
-      const bOutOfStock = b.stock != null && b.stock <= 0;
-      if (aOutOfStock && !bOutOfStock) return -1;
-      if (!aOutOfStock && bOutOfStock) return 1;
+    // Sort out of stock to the top
+    return [...list].sort((a, b) => {
+      const aNoStock = a.stock != null && a.stock <= 0;
+      const bNoStock = b.stock != null && b.stock <= 0;
+      if (aNoStock && !bNoStock) return -1;
+      if (!aNoStock && bNoStock) return 1;
       return 0;
     });
   }, [products, activeCategory, searchTerm]);
@@ -1585,23 +1615,15 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
           </div>
           <div className="flex items-center gap-2">
             <InstallPrompt />
-            <button 
-              onClick={() => {
-                if (navigator.share) {
-                  navigator.share({
-                    title: settings.storeName,
-                    url: window.location.href
-                  }).catch(console.error);
-                } else {
-                  navigator.clipboard.writeText(window.location.href);
-                  alert('Link copiado!');
-                }
-              }} 
-              className={`p-2.5 rounded-full shrink-0 active:scale-95 transition-transform ${isWaitstaff ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-              title="Compartilhar Cardápio"
-            >
-              <Share2 size={20} />
-            </button>
+            {(orderType === 'BALCAO' || orderType === 'ENTREGA') && (
+              <button 
+                onClick={handleShare} 
+                className={`p-2.5 rounded-full shrink-0 active:scale-95 transition-transform ${isWaitstaff ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                title="Compartilhar Cardápio"
+              >
+                <Share2 size={20} />
+              </button>
+            )}
             <button onClick={() => setIsTrackingModalOpen(true)} className={`p-2.5 rounded-full shrink-0 active:scale-95 transition-transform ${isWaitstaff ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}><Search size={20} /></button>
             <button onClick={() => setIsInfoOpen(true)} className={`p-2.5 rounded-full shrink-0 active:scale-95 transition-transform ${isWaitstaff ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}><Info size={20} /></button>
             <button onClick={() => { setIsCartOpen(true); setCheckoutStep('cart'); }} className={`relative p-2.5 rounded-full shrink-0 active:scale-95 transition-transform ${isWaitstaff ? 'bg-white/10 text-white' : 'bg-primary text-white hover:bg-primary/90 shadow-md'}`}>

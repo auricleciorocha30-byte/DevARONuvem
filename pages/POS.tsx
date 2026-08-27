@@ -134,7 +134,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
       payOnDelivery: false,
       useStoreOrigin: true,
       originAddress: '',
-      requiresReturn: false
+      hasReturn: false
     };
   });
   
@@ -194,18 +194,19 @@ export default function POS({ storeId, user, settings, orders, products: propPro
   }, [products]);
 
   const filteredProducts = useMemo(() => {
-    const filtered = products.filter(p => {
+    const list = products.filter(p => {
       const matchesSearch = (p.name || '').toLowerCase().includes(search.toLowerCase()) || 
                             (p.barcode || '').includes(search);
       const matchesCategory = selectedCategory === 'Todos' || p.category === selectedCategory;
       return matchesSearch && matchesCategory && p.isActive;
     });
 
-    return filtered.sort((a, b) => {
-      const aOutOfStock = a.stock != null && a.stock <= 0;
-      const bOutOfStock = b.stock != null && b.stock <= 0;
-      if (aOutOfStock && !bOutOfStock) return -1;
-      if (!aOutOfStock && bOutOfStock) return 1;
+    // Sort: OUT OF STOCK first (at the top)
+    return [...list].sort((a, b) => {
+      const aNoStock = a.stock != null && a.stock <= 0;
+      const bNoStock = b.stock != null && b.stock <= 0;
+      if (aNoStock && !bNoStock) return -1;
+      if (!aNoStock && bNoStock) return 1;
       return 0;
     });
   }, [products, search, selectedCategory]);
@@ -981,8 +982,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                         driverId: order.deliveryDriverId || '',
                         payOnDelivery: false,
                         useStoreOrigin: true,
-                        originAddress: '',
-      requiresReturn: false
+                        originAddress: ''
                     });
                 }
                 setOrderType(type);
@@ -1958,7 +1958,8 @@ export default function POS({ storeId, user, settings, orders, products: propPro
             deliveryDriverId: currentType === 'ENTREGA' && deliveryDetails.driverId ? deliveryDetails.driverId : undefined,
             customerId: selectedCustomer?.id,
             deliveryFee: currentType === 'ENTREGA' ? deliveryFee : undefined,
-            requiresDeliveryReturn: currentType === 'ENTREGA' ? deliveryDetails.requiresReturn : undefined
+            hasReturn: currentType === 'ENTREGA' ? (deliveryDetails.hasReturn ? 1 : 0) : undefined,
+            returnStatus: currentType === 'ENTREGA' && deliveryDetails.hasReturn ? 'PENDING' : undefined
         };
 
         if (loadedCommandIds.length > 0) {
@@ -2168,8 +2169,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
             driverId: '',
             payOnDelivery: false,
             useStoreOrigin: true,
-            originAddress: '',
-      requiresReturn: false
+            originAddress: ''
         });
         setDeliveryFee(0);
         alert("Pedido cancelado com sucesso!");
@@ -2272,8 +2272,9 @@ export default function POS({ storeId, user, settings, orders, products: propPro
         customerId: selectedCustomer?.id,
         customerCpf: (orderType === 'ENTREGA' || orderType === 'BALCAO') ? deliveryDetails.customerCpf : (selectedCustomer?.cpf || undefined),
         deliveryFee: orderType === 'ENTREGA' ? deliveryFee : undefined,
-        requiresDeliveryReturn: orderType === 'ENTREGA' ? deliveryDetails.requiresReturn : undefined,
-        stockDeducted: true
+        stockDeducted: true,
+        hasReturn: orderType === 'ENTREGA' ? (deliveryDetails.hasReturn ? 1 : 0) : undefined,
+        returnStatus: orderType === 'ENTREGA' && deliveryDetails.hasReturn ? 'PENDING' : undefined
       };
 
       if (isContingencyMode) {
@@ -2293,8 +2294,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
         setLoadedWaitstaffName(null);
         setLoadedServiceFee(0);
         setCommandNumber('');
-        setDeliveryDetails({ customerName: '', customerPhone: '', address: '', driverId: '', payOnDelivery: false, useStoreOrigin: true, originAddress: '',
-      requiresReturn: false, referencePoint: '' });
+        setDeliveryDetails({ customerName: '', customerPhone: '', address: '', driverId: '', payOnDelivery: false, useStoreOrigin: true, originAddress: '', referencePoint: '' });
         setCep('');
         setDeliveryFee(0);
         setSelectedCustomer(null);
@@ -2490,8 +2490,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
       setLoadedWaitstaffName(null);
       setLoadedServiceFee(0);
       setCommandNumber('');
-      setDeliveryDetails({ customerName: '', customerPhone: '', address: '', driverId: '', payOnDelivery: false, useStoreOrigin: true, originAddress: '',
-      requiresReturn: false, referencePoint: '' });
+      setDeliveryDetails({ customerName: '', customerPhone: '', address: '', driverId: '', payOnDelivery: false, useStoreOrigin: true, originAddress: '', referencePoint: '' });
       setCep('');
       setDeliveryFee(0);
       setSelectedCustomer(null);
@@ -4314,17 +4313,32 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                               Pagar no ato da entrega
                           </label>
                       </div>
-                      <div className="space-y-1 md:col-span-2 flex items-center gap-2 mt-2">
-                          <input 
-                              type="checkbox" 
-                              id="requiresReturn"
-                              checked={deliveryDetails.requiresReturn}
-                              onChange={e => setDeliveryDetails({...deliveryDetails, requiresReturn: e.target.checked})}
-                              className="w-5 h-5 text-purple-600 rounded focus:ring-purple-500 border-gray-300"
-                          />
-                          <label htmlFor="requiresReturn" className="text-sm font-bold text-purple-800 cursor-pointer">
-                              Requer retorno do entregador à loja
-                          </label>
+                      <div className="space-y-1 md:col-span-2 flex items-center justify-between mt-1">
+                          <div className="flex items-center gap-2">
+                              <input 
+                                  type="checkbox" 
+                                  id="hasReturn"
+                                  checked={deliveryDetails.hasReturn || false}
+                                  onChange={e => {
+                                      const checked = e.target.checked;
+                                      setDeliveryDetails({...deliveryDetails, hasReturn: checked});
+                                      if (settings.returnFeePercent && deliveryFee > 0) {
+                                          if (checked) {
+                                              setDeliveryFee(prev => prev * (1 + settings.returnFeePercent! / 100));
+                                          } else {
+                                              setDeliveryFee(prev => prev / (1 + settings.returnFeePercent! / 100));
+                                          }
+                                      }
+                                  }}
+                                  className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
+                              />
+                              <label htmlFor="hasReturn" className="text-sm font-bold text-blue-800 cursor-pointer">
+                                  Com Retorno para Loja
+                              </label>
+                          </div>
+                          {settings.returnFeePercent && (
+                              <span className="text-xs font-bold text-blue-600">+{settings.returnFeePercent}%</span>
+                          )}
                       </div>
                   </div>
               )}

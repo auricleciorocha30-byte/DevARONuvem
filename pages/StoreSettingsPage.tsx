@@ -555,6 +555,21 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                       />
                     </div>
 
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Taxa Adicional de Retorno (%)</label>
+                      <input 
+                        type="text" 
+                        inputMode="numeric"
+                        placeholder="Ex: 50" 
+                        value={localSettings.returnFeePercent === 0 ? '' : (localSettings.returnFeePercent || '')} 
+                        onChange={(e) => {
+                          const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+                          if (!isNaN(val)) setLocalSettings({...localSettings, returnFeePercent: val});
+                        }} 
+                        className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 outline-none text-sm font-bold" 
+                      />
+                    </div>
+
                     <div className="space-y-2">
                       <div className="flex justify-between items-center">
                         <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Regras de Taxa</label>
@@ -625,38 +640,6 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                     </div>
                   </div>
                 )}
-                
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl mt-4">
-                  <div className="flex flex-col">
-                    <span className="text-sm font-bold text-gray-700">Taxa de Retorno</span>
-                    <span className="text-[10px] text-gray-400">Paga ao entregador quando houver retorno à loja.</span>
-                  </div>
-                  <Switch 
-                    checked={localSettings.isDeliveryReturnActive === true} 
-                    onChange={(checked) => setLocalSettings({...localSettings, isDeliveryReturnActive: checked})} 
-                  />
-                </div>
-
-                {localSettings.isDeliveryReturnActive && (
-                  <div className="space-y-4 p-4 bg-gray-50 rounded-xl border border-gray-100">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Porcentagem de Retorno (%)</label>
-                      <input 
-                        type="text" 
-                        inputMode="numeric"
-                        placeholder="Ex: 50" 
-                        value={localSettings.deliveryReturnPercentage || ''} 
-                        onChange={(e) => {
-                          const val = e.target.value === '' ? 0 : parseInt(e.target.value);
-                          if (!isNaN(val)) setLocalSettings({...localSettings, deliveryReturnPercentage: val});
-                        }} 
-                        className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 outline-none text-sm font-bold" 
-                      />
-                      <p className="text-[10px] text-gray-400 px-1 pt-1">Esta porcentagem será somada ao valor total da taxa de entrega (Ex: 50% = R$ 5,00 extras em uma taxa de R$ 10,00).</p>
-                    </div>
-                  </div>
-                )}
-
               </div>
             </section>
           )}

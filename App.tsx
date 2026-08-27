@@ -384,7 +384,6 @@ function StoreContext() {
       serviceFee: Number(dbOrder.serviceFee || dbOrder.servicefee || dbOrder.service_fee || 0),
       originAddress: dbOrder.originAddress || dbOrder.originaddress || dbOrder.origin_address,
       customerId: dbOrder.customerId || dbOrder.customerid || dbOrder.customer_id,
-      requiresDeliveryReturn: dbOrder.requiresDeliveryReturn === 1 || dbOrder.requiresdeliveryreturn === 1 || dbOrder.requires_delivery_return === 1 || dbOrder.requiresDeliveryReturn === true || dbOrder.requiresdeliveryreturn === true || dbOrder.requires_delivery_return === true,
       stockDeducted: dbOrder.stockDeducted === 1 || dbOrder.stockdeducted === 1 || dbOrder.stock_deducted === 1 || dbOrder.stockDeducted === true || dbOrder.stockdeducted === true || dbOrder.stock_deducted === true
     };
   }, []);
@@ -689,8 +688,7 @@ function StoreContext() {
       displayId: order.displayId,
       session_id: order.session_id,
       deliveryDriverId: order.deliveryDriverId,
-      stockDeducted: order.stockDeducted !== false ? 1 : 0,
-      requiresDeliveryReturn: order.requiresDeliveryReturn ? 1 : 0
+      stockDeducted: order.stockDeducted !== false ? 1 : 0
     };
     await supabase.from('orders').insert([dbOrder]);
   };

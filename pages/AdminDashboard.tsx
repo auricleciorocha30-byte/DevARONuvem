@@ -160,31 +160,21 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
               return; // Already paid
           }
 
-          let driverCommValue = settings.waitstaffCommissions?.[idStr] || 0;
+          const driverCommValue = settings.waitstaffCommissions?.[idStr] || 0;
+          const deliveryFee = Number(order.deliveryFee) || 0;
+          const driverTotalPay = driverCommValue + deliveryFee;
           
-          // Se não houver taxa fixa definida, repassa o valor da entrega integral
-          if (driverCommValue === 0) {
-            driverCommValue = order.deliveryFee || 0;
-          }
-
-          // Se tiver retorno, adiciona a porcentagem da taxa de retorno
-          if (order.requiresDeliveryReturn && settings.isDeliveryReturnActive && settings.deliveryReturnPercentage) {
-             driverCommValue += (order.deliveryFee || 0) * (settings.deliveryReturnPercentage / 100);
-          }
-          
-          if (driverCommValue > 0) {
+          if (driverTotalPay > 0) {
             const existing = comms.get(idStr);
             if (existing) {
-              existing.commissionValue += driverCommValue;
-              // We do not add to totalSales because totalSales is mainly for POS/DigitalMenu attendants mapping.
-              // Wait, let's keep totalSales matching the delivery fee so it shows something.
-              existing.totalSales += (order.deliveryFee || 0);
+              existing.commissionValue += driverTotalPay;
+              existing.totalSales += deliveryFee;
             } else {
               comms.set(idStr, {
                 staffId: idStr,
                 name: driver.name + ' (Entregador)',
-                totalSales: (order.deliveryFee || 0),
-                commissionValue: driverCommValue,
+                totalSales: deliveryFee,
+                commissionValue: driverTotalPay,
                 rate: 0 // fixed rate, not %
               });
             }

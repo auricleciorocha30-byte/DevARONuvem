@@ -163,6 +163,32 @@ export default function DeliveryPanel({ storeId, user, settings, orders, storeSl
       .update(updatePayload);
   };
 
+  const updateReturnStatus = async (orderId: string, returnStatus: string, newStatus?: string) => {
+    if (!orderId) return;
+    let updatePayload: any = { returnStatus };
+    if (newStatus) {
+      updatePayload.status = newStatus;
+      if (newStatus === 'ENTREGUE') {
+        const { data: openSessions } = await supabase
+            .from('register_sessions')
+            .select('id')
+            .eq('store_id', storeId)
+            .eq('status', 'OPEN')
+            .order('opened_at', { ascending: false })
+            .limit(1);
+        if (openSessions && openSessions.length > 0) {
+            updatePayload.session_id = openSessions[0].id;
+        } else {
+            updatePayload.session_id = 'FECHADO';
+        }
+      }
+    }
+    await supabase
+      .from('orders')
+      .eq('id', orderId)
+      .update(updatePayload);
+  };
+
   const acceptDelivery = async (orderId: string) => {
     if (!orderId) return;
     
@@ -223,10 +249,14 @@ export default function DeliveryPanel({ storeId, user, settings, orders, storeSl
         }
 
         for (const order of bulkDeliveries) {
+            const updates: any = { status: 'ENTREGUE', session_id: sessionValue };
+            if (order.hasReturn) {
+                updates.returnStatus = 'RETURNED';
+            }
             await supabase
                 .from('orders')
                 .eq('id', order.id)
-                .update({ status: 'ENTREGUE', session_id: sessionValue });
+                .update(updates);
         }
         setShowBulkFinalizeModal(false);
         fetchWeeklyCount();
@@ -384,11 +414,16 @@ export default function DeliveryPanel({ storeId, user, settings, orders, storeSl
               return (
               <div key={order.id} className={`bg-white rounded-2xl shadow-sm border-2 overflow-hidden transition-all ${borderColor}`}>
                 <div className={`p-4 flex justify-between items-center ${headerBg}`}>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="font-black text-lg text-gray-700">#{order.displayId || String(order.id).slice(0,8)}</span>
                     <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider ${badgeStyle}`}>
                       {order.status.replace(/_/g, ' ')}
                     </span>
+                    {order.hasReturn ? (
+                        <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-wider ${order.returnStatus === 'RETORNANDO' ? 'bg-purple-100 text-purple-700 border border-purple-200' : 'bg-orange-100 text-orange-700 border border-orange-200'}`}>
+                            {order.returnStatus === 'RETORNANDO' ? 'RETORNO EM ANDAMENTO' : 'REQUER RETORNO'}
+                        </span>
+                    ) : null}
                   </div>
                   <div className="flex items-center gap-1 text-xs font-bold text-gray-500">
                     <Clock size={14} />
@@ -559,14 +594,6 @@ export default function DeliveryPanel({ storeId, user, settings, orders, storeSl
                                     <Truck size={18} />
                                     Iniciar Entrega
                                 </button>
-                            ) : order.status === 'RETORNANDO' ? (
-                                <button 
-                                    onClick={() => updateStatus(order.id, 'ENTREGUE')}
-                                    className="col-span-2 py-3 bg-purple-600 text-white rounded-xl font-bold shadow-lg hover:bg-purple-700 active:scale-95 transition-all flex items-center justify-center gap-2"
-                                >
-                                    <CheckCircle2 size={18} />
-                                    Finalizar Retorno na Loja
-                                </button>
                             ) : order.status === 'ENTREGUE' ? (
                                 <div className="col-span-2 py-2 text-center text-gray-400 text-sm font-bold uppercase flex items-center justify-center gap-2 bg-gray-50 rounded-xl border border-gray-100">
                                     <CheckCircle2 size={16} />
@@ -574,33 +601,64 @@ export default function DeliveryPanel({ storeId, user, settings, orders, storeSl
                                 </div>
                             ) : (
                                 <>
-                                    <button 
-                                    onClick={() => openMap(order.deliveryAddress || '')}
-                                    className="py-3 bg-blue-50 text-blue-600 rounded-xl font-bold hover:bg-blue-100 transition-all flex items-center justify-center gap-2"
-                                    >
-                                    <Navigation size={18} />
-                                    Rota Destino
-                                    </button>
-                                    <button 
-                                    onClick={() => {
-                                        if (order.requiresDeliveryReturn) {
-                                            updateStatus(order.id, 'RETORNANDO');
-                                        } else {
-                                            updateStatus(order.id, 'ENTREGUE');
-                                        }
-                                    }}
-                                    className="py-3 bg-green-600 text-white rounded-xl font-bold shadow-lg hover:bg-green-700 active:scale-95 transition-all flex items-center justify-center gap-2"
-                                    >
-                                    {order.requiresDeliveryReturn ? (
-                                        <><Truck size={18} /> Iniciar Retorno</>
+                                    {order.hasReturn ? (
+                                        order.returnStatus === 'RETORNANDO' ? (
+                                            <>
+                                                <button 
+                                                onClick={() => openMap(order.originAddress || settings.address || '')}
+                                                className="py-3 bg-blue-50 text-blue-600 rounded-xl font-bold hover:bg-blue-100 transition-all flex items-center justify-center gap-2"
+                                                >
+                                                <Navigation size={18} />
+                                                Rota Origem
+                                                </button>
+                                                <button 
+                                                onClick={() => updateReturnStatus(order.id, 'RETURNED', 'ENTREGUE')}
+                                                className="py-3 bg-purple-600 text-white rounded-xl font-bold shadow-lg hover:bg-purple-700 active:scale-95 transition-all flex items-center justify-center gap-2"
+                                                >
+                                                <CheckCircle2 size={18} />
+                                                Confirmar Retorno & Finalizar
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <button 
+                                                onClick={() => openMap(order.deliveryAddress || '')}
+                                                className="py-3 bg-blue-50 text-blue-600 rounded-xl font-bold hover:bg-blue-100 transition-all flex items-center justify-center gap-2"
+                                                >
+                                                <Navigation size={18} />
+                                                Rota Destino
+                                                </button>
+                                                <button 
+                                                onClick={() => updateReturnStatus(order.id, 'RETORNANDO')}
+                                                className="py-3 bg-orange-600 text-white rounded-xl font-bold shadow-lg hover:bg-orange-700 active:scale-95 transition-all flex items-center justify-center gap-2"
+                                                >
+                                                <CheckCircle2 size={18} />
+                                                Entregue (Iniciar Retorno)
+                                                </button>
+                                            </>
+                                        )
                                     ) : (
-                                        <><CheckCircle2 size={18} /> Finalizar</>
+                                        <>
+                                            <button 
+                                            onClick={() => openMap(order.deliveryAddress || '')}
+                                            className="py-3 bg-blue-50 text-blue-600 rounded-xl font-bold hover:bg-blue-100 transition-all flex items-center justify-center gap-2"
+                                            >
+                                            <Navigation size={18} />
+                                            Rota Destino
+                                            </button>
+                                            <button 
+                                            onClick={() => updateStatus(order.id, 'ENTREGUE')}
+                                            className="py-3 bg-green-600 text-white rounded-xl font-bold shadow-lg hover:bg-green-700 active:scale-95 transition-all flex items-center justify-center gap-2"
+                                            >
+                                            <CheckCircle2 size={18} />
+                                            Finalizar
+                                            </button>
+                                        </>
                                     )}
-                                    </button>
                                 </>
                             )}
                             
-                            {order.status !== 'ENTREGUE' && order.status !== 'RETORNANDO' && (
+                            {order.status !== 'ENTREGUE' && (
                                 <button 
                                     onClick={async () => { 
                                         if(window.confirm('Tem certeza que deseja cancelar esta entrega? O pedido voltará para a lista de disponíveis.')) {

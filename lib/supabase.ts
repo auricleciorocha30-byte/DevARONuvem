@@ -199,8 +199,9 @@ const SCHEMA_STATEMENTS = [
     serviceFee REAL,
     stockDeducted INTEGER DEFAULT 1,
     customerCpf TEXT,
-    requiresDeliveryReturn INTEGER DEFAULT 0,
-    updatedAt INTEGER
+    updatedAt INTEGER,
+    hasReturn INTEGER DEFAULT 0,
+    returnStatus TEXT
   )`,
   `CREATE TABLE IF NOT EXISTS cash_movements (
     id TEXT PRIMARY KEY,
@@ -280,7 +281,7 @@ const TABLE_COLUMNS: { [key: string]: string[] } = {
     'customerId', 'items', 'status', 'total', 'deliveryFee', 'createdAt', 'paymentMethod',
     'deliveryAddress', 'referencePoint', 'notes', 'changeFor', 'waitstaffName', 'couponApplied',
     'discountAmount', 'deliveryDriverId', 'paymentDetails', 'isSynced', 'originAddress',
-    'session_id', 'serviceFee', 'stockDeducted', 'customerCpf', 'requiresDeliveryReturn', 'updatedAt'
+    'session_id', 'serviceFee', 'stockDeducted', 'customerCpf', 'updatedAt', 'hasReturn', 'returnStatus'
   ],
   cash_movements: [
     'id', 'store_id', 'type', 'amount', 'description', 'waitstaffName', 'createdAt', 'session_id'
@@ -366,11 +367,14 @@ async function ensureSchema() {
           if (!orderColumns.includes('customerCpf')) {
               try { await client.execute(`ALTER TABLE orders ADD COLUMN customerCpf TEXT`); } catch (e) { console.warn(e); }
           }
-          if (!orderColumns.includes('requiresDeliveryReturn')) {
-              try { await client.execute(`ALTER TABLE orders ADD COLUMN requiresDeliveryReturn INTEGER DEFAULT 0`); } catch (e) { console.warn(e); }
-          }
           if (!orderColumns.includes('updatedAt')) {
               try { await client.execute(`ALTER TABLE orders ADD COLUMN updatedAt INTEGER`); } catch (e) { console.warn(e); }
+          }
+          if (!orderColumns.includes('hasReturn')) {
+              try { await client.execute(`ALTER TABLE orders ADD COLUMN hasReturn INTEGER DEFAULT 0`); } catch (e) { console.warn(e); }
+          }
+          if (!orderColumns.includes('returnStatus')) {
+              try { await client.execute(`ALTER TABLE orders ADD COLUMN returnStatus TEXT`); } catch (e) { console.warn(e); }
           }
 
           const productsTableInfo = await client.execute(`PRAGMA table_info(products)`);
@@ -557,11 +561,14 @@ class TursoBridge {
             if (!orderColumns.includes('customerCpf')) {
                 try { await this.executeSqlCustom(url, token, `ALTER TABLE orders ADD COLUMN customerCpf TEXT`); } catch (e) { console.warn(e); }
             }
-            if (!orderColumns.includes('requiresDeliveryReturn')) {
-                try { await this.executeSqlCustom(url, token, `ALTER TABLE orders ADD COLUMN requiresDeliveryReturn INTEGER DEFAULT 0`); } catch (e) { console.warn(e); }
-            }
             if (!orderColumns.includes('updatedAt')) {
                 try { await this.executeSqlCustom(url, token, `ALTER TABLE orders ADD COLUMN updatedAt INTEGER`); } catch (e) { console.warn(e); }
+            }
+            if (!orderColumns.includes('hasReturn')) {
+                try { await this.executeSqlCustom(url, token, `ALTER TABLE orders ADD COLUMN hasReturn INTEGER DEFAULT 0`); } catch (e) { console.warn(e); }
+            }
+            if (!orderColumns.includes('returnStatus')) {
+                try { await this.executeSqlCustom(url, token, `ALTER TABLE orders ADD COLUMN returnStatus TEXT`); } catch (e) { console.warn(e); }
             }
 
             const productsTableInfo = await this.executeSqlCustom(url, token, `PRAGMA table_info(products)`);
@@ -965,7 +972,7 @@ class TursoBridge {
         if (this.tableName === 'orders') {
              processedRow.isSynced = Boolean(processedRow.isSynced);
              processedRow.stockDeducted = Boolean(processedRow.stockDeducted ?? 1);
-             processedRow.requiresDeliveryReturn = Boolean(processedRow.requiresDeliveryReturn || processedRow.requiresdeliveryreturn);
+             processedRow.hasReturn = Boolean(processedRow.hasReturn);
         }
         if (this.tableName === 'customers') {
              processedRow.isLoyaltyParticipant = Boolean(processedRow.isLoyaltyParticipant ?? 1);
@@ -1026,7 +1033,6 @@ class TursoBridge {
         if (typeof valCopy.isByWeight === 'boolean') valCopy.isByWeight = valCopy.isByWeight ? 1 : 0;
         if (typeof valCopy.isSynced === 'boolean') valCopy.isSynced = valCopy.isSynced ? 1 : 0;
         if (typeof valCopy.stockDeducted === 'boolean') valCopy.stockDeducted = valCopy.stockDeducted ? 1 : 0;
-        if (typeof valCopy.requiresDeliveryReturn === 'boolean') valCopy.requiresDeliveryReturn = valCopy.requiresDeliveryReturn ? 1 : 0;
 
         const keys = Object.keys(valCopy);
         const placeholders = keys.map(() => `?`).join(', ');
