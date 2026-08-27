@@ -384,7 +384,9 @@ function StoreContext() {
       serviceFee: Number(dbOrder.serviceFee || dbOrder.servicefee || dbOrder.service_fee || 0),
       originAddress: dbOrder.originAddress || dbOrder.originaddress || dbOrder.origin_address,
       customerId: dbOrder.customerId || dbOrder.customerid || dbOrder.customer_id,
-      stockDeducted: dbOrder.stockDeducted === 1 || dbOrder.stockdeducted === 1 || dbOrder.stock_deducted === 1 || dbOrder.stockDeducted === true || dbOrder.stockdeducted === true || dbOrder.stock_deducted === true
+      stockDeducted: dbOrder.stockDeducted === 1 || dbOrder.stockdeducted === 1 || dbOrder.stock_deducted === 1 || dbOrder.stockDeducted === true || dbOrder.stockdeducted === true || dbOrder.stock_deducted === true,
+      hasReturn: dbOrder.hasReturn === 1 || dbOrder.hasreturn === 1 || dbOrder.has_return === 1 || dbOrder.hasReturn === true || dbOrder.hasreturn === true || dbOrder.has_return === true,
+      returnStatus: dbOrder.returnStatus || dbOrder.returnstatus || dbOrder.return_status
     };
   }, []);
 

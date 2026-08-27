@@ -632,8 +632,12 @@ export default function POS({ storeId, user, settings, orders, products: propPro
           }
         }
         if (appliedFee !== null) {
-          setDeliveryFee(appliedFee);
-          alert(`Taxa de entrega: R$ ${appliedFee.toFixed(2)}`);
+          let finalFee = appliedFee;
+          if (deliveryDetails.hasReturn && settings.returnFeePercent) {
+            finalFee = finalFee * (1 + Number(settings.returnFeePercent) / 100);
+          }
+          setDeliveryFee(finalFee);
+          alert(`Taxa de entrega: R$ ${finalFee.toFixed(2)}`);
         } else {
           alert("Endereço fora da área de entrega programada.");
           setDeliveryFee(0);

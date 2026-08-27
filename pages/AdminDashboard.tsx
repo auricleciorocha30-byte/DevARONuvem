@@ -161,7 +161,10 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
           }
 
           const driverCommValue = settings.waitstaffCommissions?.[idStr] || 0;
-          const deliveryFee = Number(order.deliveryFee) || 0;
+          let deliveryFee = Number(order.deliveryFee) || 0;
+          if (order.hasReturn && settings.returnFeePercent) {
+            deliveryFee = deliveryFee * (1 + Number(settings.returnFeePercent) / 100);
+          }
           const driverTotalPay = driverCommValue + deliveryFee;
           
           if (driverTotalPay > 0) {
