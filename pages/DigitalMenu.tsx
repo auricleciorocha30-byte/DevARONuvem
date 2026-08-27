@@ -45,7 +45,7 @@ import {
   Percent,
   Package,
   Calendar
-} from 'lucide-react';
+, Share2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Product, StoreSettings, Order, OrderItem, OrderType, PaymentMethod, Waitstaff, CartComplementItem, ComplementCategory } from '../types';
 import InstallPrompt from '../components/InstallPrompt';
@@ -1577,6 +1577,23 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
           </div>
           <div className="flex items-center gap-2">
             <InstallPrompt />
+            <button 
+              onClick={() => {
+                if (navigator.share) {
+                  navigator.share({
+                    title: settings.storeName,
+                    url: window.location.href
+                  }).catch(console.error);
+                } else {
+                  navigator.clipboard.writeText(window.location.href);
+                  alert('Link copiado!');
+                }
+              }} 
+              className={`p-2.5 rounded-full shrink-0 active:scale-95 transition-transform ${isWaitstaff ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+              title="Compartilhar Cardápio"
+            >
+              <Share2 size={20} />
+            </button>
             <button onClick={() => setIsTrackingModalOpen(true)} className={`p-2.5 rounded-full shrink-0 active:scale-95 transition-transform ${isWaitstaff ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}><Search size={20} /></button>
             <button onClick={() => setIsInfoOpen(true)} className={`p-2.5 rounded-full shrink-0 active:scale-95 transition-transform ${isWaitstaff ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}><Info size={20} /></button>
             <button onClick={() => { setIsCartOpen(true); setCheckoutStep('cart'); }} className={`relative p-2.5 rounded-full shrink-0 active:scale-95 transition-transform ${isWaitstaff ? 'bg-white/10 text-white' : 'bg-primary text-white hover:bg-primary/90 shadow-md'}`}>

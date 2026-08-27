@@ -1,5 +1,5 @@
 
-export type OrderStatus = 'AGUARDANDO' | 'AGUARDANDO_PAGAMENTO' | 'PAGO' | 'PENDENTE' | 'PREPARANDO' | 'PRONTO' | 'ENVIADO_PARA_ENTREGA' | 'CHEGUEI_NA_ORIGEM' | 'SAIU_PARA_ENTREGA' | 'ENTREGUE' | 'CANCELADO';
+export type OrderStatus = 'AGUARDANDO' | 'AGUARDANDO_PAGAMENTO' | 'PAGO' | 'PENDENTE' | 'PREPARANDO' | 'PRONTO' | 'ENVIADO_PARA_ENTREGA' | 'CHEGUEI_NA_ORIGEM' | 'SAIU_PARA_ENTREGA' | 'ENTREGUE' | 'RETORNANDO' | 'CANCELADO';
 export type OrderType = 'MESA' | 'BALCAO' | 'ENTREGA' | 'COMANDA';
 export type PaymentMethod = 'PIX' | 'CARTAO' | 'DINHEIRO' | 'DEBITO' | 'VALES' | 'CASHBACK' | 'MISTO' | 'A_PAGAR' | 'ONLINE' | 'MAQUININHA';
 
@@ -141,6 +141,7 @@ export interface Order {
   nfce_status?: string;
   customerCpf?: string;
   scheduledTime?: string;
+  requiresDeliveryReturn?: boolean;
 }
 
 export interface CashMovement {
@@ -235,6 +236,8 @@ export interface StoreSettings {
   isDeliveryFeeActive?: boolean;
   freeDeliveryToleranceKm?: number;
   deliveryFeeRules?: { upToKm: number; fee: number }[];
+  isDeliveryReturnActive?: boolean;
+  deliveryReturnPercentage?: number;
   digitalMenuPaymentMethods?: PaymentMethod[];
   allowSchedulingWhenClosed?: boolean;
   

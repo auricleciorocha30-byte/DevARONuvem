@@ -559,6 +559,14 @@ export default function DeliveryPanel({ storeId, user, settings, orders, storeSl
                                     <Truck size={18} />
                                     Iniciar Entrega
                                 </button>
+                            ) : order.status === 'RETORNANDO' ? (
+                                <button 
+                                    onClick={() => updateStatus(order.id, 'ENTREGUE')}
+                                    className="col-span-2 py-3 bg-purple-600 text-white rounded-xl font-bold shadow-lg hover:bg-purple-700 active:scale-95 transition-all flex items-center justify-center gap-2"
+                                >
+                                    <CheckCircle2 size={18} />
+                                    Finalizar Retorno na Loja
+                                </button>
                             ) : order.status === 'ENTREGUE' ? (
                                 <div className="col-span-2 py-2 text-center text-gray-400 text-sm font-bold uppercase flex items-center justify-center gap-2 bg-gray-50 rounded-xl border border-gray-100">
                                     <CheckCircle2 size={16} />
@@ -574,16 +582,25 @@ export default function DeliveryPanel({ storeId, user, settings, orders, storeSl
                                     Rota Destino
                                     </button>
                                     <button 
-                                    onClick={() => updateStatus(order.id, 'ENTREGUE')}
+                                    onClick={() => {
+                                        if (order.requiresDeliveryReturn) {
+                                            updateStatus(order.id, 'RETORNANDO');
+                                        } else {
+                                            updateStatus(order.id, 'ENTREGUE');
+                                        }
+                                    }}
                                     className="py-3 bg-green-600 text-white rounded-xl font-bold shadow-lg hover:bg-green-700 active:scale-95 transition-all flex items-center justify-center gap-2"
                                     >
-                                    <CheckCircle2 size={18} />
-                                    Finalizar
+                                    {order.requiresDeliveryReturn ? (
+                                        <><Truck size={18} /> Iniciar Retorno</>
+                                    ) : (
+                                        <><CheckCircle2 size={18} /> Finalizar</>
+                                    )}
                                     </button>
                                 </>
                             )}
                             
-                            {order.status !== 'ENTREGUE' && (
+                            {order.status !== 'ENTREGUE' && order.status !== 'RETORNANDO' && (
                                 <button 
                                     onClick={async () => { 
                                         if(window.confirm('Tem certeza que deseja cancelar esta entrega? O pedido voltará para a lista de disponíveis.')) {

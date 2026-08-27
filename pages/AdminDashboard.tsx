@@ -160,7 +160,17 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
               return; // Already paid
           }
 
-          const driverCommValue = settings.waitstaffCommissions?.[idStr] || 0;
+          let driverCommValue = settings.waitstaffCommissions?.[idStr] || 0;
+          
+          // Se não houver taxa fixa definida, repassa o valor da entrega integral
+          if (driverCommValue === 0) {
+            driverCommValue = order.deliveryFee || 0;
+          }
+
+          // Se tiver retorno, adiciona a porcentagem da taxa de retorno
+          if (order.requiresDeliveryReturn && settings.isDeliveryReturnActive && settings.deliveryReturnPercentage) {
+             driverCommValue += (order.deliveryFee || 0) * (settings.deliveryReturnPercentage / 100);
+          }
           
           if (driverCommValue > 0) {
             const existing = comms.get(idStr);
@@ -760,7 +770,7 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
                                           onClick={() => handlePayCommission(item.staffId, item.name)}
                                           className="px-3 py-1.5 bg-green-100 text-green-700 hover:bg-green-200 font-bold text-xs rounded-xl transition-colors"
                                         >
-                                          PAGO
+                                          PAGAR
                                         </button>
                                       )}
                                     </td>

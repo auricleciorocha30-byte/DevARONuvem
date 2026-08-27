@@ -133,7 +133,8 @@ export default function POS({ storeId, user, settings, orders, products: propPro
       driverId: '',
       payOnDelivery: false,
       useStoreOrigin: true,
-      originAddress: ''
+      originAddress: '',
+      requiresReturn: false
     };
   });
   
@@ -972,7 +973,8 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                         driverId: order.deliveryDriverId || '',
                         payOnDelivery: false,
                         useStoreOrigin: true,
-                        originAddress: ''
+                        originAddress: '',
+      requiresReturn: false
                     });
                 }
                 setOrderType(type);
@@ -1947,7 +1949,8 @@ export default function POS({ storeId, user, settings, orders, products: propPro
             referencePoint: currentType === 'ENTREGA' ? deliveryDetails.referencePoint : undefined,
             deliveryDriverId: currentType === 'ENTREGA' && deliveryDetails.driverId ? deliveryDetails.driverId : undefined,
             customerId: selectedCustomer?.id,
-            deliveryFee: currentType === 'ENTREGA' ? deliveryFee : undefined
+            deliveryFee: currentType === 'ENTREGA' ? deliveryFee : undefined,
+            requiresDeliveryReturn: currentType === 'ENTREGA' ? deliveryDetails.requiresReturn : undefined
         };
 
         if (loadedCommandIds.length > 0) {
@@ -2157,7 +2160,8 @@ export default function POS({ storeId, user, settings, orders, products: propPro
             driverId: '',
             payOnDelivery: false,
             useStoreOrigin: true,
-            originAddress: ''
+            originAddress: '',
+      requiresReturn: false
         });
         setDeliveryFee(0);
         alert("Pedido cancelado com sucesso!");
@@ -2260,6 +2264,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
         customerId: selectedCustomer?.id,
         customerCpf: (orderType === 'ENTREGA' || orderType === 'BALCAO') ? deliveryDetails.customerCpf : (selectedCustomer?.cpf || undefined),
         deliveryFee: orderType === 'ENTREGA' ? deliveryFee : undefined,
+        requiresDeliveryReturn: orderType === 'ENTREGA' ? deliveryDetails.requiresReturn : undefined,
         stockDeducted: true
       };
 
@@ -2280,7 +2285,8 @@ export default function POS({ storeId, user, settings, orders, products: propPro
         setLoadedWaitstaffName(null);
         setLoadedServiceFee(0);
         setCommandNumber('');
-        setDeliveryDetails({ customerName: '', customerPhone: '', address: '', driverId: '', payOnDelivery: false, useStoreOrigin: true, originAddress: '', referencePoint: '' });
+        setDeliveryDetails({ customerName: '', customerPhone: '', address: '', driverId: '', payOnDelivery: false, useStoreOrigin: true, originAddress: '',
+      requiresReturn: false, referencePoint: '' });
         setCep('');
         setDeliveryFee(0);
         setSelectedCustomer(null);
@@ -2476,7 +2482,8 @@ export default function POS({ storeId, user, settings, orders, products: propPro
       setLoadedWaitstaffName(null);
       setLoadedServiceFee(0);
       setCommandNumber('');
-      setDeliveryDetails({ customerName: '', customerPhone: '', address: '', driverId: '', payOnDelivery: false, useStoreOrigin: true, originAddress: '', referencePoint: '' });
+      setDeliveryDetails({ customerName: '', customerPhone: '', address: '', driverId: '', payOnDelivery: false, useStoreOrigin: true, originAddress: '',
+      requiresReturn: false, referencePoint: '' });
       setCep('');
       setDeliveryFee(0);
       setSelectedCustomer(null);
@@ -4297,6 +4304,18 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                           />
                           <label htmlFor="payOnDelivery" className="text-sm font-bold text-blue-800 cursor-pointer">
                               Pagar no ato da entrega
+                          </label>
+                      </div>
+                      <div className="space-y-1 md:col-span-2 flex items-center gap-2 mt-2">
+                          <input 
+                              type="checkbox" 
+                              id="requiresReturn"
+                              checked={deliveryDetails.requiresReturn}
+                              onChange={e => setDeliveryDetails({...deliveryDetails, requiresReturn: e.target.checked})}
+                              className="w-5 h-5 text-purple-600 rounded focus:ring-purple-500 border-gray-300"
+                          />
+                          <label htmlFor="requiresReturn" className="text-sm font-bold text-purple-800 cursor-pointer">
+                              Requer retorno do entregador à loja
                           </label>
                       </div>
                   </div>
