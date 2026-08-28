@@ -167,6 +167,11 @@ export default function SuperAdminPanel() {
   const [showModal, setShowModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isCleaning, setIsCleaning] = useState(false);
+  const [inactivityDays, setInactivityDays] = useState(90);
+  const [analyzedCount, setAnalyzedCount] = useState<number | null>(null);
+  const [inactiveCustIds, setInactiveCustIds] = useState<string[]>([]);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -516,6 +521,102 @@ export default function SuperAdminPanel() {
       alert("Falha ao executar a limpeza manual: " + err.message);
     } finally {
       setIsCleaning(false);
+      if ((editingStore as any).dbUrl && (editingStore as any).dbAuthToken) {
+          (supabase as any).connectToStore((editingStore as any).dbUrl, (editingStore as any).dbAuthToken);
+      } else {
+          (supabase as any).disconnectStore();
+      }
+    }
+  };
+
+  const handleAnalyzeInactiveCustomers = async () => {
+    if (!editingStore) return;
+    setIsAnalyzing(true);
+    setAnalyzedCount(null);
+    setInactiveCustIds([]);
+    try {
+      if ((editingStore as any).dbUrl && (editingStore as any).dbAuthToken) {
+          (supabase as any).connectToStore((editingStore as any).dbUrl, (editingStore as any).dbAuthToken);
+      } else {
+          (supabase as any).disconnectStore();
+      }
+
+      const cutoffTimestamp = Date.now() - inactivityDays * 24 * 60 * 60 * 1000;
+
+      // 1. Fetch all customers of the store created before cutoff
+      const { data: potentialInactive, error: custError } = await supabase
+        .from('customers')
+        .select('id, name, phone, createdAt')
+        .eq('store_id', editingStore.id)
+        .lt('createdAt', cutoffTimestamp);
+
+      if (custError) throw custError;
+
+      if (!potentialInactive || potentialInactive.length === 0) {
+        setAnalyzedCount(0);
+        setInactiveCustIds([]);
+        return;
+      }
+
+      // 2. Fetch active customer ids from orders created after cutoff
+      const { data: recentOrders, error: orderError } = await supabase
+        .from('orders')
+        .select('customerId')
+        .eq('store_id', editingStore.id)
+        .gt('createdAt', cutoffTimestamp);
+
+      if (orderError) throw orderError;
+
+      const activeIds = new Set(recentOrders?.map(o => o.customerId).filter(Boolean));
+
+      // 3. Filter potential list to exclude those with recent orders
+      const inactive = potentialInactive.filter(c => !activeIds.has(c.id));
+      
+      setAnalyzedCount(inactive.length);
+      setInactiveCustIds(inactive.map(c => c.id));
+    } catch (error) {
+      console.error("Erro ao analisar clientes inativos:", error);
+      alert("Falha ao analisar clientes inativos.");
+    } finally {
+      setIsAnalyzing(false);
+      // Clean up connection
+      if ((editingStore as any).dbUrl && (editingStore as any).dbAuthToken) {
+          (supabase as any).connectToStore((editingStore as any).dbUrl, (editingStore as any).dbAuthToken);
+      } else {
+          (supabase as any).disconnectStore();
+      }
+    }
+  };
+
+  const handleDeleteInactiveCustomers = async () => {
+    if (!editingStore || inactiveCustIds.length === 0) return;
+    if (!window.confirm(`AVISO: Deseja realmente excluir permanentemente ${inactiveCustIds.length} clientes inativos da unidade "${editingStore.name}"? Esta ação é irreversível e apagará seus cadastros para liberar espaço.`)) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      if ((editingStore as any).dbUrl && (editingStore as any).dbAuthToken) {
+          (supabase as any).connectToStore((editingStore as any).dbUrl, (editingStore as any).dbAuthToken);
+      } else {
+          (supabase as any).disconnectStore();
+      }
+
+      const { error } = await supabase
+        .from('customers')
+        .in('id', inactiveCustIds)
+        .delete();
+
+      if (error) throw error;
+
+      alert(`${inactiveCustIds.length} clientes inativos foram excluídos com sucesso!`);
+      setAnalyzedCount(null);
+      setInactiveCustIds([]);
+    } catch (error: any) {
+      console.error("Erro ao excluir clientes:", error);
+      alert("Falha ao excluir clientes inativos: " + error.message);
+    } finally {
+      setIsDeleting(false);
       if ((editingStore as any).dbUrl && (editingStore as any).dbAuthToken) {
           (supabase as any).connectToStore((editingStore as any).dbUrl, (editingStore as any).dbAuthToken);
       } else {
@@ -968,6 +1069,74 @@ export default function SuperAdminPanel() {
                                 )}
                                 Limpar Históricos Agora
                             </button>
+                        </div>
+
+                        {/* Limpeza de Clientes Inativos */}
+                        <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                <div className="space-y-1">
+                                    <span className="block text-xs font-bold text-slate-700">Limpeza de Clientes Inativos</span>
+                                    <span className="block text-[11px] text-slate-400 leading-relaxed max-w-xl">
+                                        Exclua permanentemente clientes cadastrados que não realizam compras ou movimentações no sistema pelo tempo selecionado para reduzir o uso de armazenamento.
+                                    </span>
+                                </div>
+                                <div className="w-full md:w-auto flex flex-col sm:flex-row gap-3 items-stretch sm:items-center self-stretch md:self-auto">
+                                    <select
+                                        value={inactivityDays}
+                                        onChange={(e) => {
+                                            setInactivityDays(Number(e.target.value));
+                                            setAnalyzedCount(null);
+                                            setInactiveCustIds([]);
+                                        }}
+                                        className="px-4 py-3 bg-white rounded-xl border border-slate-200 outline-none font-bold text-xs text-slate-700 focus:border-slate-400"
+                                    >
+                                        <option value={30}>30 dias (1 mês)</option>
+                                        <option value={60}>60 dias (2 meses)</option>
+                                        <option value={90}>90 dias (3 meses)</option>
+                                        <option value={180}>180 dias (6 meses)</option>
+                                        <option value={365}>365 dias (1 ano)</option>
+                                    </select>
+                                    <button
+                                        type="button"
+                                        onClick={handleAnalyzeInactiveCustomers}
+                                        disabled={isAnalyzing || isDeleting}
+                                        className="flex items-center justify-center gap-2 px-6 py-4 bg-slate-200 hover:bg-slate-300 disabled:opacity-50 transition-colors rounded-xl text-xs font-bold whitespace-nowrap"
+                                    >
+                                        {isAnalyzing ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
+                                        {isAnalyzing ? "Analisando..." : "Analisar Inativos"}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {analyzedCount !== null && (
+                                <div className="p-4 rounded-xl border animate-scale-up space-y-3 bg-rose-50 border-rose-100 text-rose-950">
+                                    <div className="flex items-start gap-2 text-xs leading-relaxed">
+                                        <ShieldAlert className="text-rose-500 shrink-0 mt-0.5" size={16} />
+                                        <div>
+                                            <p className="font-bold">Análise Concluída</p>
+                                            <p className="text-rose-700 mt-1">
+                                                {analyzedCount === 0 ? (
+                                                    "Nenhum cliente inativo foi encontrado para o período de tempo selecionado."
+                                                ) : (
+                                                    `Encontramos ${analyzedCount} ${analyzedCount === 1 ? 'cliente inativo' : 'clientes inativos'} que não fazem nenhuma movimentação há mais de ${inactivityDays} dias.`
+                                                )}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {analyzedCount > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={handleDeleteInactiveCustomers}
+                                            disabled={isDeleting}
+                                            className="w-full py-4 bg-rose-600 text-white rounded-xl font-black text-xs uppercase tracking-wider hover:bg-rose-700 transition-colors shadow-lg shadow-rose-600/10 flex items-center justify-center gap-2"
+                                        >
+                                            {isDeleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                                            {isDeleting ? "Excluindo..." : `Confirmar Exclusão de ${analyzedCount} Clientes`}
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
 
