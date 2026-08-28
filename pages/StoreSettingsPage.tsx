@@ -71,6 +71,86 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
   const [productSearch, setProductSearch] = useState('');
   const [cashbackProductSearch, setCashbackProductSearch] = useState('');
 
+  const [inactivityDays, setInactivityDays] = useState(90);
+  const [analyzedCount, setAnalyzedCount] = useState<number | null>(null);
+  const [inactiveCustIds, setInactiveCustIds] = useState<string[]>([]);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleAnalyzeInactiveCustomers = async () => {
+    if (!storeId) return;
+    setIsAnalyzing(true);
+    setAnalyzedCount(null);
+    setInactiveCustIds([]);
+    try {
+      const cutoffTimestamp = Date.now() - inactivityDays * 24 * 60 * 60 * 1000;
+
+      // 1. Fetch all customers of the store created before cutoff
+      const { data: potentialInactive, error: custError } = await supabase
+        .from('customers')
+        .select('id, name, phone, createdAt')
+        .eq('store_id', storeId)
+        .lt('createdAt', cutoffTimestamp);
+
+      if (custError) throw custError;
+
+      if (!potentialInactive || potentialInactive.length === 0) {
+        setAnalyzedCount(0);
+        setInactiveCustIds([]);
+        setIsAnalyzing(false);
+        return;
+      }
+
+      // 2. Fetch active customer ids from orders created after cutoff
+      const { data: recentOrders, error: orderError } = await supabase
+        .from('orders')
+        .select('customerId')
+        .eq('store_id', storeId)
+        .gt('createdAt', cutoffTimestamp);
+
+      if (orderError) throw orderError;
+
+      const activeIds = new Set(recentOrders?.map(o => o.customerId).filter(Boolean));
+
+      // 3. Filter potential list to exclude those with recent orders
+      const inactive = potentialInactive.filter(c => !activeIds.has(c.id));
+      
+      setAnalyzedCount(inactive.length);
+      setInactiveCustIds(inactive.map(c => c.id));
+    } catch (error) {
+      console.error("Erro ao analisar clientes inativos:", error);
+      alert("Falha ao analisar clientes inativos.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleDeleteInactiveCustomers = async () => {
+    if (inactiveCustIds.length === 0) return;
+    if (!window.confirm(`AVISO: Deseja realmente excluir permanentemente ${inactiveCustIds.length} clientes inativos? Esta ação é irreversível e apagará seus cadastros para liberar espaço.`)) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('customers')
+        .in('id', inactiveCustIds)
+        .delete();
+
+      if (error) throw error;
+
+      alert(`${inactiveCustIds.length} clientes inativos foram excluídos com sucesso!`);
+      setAnalyzedCount(null);
+      setInactiveCustIds([]);
+    } catch (error: any) {
+      console.error("Erro ao excluir clientes:", error);
+      alert("Falha ao excluir clientes inativos: " + error.message);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const allPaymentMethods = [
     { id: 'PIX', label: 'PIX' },
     { id: 'CARTAO', label: 'Cartão' },
@@ -1087,6 +1167,76 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                 </button>
               </div>
               <input type="file" ref={importFileRef} onChange={handleRestore} className="hidden" accept=".json" />
+
+              {/* Limpeza de Clientes Inativos */}
+              <div className="pt-6 border-t border-gray-100 space-y-4">
+                <div className="flex items-center gap-2">
+                  <Trash2 className="text-red-500" size={18} />
+                  <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">Limpeza de Clientes Inativos</h3>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Exclua clientes que não realizaram nenhuma compra ou movimentação no sistema por um longo período para liberar memória e otimizar o banco de dados.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Tempo de Inatividade</label>
+                    <select
+                      value={inactivityDays}
+                      onChange={(e) => {
+                        setInactivityDays(Number(e.target.value));
+                        setAnalyzedCount(null);
+                        setInactiveCustIds([]);
+                      }}
+                      className="w-full px-4 py-3 bg-gray-50 rounded-xl border border-gray-100 outline-none font-bold text-sm text-gray-700 focus:border-slate-200"
+                    >
+                      <option value={30}>30 dias (1 mês)</option>
+                      <option value={60}>60 dias (2 meses)</option>
+                      <option value={90}>90 dias (3 meses)</option>
+                      <option value={180}>180 dias (6 meses)</option>
+                      <option value={365}>365 dias (1 ano)</option>
+                    </select>
+                  </div>
+
+                  <button
+                    onClick={handleAnalyzeInactiveCustomers}
+                    disabled={isAnalyzing || isDeleting}
+                    className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+                  >
+                    {isAnalyzing ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
+                    {isAnalyzing ? "Analisando..." : "Analisar Inativos"}
+                  </button>
+                </div>
+
+                {analyzedCount !== null && (
+                  <div className="p-4 rounded-xl border animate-slide-up space-y-3 bg-rose-50 border-rose-100 text-rose-900">
+                    <div className="flex items-start gap-2 text-xs">
+                      <AlertTriangle className="text-rose-500 shrink-0 mt-0.5" size={16} />
+                      <div>
+                        <p className="font-bold">Análise Concluída</p>
+                        <p className="text-rose-700 mt-1">
+                          {analyzedCount === 0 ? (
+                            "Nenhum cliente inativo foi encontrado para o período selecionado."
+                          ) : (
+                            `Encontramos ${analyzedCount} ${analyzedCount === 1 ? 'cliente inativo' : 'clientes inativos'} que não fazem movimentações há mais de ${inactivityDays} dias.`
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    {analyzedCount > 0 && (
+                      <button
+                        onClick={handleDeleteInactiveCustomers}
+                        disabled={isDeleting}
+                        className="w-full py-3.5 bg-rose-600 text-white rounded-xl font-black text-xs uppercase tracking-wider hover:bg-rose-700 transition-colors shadow-lg shadow-rose-600/10 active:scale-95 flex items-center justify-center gap-2"
+                      >
+                        {isDeleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                        {isDeleting ? "Excluindo..." : `Excluir ${analyzedCount} Clientes`}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </section>
         </div>
