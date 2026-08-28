@@ -177,7 +177,7 @@ export default function SuperAdminPanel() {
   const [storeWaitstaff, setStoreWaitstaff] = useState<Waitstaff[]>([]);
   const [newCatName, setNewCatName] = useState('');
   const [isManagingContent, setIsManagingContent] = useState(false);
-  const [activeSubTab, setActiveSubTab] = useState<'perfil' | 'inventario' | 'equipe'>('perfil');
+  const [activeSubTab, setActiveSubTab] = useState<'perfil' | 'equipe'>('perfil');
 
   // Estados para Edição de Perfil
   const [editProfileData, setEditProfileData] = useState<{
@@ -812,7 +812,6 @@ export default function SuperAdminPanel() {
              </div>
              <div className="flex bg-slate-100 p-1.5 rounded-2xl overflow-x-auto no-scrollbar">
                 <button onClick={() => setActiveSubTab('perfil')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${activeSubTab === 'perfil' ? 'bg-white shadow-sm text-primary' : 'text-slate-400'}`}>Perfil</button>
-                <button onClick={() => setActiveSubTab('inventario')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${activeSubTab === 'inventario' ? 'bg-white shadow-sm text-primary' : 'text-slate-400'}`}>Produtos</button>
                 <button onClick={() => setActiveSubTab('equipe')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${activeSubTab === 'equipe' ? 'bg-white shadow-sm text-primary' : 'text-slate-400'}`}>Usuários/Acesso</button>
                 <button onClick={handleLogout} className="px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all text-red-500 hover:bg-red-50">Sair</button>
              </div>
@@ -1042,7 +1041,7 @@ export default function SuperAdminPanel() {
                  </div>
                </div>
              </div>
-           ) : (
+           ) : (activeSubTab as any) === 'inventario' ? (
              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-scale-up">
                <div className="lg:col-span-4 bg-white rounded-[3rem] p-8 shadow-xl border border-slate-100 h-fit">
                  <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
@@ -1104,7 +1103,7 @@ export default function SuperAdminPanel() {
                   </div>
                </div>
              </div>
-           )}
+           ) : null}
         </div>
 
         {showProductForm && (
@@ -1242,15 +1241,6 @@ export default function SuperAdminPanel() {
                   <a href={`/#/login?loja=${store.slug}`} target="_blank" className="flex items-center justify-center gap-2 py-4 bg-secondary text-primary rounded-2xl font-black text-[10px] uppercase col-span-2 shadow-sm hover:brightness-95" rel="noreferrer">
                     <LayoutDashboard size={14} /> Acessar Painel ADM
                   </a>
-                  <a href={`/#/cardapio?loja=${store.slug}`} target="_blank" className="flex items-center justify-center gap-2 py-4 bg-primary text-white rounded-2xl font-black text-[10px] uppercase col-span-2 shadow-sm hover:brightness-110" rel="noreferrer">
-                    <ArrowUpRight size={14} /> Ver Cardápio Público
-                  </a>
-                  <button 
-                    onClick={() => copyLink(store.slug)}
-                    className="flex items-center justify-center gap-2 py-3 bg-slate-50 text-slate-400 rounded-xl font-black text-[8px] uppercase col-span-2 mt-2 border border-slate-100"
-                  >
-                    {copiedId === store.slug ? <Check size={12} className="text-green-500" /> : <Copy size={12} />} {copiedId === store.slug ? 'Link Copiado' : 'Copiar Link do Cardápio'}
-                  </button>
                   <button 
                     onClick={() => handleDeleteStore(store.id)}
                     className="flex items-center justify-center gap-2 py-3 bg-red-50 text-red-500 rounded-xl font-black text-[8px] uppercase col-span-2 mt-1 border border-red-100 hover:bg-red-100 transition-colors"
