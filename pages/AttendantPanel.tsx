@@ -27,6 +27,7 @@ import {
 import { Order, OrderStatus, Waitstaff, StoreSettings } from '../types';
 import { supabase } from '../lib/supabase';
 import InstallPrompt from '../components/InstallPrompt';
+import ManagerPasswordModal from '../components/ManagerPasswordModal';
 
 interface Props {
   adminUser: Waitstaff | null;
@@ -41,6 +42,16 @@ interface Props {
 const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, settings, updateStatus, onLogout, isOffline }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [managerModal, setManagerModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    actionDescription?: string;
+    onSuccess: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    onSuccess: () => {}
+  });
   const [selectedTableModal, setSelectedTableModal] = useState<{id: string, type: 'MESA' | 'COMANDA'} | null>(null);
   const [activeTab, setActiveTab] = useState<'MAPA' | 'PEDIDOS'>('MAPA');
   const [printOrder, setPrintOrder] = useState<any | null>(null);
@@ -681,19 +692,32 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
                                         <CheckCircle2 size={14} className="text-green-500"/> Pular Produção (Pronto)
                                     </button>
                                     
-                                    {(isGerente || settings.canWaitstaffCancelItems) && (
-                                        <button 
-                                            onClick={() => {
+                                    <button 
+                                        onClick={() => {
+                                            const proceedCancel = () => {
                                                 if(window.confirm('Tem certeza que deseja cancelar este pedido?')) {
                                                     handleGroupStatusUpdate(order.originalIds, 'CANCELADO');
                                                 }
                                                 setOpenMenuId(null);
-                                            }}
-                                            className="px-4 py-3 text-left text-xs font-bold text-red-500 hover:bg-red-50 flex items-center gap-2 border-t border-gray-50 w-full"
-                                        >
-                                            <XCircle size={14} /> Cancelar Pedido
-                                        </button>
-                                    )}
+                                            };
+                                            if (isGerente || settings.canWaitstaffCancelItems) {
+                                                proceedCancel();
+                                            } else {
+                                                setOpenMenuId(null);
+                                                setManagerModal({
+                                                    isOpen: true,
+                                                    title: 'Cancelar Pedido',
+                                                    actionDescription: `Esta conta de atendente não possui permissão para cancelar o pedido #${order.displayId || order.id}.`,
+                                                    onSuccess: () => {
+                                                        proceedCancel();
+                                                    }
+                                                });
+                                            }
+                                        }}
+                                        className="px-4 py-3 text-left text-xs font-bold text-red-500 hover:bg-red-50 flex items-center gap-2 border-t border-gray-50 w-full"
+                                    >
+                                        <XCircle size={14} /> Cancelar Pedido
+                                    </button>
                                 </div>
                             )}
                         </div>
@@ -711,17 +735,33 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
                     )}
                     
                     {order.status === 'PRONTO' && (
-                      checkCanFinish(order.type) ? (
+                      (checkCanFinish(order.type) || (!settings.requirePosFinalization)) ? (
                         <button 
                           disabled={isUpdating === order.id}
-                          onClick={() => handleGroupStatusUpdate(order.originalIds, order.type === 'ENTREGA' ? 'ENVIADO_PARA_ENTREGA' : 'ENTREGUE')} 
+                          onClick={() => {
+                            const proceedFinish = () => {
+                              handleGroupStatusUpdate(order.originalIds, order.type === 'ENTREGA' ? 'ENVIADO_PARA_ENTREGA' : 'ENTREGUE');
+                            };
+                            if (checkCanFinish(order.type)) {
+                              proceedFinish();
+                            } else {
+                              setManagerModal({
+                                isOpen: true,
+                                title: 'Finalizar Pedido',
+                                actionDescription: `Esta conta de atendente não possui permissão para finalizar o pedido #${order.displayId || order.id}.`,
+                                onSuccess: () => {
+                                  proceedFinish();
+                                }
+                              });
+                            }
+                          }} 
                           className="flex-1 py-3.5 bg-green-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
                         >
                           {isUpdating === order.id ? <Loader2 className="animate-spin" size={14} /> : (order.type === 'ENTREGA' ? 'ENVIAR P/ ENTREGA' : 'FINALIZAR')}
                         </button>
                       ) : (
                         <div className="flex-1 py-3.5 bg-gray-100 text-gray-400 rounded-2xl text-[8px] font-black uppercase tracking-widest flex items-center justify-center gap-1 cursor-not-allowed">
-                          <Lock size={12} /> {settings.requirePosFinalization ? 'Finalizar no PDV' : 'Apenas Gerente'}
+                          <Lock size={12} /> Finalizar no PDV
                         </div>
                       )
                     )}
@@ -814,33 +854,61 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
                 {isUpdating === `table-${selectedTableModal.id}` ? <Loader2 className="animate-spin" size={20} /> : <CheckCircle2 className="text-blue-500" size={20} />} Marcar Tudo Pronto
               </button>
               
-              {checkCanFinish(selectedTableModal.type) ? (
+              {(checkCanFinish(selectedTableModal.type) || (!settings.requirePosFinalization)) ? (
                 <button 
                   disabled={isUpdating === `table-${selectedTableModal.id}`}
-                  onClick={() => updateTableOrders(selectedTableModal.id, 'ENTREGUE', selectedTableModal.type)} 
+                  onClick={() => {
+                    const proceedFinish = () => {
+                      updateTableOrders(selectedTableModal.id, 'ENTREGUE', selectedTableModal.type);
+                    };
+                    if (checkCanFinish(selectedTableModal.type)) {
+                      proceedFinish();
+                    } else {
+                      setManagerModal({
+                        isOpen: true,
+                        title: 'Finalizar Pedidos',
+                        actionDescription: `Esta conta de atendente não possui permissão para finalizar pedidos diretamente.`,
+                        onSuccess: () => {
+                          proceedFinish();
+                        }
+                      });
+                    }
+                  }} 
                   className="w-full flex items-center gap-4 p-5 bg-green-50 rounded-2xl border border-green-100 font-black text-[11px] uppercase tracking-wider text-green-700 hover:bg-green-100 transition-all active:scale-95"
                 >
                   {isUpdating === `table-${selectedTableModal.id}` ? <Loader2 className="animate-spin" size={20} /> : <CheckCircle className="text-green-500" size={20} />} Finalizar Pedidos
                 </button>
               ) : (
                 <div className="w-full flex items-center gap-4 p-5 bg-gray-50 rounded-2xl border border-gray-100 font-black text-[9px] uppercase tracking-wider text-gray-400 cursor-not-allowed">
-                  <Lock size={16} /> {settings.requirePosFinalization ? 'Finalizar no PDV' : 'Apenas Gerente'}
+                  <Lock size={16} /> Finalizar no PDV
                 </div>
               )}
 
-              {canCancel ? (
-                <button 
-                  disabled={isUpdating === `table-${selectedTableModal.id}`}
-                  onClick={() => { if(window.confirm('Deseja realmente cancelar todos os pedidos desta mesa/comanda?')) updateTableOrders(selectedTableModal.id, 'CANCELADO', selectedTableModal.type); }} 
-                  className="w-full flex items-center gap-4 p-5 bg-red-50 rounded-2xl border border-red-100 font-black text-[11px] uppercase tracking-wider text-red-700 hover:bg-red-100 transition-all active:scale-95"
-                >
-                  {isUpdating === `table-${selectedTableModal.id}` ? <Loader2 className="animate-spin" size={20} /> : <XCircle className="text-red-500" size={20} />} Cancelar Pedidos
-                </button>
-              ) : (
-                <div className="w-full flex items-center gap-4 p-5 bg-gray-50 rounded-2xl border border-gray-100 font-black text-[9px] uppercase tracking-wider text-gray-400 cursor-not-allowed">
-                  <Lock size={16} /> Cancelar (Apenas Gerente)
-                </div>
-              )}
+              <button 
+                disabled={isUpdating === `table-${selectedTableModal.id}`}
+                onClick={() => {
+                  const proceedCancel = () => {
+                    if (window.confirm('Deseja realmente cancelar todos os pedidos desta mesa/comanda?')) {
+                      updateTableOrders(selectedTableModal.id, 'CANCELADO', selectedTableModal.type);
+                    }
+                  };
+                  if (canCancel) {
+                    proceedCancel();
+                  } else {
+                    setManagerModal({
+                      isOpen: true,
+                      title: 'Cancelar Pedidos',
+                      actionDescription: `Esta conta de atendente não possui permissão para cancelar pedidos diretamente.`,
+                      onSuccess: () => {
+                        proceedCancel();
+                      }
+                    });
+                  }
+                }} 
+                className="w-full flex items-center gap-4 p-5 bg-red-50 rounded-2xl border border-red-100 font-black text-[11px] uppercase tracking-wider text-red-700 hover:bg-red-100 transition-all active:scale-95"
+              >
+                {isUpdating === `table-${selectedTableModal.id}` ? <Loader2 className="animate-spin" size={20} /> : <XCircle className="text-red-500" size={20} />} Cancelar Pedidos
+              </button>
             </div>
           </div>
         </div>
@@ -1302,6 +1370,16 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
               {printOrder.isConferencia && <p style={{ fontSize: '7pt', fontWeight: 'bold', marginTop: '2mm' }}>ESTE DOCUMENTO NÃO É UM CUPOM FISCAL</p>}
           </div>
         </div>
+      )}
+      {adminUser && (
+        <ManagerPasswordModal
+          isOpen={managerModal.isOpen}
+          onClose={() => setManagerModal(prev => ({ ...prev, isOpen: false }))}
+          storeId={adminUser.store_id}
+          title={managerModal.title}
+          actionDescription={managerModal.actionDescription}
+          onSuccess={managerModal.onSuccess}
+        />
       )}
     </div>
   );

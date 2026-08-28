@@ -45,6 +45,7 @@ import { Product, Order, OrderItem, StoreSettings, Waitstaff, PaymentMethod, Cus
 import { useNavigate } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
 import { ComplementsModal } from '../components/ComplementsModal';
+import ManagerPasswordModal from '../components/ManagerPasswordModal';
 
 import InstallPrompt from '../components/InstallPrompt';
 
@@ -87,6 +88,16 @@ interface Payment {
 export default function POS({ storeId, user, settings, orders, products: propProducts, onLogout, updateStatus, isOffline, ecosystemUsage, refreshEcosystemUsage }: POSProps) {
   const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>(propProducts || []);
+  const [managerModal, setManagerModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    actionDescription?: string;
+    onSuccess: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    onSuccess: () => {}
+  });
   
   useEffect(() => {
     setProducts(propProducts || []);
@@ -1594,8 +1605,8 @@ export default function POS({ storeId, user, settings, orders, products: propPro
     setWeightModal({ isOpen: false, product: null });
   };
 
-  const updateQuantity = (productId: string, delta: number) => {
-    const canCancel = user.role === 'GERENTE' || settings.canWaitstaffCancelItems;
+  const applyUpdateQuantity = (productId: string, delta: number, bypassPermissionCheck = false) => {
+    const canCancel = bypassPermissionCheck || user.role === 'GERENTE' || settings.canWaitstaffCancelItems;
 
     setCart(prev => {
       const itemToUpdate = prev.find(item => item.productId === productId);
@@ -1629,6 +1640,34 @@ export default function POS({ storeId, user, settings, orders, products: propPro
 
       return proposedCart;
     });
+  };
+
+  const updateQuantity = (productId: string, delta: number) => {
+    const itemToUpdate = cart.find(item => item.productId === productId);
+    if (!itemToUpdate) return;
+
+    const isGerente = user.role === 'GERENTE';
+    const canCancel = isGerente || settings.canWaitstaffCancelItems;
+
+    let newQty = itemToUpdate.quantity + delta;
+    newQty = Math.round(newQty * 1000) / 1000;
+    newQty = Math.max(0, newQty);
+
+    const isReducingPersisted = delta < 0 && itemToUpdate.isPersisted && newQty < (itemToUpdate.originalQuantity || 0);
+
+    if (isReducingPersisted && !canCancel) {
+      setManagerModal({
+        isOpen: true,
+        title: 'Cancelar/Remover Item Lançado',
+        actionDescription: `Esta conta de atendente não possui permissão para remover ou diminuir a quantidade do item "${itemToUpdate.name}" já lançado.`,
+        onSuccess: () => {
+          applyUpdateQuantity(productId, delta, true);
+        }
+      });
+      return;
+    }
+
+    applyUpdateQuantity(productId, delta, false);
   };
 
   const subtotal = cart.reduce((acc, item) => acc + ((item.price || 0) * (item.quantity || 0)), 0);
@@ -2138,50 +2177,63 @@ export default function POS({ storeId, user, settings, orders, products: propPro
   const handleCancelOrder = async () => {
     if (loadedCommandIds.length === 0) return;
     
-    const canCancel = user.role === 'GERENTE' || settings.canWaitstaffCancelItems;
+    const isGerente = user.role === 'GERENTE';
+    const canCancel = isGerente || settings.canWaitstaffCancelItems;
+
+    const proceedCancel = async () => {
+      if (!window.confirm(`Tem certeza que deseja cancelar este pedido?`)) {
+          return;
+      }
+
+      setIsProcessing(true);
+      try {
+          // Cancel the loaded orders
+          const uniqueIds: string[] = Array.from(new Set(loadedCommandIds));
+          for (const id of uniqueIds) {
+              await updateStatus(id, 'CANCELADO');
+          }
+          
+          const { data: updatedProducts } = await supabase.from('products').select('*').eq('store_id', storeId);
+          if (updatedProducts) setProducts(updatedProducts);
+
+          setCart([]);
+          setOriginalCart([]);
+          setLoadedCommandIds([]);
+          setLoadedPayments([]);
+          setCommandNumber('');
+          setOrderType('BALCAO');
+          setDeliveryDetails({
+              customerName: '',
+              customerPhone: '',
+              address: '',
+              referencePoint: '',
+              driverId: '',
+              payOnDelivery: false,
+              useStoreOrigin: true,
+              originAddress: ''
+          });
+          setDeliveryFee(0);
+          alert("Pedido cancelado com sucesso!");
+      } catch (err: any) {
+          alert("Erro ao cancelar pedido: " + err.message);
+      } finally {
+          setIsProcessing(false);
+      }
+    };
+
     if (!canCancel) {
-        alert('Você não tem permissão para cancelar pedidos.');
-        return;
-    }
-
-    if (!window.confirm(`Tem certeza que deseja cancelar este pedido?`)) {
-        return;
-    }
-
-    setIsProcessing(true);
-    try {
-        // Cancel the loaded orders
-        const uniqueIds: string[] = Array.from(new Set(loadedCommandIds));
-        for (const id of uniqueIds) {
-            await updateStatus(id, 'CANCELADO');
+      setManagerModal({
+        isOpen: true,
+        title: 'Cancelar Pedido',
+        actionDescription: 'Esta conta de atendente não possui permissão para cancelar pedidos diretamente.',
+        onSuccess: () => {
+          proceedCancel();
         }
-        
-        const { data: updatedProducts } = await supabase.from('products').select('*').eq('store_id', storeId);
-        if (updatedProducts) setProducts(updatedProducts);
-
-        setCart([]);
-        setOriginalCart([]);
-        setLoadedCommandIds([]);
-        setLoadedPayments([]);
-        setCommandNumber('');
-        setOrderType('BALCAO');
-        setDeliveryDetails({
-            customerName: '',
-            customerPhone: '',
-            address: '',
-            referencePoint: '',
-            driverId: '',
-            payOnDelivery: false,
-            useStoreOrigin: true,
-            originAddress: ''
-        });
-        setDeliveryFee(0);
-        alert("Pedido cancelado com sucesso!");
-    } catch (err: any) {
-        alert("Erro ao cancelar pedido: " + err.message);
-    } finally {
-        setIsProcessing(false);
+      });
+      return;
     }
+
+    proceedCancel();
   };
 
   const handleSaveNewCustomer = async () => {
@@ -2220,6 +2272,27 @@ export default function POS({ storeId, user, settings, orders, products: propPro
   };
 
   const handleCheckout = async () => {
+    if (cart.length === 0) return;
+
+    const isGerente = user.role === 'GERENTE';
+    const canFinish = isGerente || settings.canWaitstaffFinishOrder;
+
+    if (!canFinish) {
+      setManagerModal({
+        isOpen: true,
+        title: 'Finalizar Venda',
+        actionDescription: 'Esta conta de atendente não possui permissão para finalizar vendas diretamente.',
+        onSuccess: () => {
+          executeCheckout();
+        }
+      });
+      return;
+    }
+
+    executeCheckout();
+  };
+
+  const executeCheckout = async () => {
     if (cart.length === 0) return;
     
     if (loadedCommandIds.length === 0 && ecosystemUsage && settings.maxOrdersPerMonth && ecosystemUsage.ordersThisMonth >= settings.maxOrdersPerMonth) {
@@ -2617,6 +2690,33 @@ export default function POS({ storeId, user, settings, orders, products: propPro
   };
 
   const handleProcessReturn = async () => {
+    if (!selectedReturnOrder) return;
+
+    const itemsToReturn = Object.entries(returnQuantities).filter(([_, qty]) => qty > 0);
+    if (itemsToReturn.length === 0) {
+      alert("Por favor, selecione a quantidade de pelo menos um item para devolução.");
+      return;
+    }
+
+    const isGerente = user.role === 'GERENTE';
+    const canRefund = isGerente || settings.canWaitstaffRefund;
+
+    if (!canRefund) {
+      setManagerModal({
+        isOpen: true,
+        title: 'Realizar Devolução / Estorno',
+        actionDescription: 'Esta conta de atendente não possui permissão para realizar devoluções ou estornos de vendas.',
+        onSuccess: () => {
+          executeProcessReturn();
+        }
+      });
+      return;
+    }
+
+    executeProcessReturn();
+  };
+
+  const executeProcessReturn = async () => {
     if (!selectedReturnOrder) return;
 
     const itemsToReturn = Object.entries(returnQuantities).filter(([_, qty]) => qty > 0);
@@ -5374,6 +5474,15 @@ export default function POS({ storeId, user, settings, orders, products: propPro
           </div>
         </div>
       )}
+
+      <ManagerPasswordModal
+        isOpen={managerModal.isOpen}
+        onClose={() => setManagerModal(prev => ({ ...prev, isOpen: false }))}
+        storeId={storeId}
+        title={managerModal.title}
+        actionDescription={managerModal.actionDescription}
+        onSuccess={managerModal.onSuccess}
+      />
     </div>
   );
 }

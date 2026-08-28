@@ -28,6 +28,7 @@ export const INITIAL_SETTINGS: StoreSettings = {
   secondaryColor: '#FFD700',
   canWaitstaffFinishOrder: false,
   canWaitstaffCancelItems: false,
+  canWaitstaffRefund: false,
   thermalPrinterWidth: '80mm',
   address: 'Rua das Flores, 123 - Centro',
   whatsapp: '558591076984',

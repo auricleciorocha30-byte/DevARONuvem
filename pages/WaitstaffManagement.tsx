@@ -17,7 +17,8 @@ import {
   Truck,
   Edit2,
   Save,
-  X
+  X,
+  RotateCcw
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -163,6 +164,13 @@ const WaitstaffManagement: React.FC<Props> = ({ currentStore, settings, onUpdate
               icon={<XCircle className="text-red-500" />}
               checked={settings.canWaitstaffCancelItems}
               onChange={() => togglePermission('canWaitstaffCancelItems')}
+            />
+            <PermissionCard 
+              title="Devolução/Estorno" 
+              description="Permite que o atendente realize devoluções ou estornos de pedidos."
+              icon={<RotateCcw className="text-rose-500" />}
+              checked={!!settings.canWaitstaffRefund}
+              onChange={() => togglePermission('canWaitstaffRefund')}
             />
           </div>
         </section>

@@ -212,6 +212,7 @@ export interface StoreSettings {
   commandCount?: number;
   canWaitstaffFinishOrder: boolean;
   canWaitstaffCancelItems: boolean;
+  canWaitstaffRefund?: boolean;
   thermalPrinterWidth: '80mm' | '58mm';
   printWidthPx?: number;
   address?: string;
