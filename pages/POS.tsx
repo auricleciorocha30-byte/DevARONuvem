@@ -4457,7 +4457,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
               )}
 
               <div className="flex flex-col md:flex-row gap-6">
-                  <div className="flex-1 space-y-4">
+                  <div className="flex-1 min-w-0 space-y-4">
                       <div className="text-center p-4 bg-gray-50 rounded-2xl border border-gray-200">
                         <p className="text-xs text-gray-500 uppercase tracking-widest font-bold">Total a Pagar</p>
                         <p className="text-3xl font-black text-gray-900">{formatCurrency(total)}</p>
@@ -4493,7 +4493,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                                       <select 
                                           value={currentPaymentMethod}
                                           onChange={e => setCurrentPaymentMethod(e.target.value as PaymentMethod)}
-                                          className="p-3 rounded-xl border border-gray-200 font-bold outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                          className="p-3 rounded-xl border border-gray-200 font-bold outline-none focus:ring-2 focus:ring-blue-500 bg-white w-32 md:w-44 truncate"
                                       >
                                           <option value="DINHEIRO">Dinheiro</option>
                                           <option value="CARTAO">Cartão</option>
@@ -4501,7 +4501,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                                           <option value="VALES">Vales</option>
                                           <option value="PIX">Pix</option>
                                           {!isAutoFinalize && (
-                                              <option value="A_PAGAR">Não Pago (Cobrar no Atendente)</option>
+                                              <option value="A_PAGAR">Não Pago (A Cobrar)</option>
                                           )}
                                           {settings.isOnlinePaymentActive && (
                                               <option value="ONLINE">Pagar externo</option>
