@@ -595,7 +595,9 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
                      {order.paymentMethod && (
                         <div className="flex justify-between">
                            <span className="font-bold uppercase tracking-wider">Pagamento:</span>
-                           <span>{order.paymentMethod}</span>
+                           <span className={order.paymentMethod === 'A_PAGAR' ? 'text-red-500 font-extrabold animate-pulse' : ''}>
+                              {order.paymentMethod === 'A_PAGAR' ? 'Não Pago (A Cobrar)' : order.paymentMethod}
+                           </span>
                         </div>
                      )}
                      {order.customerPhone && (
@@ -657,7 +659,12 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
                       <p className="text-2xl font-brand font-bold text-primary">R$ {order.total.toFixed(2)}</p>
                       {order.serviceFee > 0 && <span className="text-[10px] text-gray-500 font-bold">Inclui R$ {order.serviceFee.toFixed(2)} de comissão</span>}
                     </div>
-                    <span className={`text-[9px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest ${order.status === 'PRONTO' ? 'bg-green-100 text-green-600 animate-pulse' : (order.status === 'AGUARDANDO' || order.status === 'AGUARDANDO_PAGAMENTO' || order.status === 'PENDENTE') ? 'bg-yellow-100 text-yellow-600' : 'bg-orange-100 text-orange-600'}`}>
+                    <span className={`text-[9px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest ${
+                      order.status === 'PRONTO' ? 'bg-green-100 text-green-600 animate-pulse' : 
+                      order.status === 'PAGO' ? 'bg-emerald-100 text-emerald-700 font-extrabold border border-emerald-200 animate-pulse' :
+                      (order.status === 'AGUARDANDO' || order.status === 'AGUARDANDO_PAGAMENTO' || order.status === 'PENDENTE') ? 'bg-yellow-100 text-yellow-600' : 
+                      'bg-orange-100 text-orange-600'
+                    }`}>
                         {order.status.replace('_', ' ')}
                     </span>
                   </div>

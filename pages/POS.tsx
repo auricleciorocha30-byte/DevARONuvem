@@ -2302,12 +2302,12 @@ export default function POS({ storeId, user, settings, orders, products: propPro
     
     const isPayOnDelivery = orderType === 'ENTREGA' && deliveryDetails.payOnDelivery;
     
-    if (remaining > 0.01 && !isPayOnDelivery) {
+    if (remaining > 0.01 && !isPayOnDelivery && isAutoFinalize) {
       alert(`Falta pagar ${formatCurrency(remaining)}`);
       return;
     }
 
-    if (!isPayOnDelivery && payments.some(p => p.method === 'A_PAGAR')) {
+    if (isAutoFinalize && !isPayOnDelivery && payments.some(p => p.method === 'A_PAGAR')) {
       alert("Para concluir a venda, remova o item 'A PAGAR' e lance a forma de pagamento real (Pix, Dinheiro, Cartão, etc).");
       return;
     }
@@ -2316,13 +2316,20 @@ export default function POS({ storeId, user, settings, orders, products: propPro
 
     try {
       const finalPayments = [...payments];
-      if (isPayOnDelivery) {
+      if (!isAutoFinalize || isPayOnDelivery) {
         const paidAmount = payments.reduce((acc, p) => acc + p.amount, 0);
         const aPagarAmount = total - paidAmount;
-        if (aPagarAmount > 0) {
-          finalPayments.push({ method: 'A_PAGAR', amount: aPagarAmount });
+        if (aPagarAmount > 0.01) {
+          const existingAPagar = finalPayments.find(p => p.method === 'A_PAGAR');
+          if (existingAPagar) {
+            existingAPagar.amount += aPagarAmount;
+          } else {
+            finalPayments.push({ method: 'A_PAGAR', amount: aPagarAmount });
+          }
         }
       }
+
+      const hasRealPayment = finalPayments.some(p => p.method !== 'A_PAGAR' && p.method !== 'CASHBACK');
 
       const order: Partial<Order> = {
         store_id: storeId,
@@ -2331,7 +2338,9 @@ export default function POS({ storeId, user, settings, orders, products: propPro
         items: cart,
         status: isAutoFinalize 
           ? (orderType === 'ENTREGA' ? 'ENVIADO_PARA_ENTREGA' : 'ENTREGUE') 
-          : (orderType === 'ENTREGA' && settings.autoApproveDeliveries) ? 'ENVIADO_PARA_ENTREGA' : 'PREPARANDO',
+          : (hasRealPayment 
+              ? 'PAGO' 
+              : ((orderType === 'ENTREGA' && settings.autoApproveDeliveries) ? 'ENVIADO_PARA_ENTREGA' : 'PREPARANDO')),
         total: total,
         serviceFee: serviceFee,
         paymentMethod: finalPayments.length === 1 ? finalPayments[0].method : 'MISTO' as any,
@@ -4491,6 +4500,9 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                                           <option value="DEBITO">Débito</option>
                                           <option value="VALES">Vales</option>
                                           <option value="PIX">Pix</option>
+                                          {!isAutoFinalize && (
+                                              <option value="A_PAGAR">Não Pago (Cobrar no Atendente)</option>
+                                          )}
                                           {settings.isOnlinePaymentActive && (
                                               <option value="ONLINE">Pagar externo</option>
                                           )}
