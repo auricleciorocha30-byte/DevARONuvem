@@ -4456,44 +4456,93 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                   </div>
               )}
 
-              <div className="flex flex-col md:flex-row gap-6">
-                  <div className="flex-1 min-w-0 space-y-4">
-                      <div className="text-center p-4 bg-gray-50 rounded-2xl border border-gray-200">
+              <div className="space-y-6">
+                  {/* Linha 1: Status de Total e Pagamentos Lançados */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Card de Total a Pagar */}
+                      <div className="text-center p-5 bg-gray-50 rounded-2xl border border-gray-200 flex flex-col justify-center min-h-[140px]">
                         <p className="text-xs text-gray-500 uppercase tracking-widest font-bold">Total a Pagar</p>
                         <p className="text-3xl font-black text-gray-900">{formatCurrency(total)}</p>
-                        <p className="text-xs text-red-500 font-bold mt-1">Restante: {formatCurrency(remaining)}</p>
+                        <p className="text-sm text-red-500 font-extrabold mt-1">Restante: {formatCurrency(remaining)}</p>
                         
                         {settings.isCashbackActive && selectedCustomer && selectedCustomer.points > 0 && selectedCustomer.points >= (settings.minCashbackToUse || 0) && remaining > 0 && (
                             <button 
                                 onClick={handleUseCashback}
-                                className="mt-3 w-full flex items-center justify-center gap-2 p-2 bg-orange-100 text-orange-700 rounded-xl border border-orange-200 hover:bg-orange-200 transition-colors text-sm font-bold"
+                                className="mt-3 w-full flex items-center justify-center gap-2 p-2 bg-orange-100 text-orange-700 rounded-xl border border-orange-200 hover:bg-orange-200 transition-colors text-xs font-bold"
                             >
-                                <Award size={16} />
+                                <Award size={14} />
                                 Usar Cashback: {formatCurrency(selectedCustomer.points)}
                             </button>
                         )}
                       </div>
 
-                      <div className="space-y-2">
-                          {orderType === 'ENTREGA' && deliveryDetails.payOnDelivery ? (
-                              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-yellow-800 text-sm font-bold text-center">
-                                  Pagamento será realizado no ato da entrega.
+                      {/* Card de Pagamentos Lançados */}
+                      <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200 h-[140px] overflow-y-auto flex flex-col">
+                          <h3 className="text-xs font-bold text-gray-500 uppercase mb-2">Pagamentos Lançados</h3>
+                          {payments.length === 0 ? (
+                              <div className="flex-1 flex items-center justify-center">
+                                  <p className="text-gray-400 text-xs italic">Nenhum pagamento lançado</p>
                               </div>
                           ) : (
-                              <>
-                                  <label className="text-xs font-bold text-gray-500 uppercase">Adicionar Pagamento</label>
-                                  <div className="flex gap-2">
-                                      <input 
-                                          type="number" 
-                                          value={currentPaymentAmount}
-                                          onChange={e => setCurrentPaymentAmount(e.target.value)}
-                                          className="flex-1 p-3 rounded-xl border border-gray-200 font-bold outline-none focus:ring-2 focus:ring-blue-500"
-                                          placeholder="Valor"
-                                      />
+                              <div className="space-y-2 flex-1">
+                                  {payments.map((p, i) => (
+                                      <div key={i} className="flex justify-between items-center bg-white p-2 rounded-xl shadow-sm border border-gray-100">
+                                          <div className="flex items-center gap-1.5">
+                                              {p.method === 'DINHEIRO' && <Banknote size={14} className="text-green-600" />}
+                                              {p.method === 'CARTAO' && <CreditCard size={14} className="text-blue-600" />}
+                                              {p.method === 'DEBITO' && <CreditCard size={14} className="text-blue-400" />}
+                                              {p.method === 'VALES' && <Ticket size={14} className="text-orange-600" />}
+                                              {p.method === 'PIX' && <QrCode size={14} className="text-purple-600" />}
+                                              {p.method === 'CASHBACK' && <Award size={14} className="text-orange-500" />}
+                                              {p.method === 'MAQUININHA' && <Zap size={14} className="text-blue-600" />}
+                                              <span className="font-extrabold text-[11px]">{p.method === 'CASHBACK' ? 'CASHBACK' : p.method === 'A_PAGAR' ? 'NÃO PAGO' : p.method}</span>
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                              <span className="font-black text-xs text-gray-800">{formatCurrency(p.amount)}</span>
+                                              <button onClick={() => handleRemovePayment(i)} className="text-red-400 hover:text-red-600 p-0.5 transition-colors">
+                                                  <Trash2 size={13} />
+                                              </button>
+                                          </div>
+                                      </div>
+                                  ))}
+                                  {change > 0 && (
+                                      <div className="flex justify-between items-center bg-green-50 p-2 rounded-xl border border-green-100">
+                                          <span className="font-bold text-green-700 text-xs">Troco</span>
+                                          <span className="font-black text-green-700 text-xs">{formatCurrency(change)}</span>
+                                      </div>
+                                  )}
+                              </div>
+                          )}
+                      </div>
+                  </div>
+
+                  {/* Linha 2: Área de Adicionar Pagamento (Largura Total) */}
+                  <div className="bg-blue-50/40 p-4 rounded-2xl border border-blue-100 space-y-3">
+                      {orderType === 'ENTREGA' && deliveryDetails.payOnDelivery ? (
+                          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-yellow-800 text-sm font-bold text-center">
+                              Pagamento será realizado no ato da entrega.
+                          </div>
+                      ) : (
+                          <>
+                              <div className="flex flex-col gap-2">
+                                  <label className="text-xs font-bold text-blue-900 uppercase tracking-wide">Adicionar Pagamento</label>
+                                  <div className="flex flex-col sm:flex-row gap-2">
+                                      {/* Input de Valor */}
+                                      <div className="flex-1 relative">
+                                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">R$</span>
+                                          <input 
+                                              type="number" 
+                                              value={currentPaymentAmount}
+                                              onChange={e => setCurrentPaymentAmount(e.target.value)}
+                                              className="w-full pl-9 pr-3 py-3 rounded-xl border border-blue-200 font-bold outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                              placeholder="0,00"
+                                          />
+                                      </div>
+                                      {/* Seletor de Método */}
                                       <select 
                                           value={currentPaymentMethod}
                                           onChange={e => setCurrentPaymentMethod(e.target.value as PaymentMethod)}
-                                          className="p-3 rounded-xl border border-gray-200 font-bold outline-none focus:ring-2 focus:ring-blue-500 bg-white w-32 md:w-44 truncate"
+                                          className="p-3 rounded-xl border border-blue-200 font-bold outline-none focus:ring-2 focus:ring-blue-500 bg-white w-full sm:w-56 shrink-0"
                                       >
                                           <option value="DINHEIRO">Dinheiro</option>
                                           <option value="CARTAO">Cartão</option>
@@ -4510,6 +4559,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                                               <option value="MAQUININHA">Maquininha Point</option>
                                           )}
                                       </select>
+                                      {/* Botão de Confirmação */}
                                       <button 
                                           onClick={
                                             currentPaymentMethod === 'MAQUININHA' ? handlePointPayment : 
@@ -4517,193 +4567,169 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                                             (currentPaymentMethod === 'PIX' && settings.onlinePaymentAccessToken && !generatedPix ? handleCreatePixQrCode : handleAddPayment))
                                           }
                                           disabled={isPointProcessing || isOnlineProcessing || isGeneratingPix}
-                                          className={`p-3 text-white rounded-xl ${isPointProcessing || isOnlineProcessing || isGeneratingPix ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`}
+                                          className={`py-3 px-6 text-white rounded-xl font-bold flex items-center justify-center gap-2 shrink-0 active:scale-95 transition-all shadow-sm ${
+                                              isPointProcessing || isOnlineProcessing || isGeneratingPix ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'
+                                          }`}
                                       >
                                           {isPointProcessing || isOnlineProcessing || isGeneratingPix ? (
-                                            <Loader2 className="animate-spin" size={20} />
+                                            <Loader2 className="animate-spin" size={18} />
                                           ) : (
                                             ((currentPaymentMethod === 'ONLINE' && !onlineCheckoutUrl) || (currentPaymentMethod === 'PIX' && settings.onlinePaymentAccessToken && !generatedPix)) ? (
-                                              <Zap size={20} />
+                                              <>
+                                                <Zap size={16} />
+                                                <span>Gerar</span>
+                                              </>
                                             ) : (
-                                              <Plus size={20} />
+                                              <>
+                                                <Plus size={16} />
+                                                <span>Adicionar</span>
+                                              </>
                                             )
                                           )}
                                       </button>
                                   </div>
-
-                                  {isGeneratingPix && (
-                                      <div className="p-3 bg-purple-50 rounded-xl border border-purple-100 flex items-center gap-3 animate-pulse">
-                                          <Loader2 className="animate-spin text-purple-600" size={20} />
-                                          <span className="text-sm font-bold text-purple-800">Gerando QR Code PIX...</span>
-                                      </div>
-                                  )}
-
-                                  {isOnlineProcessing && (
-                                      <div className="p-3 bg-green-50 rounded-xl border border-green-100 flex items-center gap-3 animate-pulse">
-                                          <Loader2 className="animate-spin text-green-600" size={20} />
-                                          <span className="text-sm font-bold text-green-800">Gerando link de pagamento...</span>
-                                      </div>
-                                  )}
-
-                                  {currentPaymentMethod === 'ONLINE' && onlineCheckoutUrl && (
-                                      <div className="p-3 bg-green-50 rounded-xl border border-green-100 space-y-2">
-                                          <div className="flex justify-between items-center">
-                                              <span className="text-xs font-bold text-green-800 uppercase tracking-widest">Link de Pagamento Ativo</span>
-                                              <button onClick={() => setOnlineCheckoutUrl(null)} className="text-red-500 hover:text-red-700">
-                                                  <X size={14} />
-                                              </button>
-                                          </div>
-                                          <button 
-                                              onClick={() => window.open(onlineCheckoutUrl, '_blank')}
-                                              className="w-full py-2 bg-white border border-green-200 text-green-700 rounded-lg text-xs font-bold flex items-center justify-center gap-2"
-                                          >
-                                              <Globe size={14} /> Abrir Link Novamente
-                                          </button>
-                                          <p className="text-[10px] text-green-600 italic">* Após receber a confirmação no celular do cliente, clique no botão (+) acima para confirmar no PDV.</p>
-                                      </div>
-                                  )}
-
-                                  {isPointProcessing && (
-                                      <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 flex items-center gap-3 animate-pulse">
-                                          <Loader2 className="animate-spin text-blue-600" size={20} />
-                                          <span className="text-sm font-bold text-blue-800">{pointStatus}</span>
-                                      </div>
-                                  )}
-                                  
-                                  {currentPaymentMethod === 'MAQUININHA' && !isPointProcessing && (
-                                      <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 text-xs text-blue-800">
-                                          <p className="font-bold uppercase">Integração Mercado Pago Point</p>
-                                          <p>Ao clicar no botão (+), o valor será enviado automaticamente para a maquininha vinculada.</p>
-                                      </div>
-                                  )}
-                                  
-                                  {currentPaymentMethod === 'CARTAO' && currentPaymentAmount && !isNaN(parseFloat(currentPaymentAmount)) && (
-                                      <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 text-xs text-blue-800 space-y-1">
-                                          <p className="font-bold uppercase">Simulação de Parcelamento</p>
-                                          <div className="grid grid-cols-3 gap-2">
-                                              {[1, 2, 3, 4, 5, 6].map(i => (
-                                                  <div key={i} className="bg-white p-1 rounded border border-blue-100 text-center">
-                                                      <span className="font-bold">{i}x</span> {formatCurrency(parseFloat(currentPaymentAmount) / i)}
-                                                  </div>
-                                              ))}
-                                          </div>
-                                      </div>
-                                  )}
-                              </>
-                          )}
-                      </div>
-
-                      {currentPaymentMethod === 'PIX' && (!orderType || orderType !== 'ENTREGA' || !deliveryDetails.payOnDelivery) && (
-                        <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex flex-col items-center gap-4 text-center">
-                          {generatedPix ? (
-                            <div className="space-y-4 w-full">
-                                <div className="flex justify-between items-center px-2">
-                                    <span className="text-[10px] font-black uppercase text-purple-600 tracking-widest">PIX Dinâmico MP</span>
-                                    <button onClick={() => setGeneratedPix(null)} className="text-red-500 p-1 hover:bg-red-50 rounded-lg">
-                                        <X size={14} />
-                                    </button>
                                 </div>
-                                <img src={`data:image/png;base64,${generatedPix.qr_code_base64}`} alt="QR Pix Dinâmico" className="w-48 h-48 object-contain bg-white p-2 rounded-xl shadow-sm mx-auto" />
-                                <div className="space-y-2">
-                                    <div className="bg-purple-50 p-2 rounded-lg border border-purple-100 animate-pulse text-center">
-                                        <p className="text-[10px] font-bold text-purple-700">Aguardando confirmação automática...</p>
-                                    </div>
-                                    <button 
-                                        onClick={async () => {
-                                            try {
-                                                const resp = await fetch(`/api/mercado-pago/payment-status/${generatedPix.id}?accessToken=${settings.onlinePaymentAccessToken}`);
-                                                const data = await resp.json();
-                                                if (data.status === 'approved') {
-                                                    setIsPixApproved(true);
-                                                    setPayments(prev => [...prev, { method: 'PIX', amount: parseFloat(currentPaymentAmount) }]);
-                                                    setCurrentPaymentAmount('');
-                                                    setGeneratedPix(null);
-                                                    alert("Pagamento PIX Confirmado!");
-                                                } else {
-                                                    alert("Pagamento ainda não aprovado. Status: " + (data.status || 'pendente'));
-                                                }
-                                            } catch (e) { alert("Erro ao consultar: " + e); }
-                                        }}
-                                        className="w-full py-2 bg-blue-50 text-blue-700 rounded-lg text-[10px] font-bold border border-blue-100 uppercase"
-                                    >
-                                        Verificar Pagamento Manualmente
-                                    </button>
-                                </div>
-                                <button 
-                                    onClick={() => {
-                                        navigator.clipboard.writeText(generatedPix.qr_code);
-                                        setIsPixCopied(true);
-                                        setTimeout(() => setIsPixCopied(false), 3000);
-                                    }}
-                                    className="text-xs font-bold text-blue-600 underline flex items-center justify-center gap-1 mx-auto transition-all"
-                                >
-                                    {isPixCopied ? (
-                                        <><CheckCircle2 size={14}/> Copiado!</>
-                                    ) : (
-                                        <>Copiar Código PIX</>
-                                    )}
-                                </button>
-                            </div>
-                          ) : settings.pixQrCodeUrl ? (
-                            <>
-                                <img src={settings.pixQrCodeUrl || undefined} alt="QR Pix" className="w-48 h-48 object-contain mix-blend-multiply bg-white p-2 rounded-xl shadow-sm" />
-                                <div className="flex-1">
-                                    <p className="text-sm font-bold text-gray-700">QR Code Pix Estático</p>
-                                    <p className="text-xs text-gray-500">Escaneie para pagar</p>
-                                </div>
-                                {settings.onlinePaymentAccessToken && (
-                                    <p className="text-[10px] text-purple-600 font-medium">Dica: Clique no raio (⚡) acima para gerar um PIX dinâmico com confirmação automática.</p>
-                                )}
-                            </>
-                          ) : (
-                            <>
-                                <QrCode size={48} className="text-gray-400" />
-                                <div className="flex-1">
-                                    <p className="text-sm font-bold text-gray-700">QR Code Pix</p>
-                                    <p className="text-xs text-gray-500">Configure um QR Code ou use Mercado Pago</p>
-                                </div>
-                            </>
-                          )}
-                        </div>
-                      )}
-                  </div>
 
-                  <div className="flex-1 bg-gray-50 rounded-2xl p-4 border border-gray-200 h-64 overflow-y-auto">
-                      <h3 className="text-xs font-bold text-gray-500 uppercase mb-3">Pagamentos Lançados</h3>
-                      {payments.length === 0 ? (
-                          <p className="text-center text-gray-400 text-sm mt-10">Nenhum pagamento adicionado</p>
-                      ) : (
-                          <div className="space-y-2">
-                              {payments.map((p, i) => (
-                                  <div key={i} className="flex justify-between items-center bg-white p-3 rounded-xl shadow-sm">
-                                      <div className="flex items-center gap-2">
-                                          {p.method === 'DINHEIRO' && <Banknote size={16} className="text-green-600" />}
-                                          {p.method === 'CARTAO' && <CreditCard size={16} className="text-blue-600" />}
-                                          {p.method === 'DEBITO' && <CreditCard size={16} className="text-blue-400" />}
-                                          {p.method === 'VALES' && <Ticket size={16} className="text-orange-600" />}
-                                          {p.method === 'PIX' && <QrCode size={16} className="text-purple-600" />}
-                                          {p.method === 'CASHBACK' && <Award size={16} className="text-orange-500" />}
-                                          {p.method === 'MAQUININHA' && <Zap size={16} className="text-blue-600" />}
-                                          <span className="font-bold text-sm">{p.method === 'CASHBACK' ? 'CASHBACK' : p.method}</span>
-                                      </div>
-                                      <div className="flex items-center gap-3">
-                                          <span className="font-bold">{formatCurrency(p.amount)}</span>
-                                          <button onClick={() => handleRemovePayment(i)} className="text-red-400 hover:text-red-600">
-                                              <Trash2 size={14} />
-                                          </button>
-                                      </div>
-                                  </div>
-                              ))}
-                              {change > 0 && (
-                                  <div className="flex justify-between items-center bg-green-50 p-3 rounded-xl border border-green-100">
-                                      <span className="font-bold text-green-700 text-sm">Troco</span>
-                                      <span className="font-black text-green-700">{formatCurrency(change)}</span>
-                                  </div>
-                              )}
-                          </div>
-                      )}
-                  </div>
-              </div>
+                               {/* Informações adicionais de integrações */}
+                               <div className="space-y-2">
+                                   {isGeneratingPix && (
+                                       <div className="p-3 bg-purple-50 rounded-xl border border-purple-100 flex items-center gap-3 animate-pulse">
+                                           <Loader2 className="animate-spin text-purple-600" size={20} />
+                                           <span className="text-sm font-bold text-purple-800">Gerando QR Code PIX...</span>
+                                       </div>
+                                   )}
+
+                                   {isOnlineProcessing && (
+                                       <div className="p-3 bg-green-50 rounded-xl border border-green-100 flex items-center gap-3 animate-pulse">
+                                           <Loader2 className="animate-spin text-green-600" size={20} />
+                                           <span className="text-sm font-bold text-green-800">Gerando link de pagamento...</span>
+                                       </div>
+                                   )}
+
+                                   {currentPaymentMethod === 'ONLINE' && onlineCheckoutUrl && (
+                                       <div className="p-3 bg-green-50 rounded-xl border border-green-100 space-y-2">
+                                           <div className="flex justify-between items-center">
+                                               <span className="text-xs font-bold text-green-800 uppercase tracking-widest">Link de Pagamento Ativo</span>
+                                               <button onClick={() => setOnlineCheckoutUrl(null)} className="text-red-500 hover:text-red-700">
+                                                   <X size={14} />
+                                               </button>
+                                           </div>
+                                           <button 
+                                               onClick={() => window.open(onlineCheckoutUrl, '_blank')}
+                                               className="w-full py-2 bg-white border border-green-200 text-green-700 rounded-lg text-xs font-bold flex items-center justify-center gap-2"
+                                           >
+                                               <Globe size={14} /> Abrir Link Novamente
+                                           </button>
+                                           <p className="text-[10px] text-green-600 italic">* Após receber a confirmação no celular do cliente, clique no botão (+) acima para confirmar no PDV.</p>
+                                       </div>
+                                   )}
+
+                                   {isPointProcessing && (
+                                       <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 flex items-center gap-3 animate-pulse">
+                                           <Loader2 className="animate-spin text-blue-600" size={20} />
+                                           <span className="text-sm font-bold text-blue-800">{pointStatus}</span>
+                                       </div>
+                                   )}
+                                   
+                                   {currentPaymentMethod === 'MAQUININHA' && !isPointProcessing && (
+                                       <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 text-xs text-blue-800">
+                                           <p className="font-bold uppercase">Integração Mercado Pago Point</p>
+                                           <p>Ao clicar no botão Adicionar, o valor será enviado automaticamente para a maquininha vinculada.</p>
+                                       </div>
+                                   )}
+                                   
+                                   {currentPaymentMethod === 'CARTAO' && currentPaymentAmount && !isNaN(parseFloat(currentPaymentAmount)) && (
+                                       <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 text-xs text-blue-800 space-y-1">
+                                           <p className="font-bold uppercase">Simulação de Parcelamento</p>
+                                           <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                                               {[1, 2, 3, 4, 5, 6].map(i => (
+                                                   <div key={i} className="bg-white p-1 rounded border border-blue-100 text-center text-[11px]">
+                                                       <span className="font-bold">{i}x</span> {formatCurrency(parseFloat(currentPaymentAmount) / i)}
+                                                   </div>
+                                               ))}
+                                           </div>
+                                       </div>
+                                   )}
+                               </div>
+                           </>
+                       )}
+                   </div>
+
+                   {/* Bloco de QR Code / PIX Estático se aplicável */}
+                   {currentPaymentMethod === 'PIX' && (!orderType || orderType !== 'ENTREGA' || !deliveryDetails.payOnDelivery) && (
+                     <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex flex-col items-center gap-4 text-center">
+                       {generatedPix ? (
+                         <div className="space-y-4 w-full">
+                             <div className="flex justify-between items-center px-2">
+                                 <span className="text-[10px] font-black uppercase text-purple-600 tracking-widest">PIX Dinâmico MP</span>
+                                 <button onClick={() => setGeneratedPix(null)} className="text-red-500 p-1 hover:bg-red-50 rounded-lg">
+                                     <X size={14} />
+                                 </button>
+                             </div>
+                             <img src={`data:image/png;base64,${generatedPix.qr_code_base64}`} alt="QR Pix Dinâmico" className="w-48 h-48 object-contain bg-white p-2 rounded-xl shadow-sm mx-auto" />
+                             <div className="space-y-2">
+                                 <div className="bg-purple-50 p-2 rounded-lg border border-purple-100 animate-pulse text-center">
+                                     <p className="text-[10px] font-bold text-purple-700">Aguardando confirmação automática...</p>
+                                 </div>
+                                 <button 
+                                     onClick={async () => {
+                                         try {
+                                             const resp = await fetch(`/api/mercado-pago/payment-status/${generatedPix.id}?accessToken=${settings.onlinePaymentAccessToken}`);
+                                             const data = await resp.json();
+                                             if (data.status === 'approved') {
+                                                 setIsPixApproved(true);
+                                                 setPayments(prev => [...prev, { method: 'PIX', amount: parseFloat(currentPaymentAmount) }]);
+                                                 setCurrentPaymentAmount('');
+                                                 setGeneratedPix(null);
+                                                 alert("Pagamento PIX Confirmado!");
+                                             } else {
+                                                 alert("Pagamento ainda não aprovado. Status: " + (data.status || 'pendente'));
+                                             }
+                                         } catch (e) { alert("Erro ao consultar: " + e); }
+                                     }}
+                                     className="w-full py-2 bg-blue-50 text-blue-700 rounded-lg text-[10px] font-bold border border-blue-100 uppercase"
+                                 >
+                                     Verificar Pagamento Manualmente
+                                 </button>
+                             </div>
+                             <button 
+                                 onClick={() => {
+                                     navigator.clipboard.writeText(generatedPix.qr_code);
+                                     setIsPixCopied(true);
+                                     setTimeout(() => setIsPixCopied(false), 3000);
+                                 }}
+                                 className="text-xs font-bold text-blue-600 underline flex items-center justify-center gap-1 mx-auto transition-all"
+                             >
+                                 {isPixCopied ? (
+                                     <><CheckCircle2 size={14}/> Copiado!</>
+                                 ) : (
+                                     <>Copiar Código PIX</>
+                                 )}
+                             </button>
+                         </div>
+                       ) : settings.pixQrCodeUrl ? (
+                         <>
+                             <img src={settings.pixQrCodeUrl || undefined} alt="QR Pix" className="w-48 h-48 object-contain mix-blend-multiply bg-white p-2 rounded-xl shadow-sm" />
+                             <div className="flex-1">
+                                 <p className="text-sm font-bold text-gray-700">QR Code Pix Estático</p>
+                                 <p className="text-xs text-gray-500">Escaneie para pagar</p>
+                             </div>
+                             {settings.onlinePaymentAccessToken && (
+                                 <p className="text-[10px] text-purple-600 font-medium">Dica: Clique no raio (⚡) acima para gerar um PIX dinâmico com confirmação automática.</p>
+                             )}
+                         </>
+                       ) : (
+                         <>
+                             <QrCode size={48} className="text-gray-400" />
+                             <div className="flex-1">
+                                 <p className="text-sm font-bold text-gray-700">QR Code Pix</p>
+                                 <p className="text-xs text-gray-500">Configure um QR Code ou use Mercado Pago</p>
+                             </div>
+                         </>
+                       )}
+                     </div>
+                   )}
+               </div>
 
             </div>
 
