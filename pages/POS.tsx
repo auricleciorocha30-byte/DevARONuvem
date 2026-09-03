@@ -4840,40 +4840,17 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider bg-yellow-100 text-yellow-700 flex items-center gap-1">
                                             <Truck size={10} />
                                             {couriers.find(c => c.id === order.deliveryDriverId)?.name || 'Entregador'}
-                                            {couriers.find(c => c.id === order.deliveryDriverId)?.phone && (
-                                              <a 
-                                                href={`https://wa.me/55${couriers.find(c => c.id === order.deliveryDriverId)?.phone?.replace(/\D/g, '')}`}
-                                                target="_blank" 
-                                                rel="noopener noreferrer"
-                                                className="ml-1 text-green-600 hover:text-green-700 hover:scale-110 transition-transform"
-                                                onClick={e => e.stopPropagation()}
-                                                title="WhatsApp do Entregador"
-                                              >
-                                                <MessageCircle size={12} />
-                                              </a>
-                                            )}
                                         </span>
                                     )}
                                 </div>
                                 {((order.type !== 'MESA' && order.type !== 'COMANDA') || order.customerName) && (
                                     <h3 className="font-bold text-gray-800">{order.customerName || 'Cliente sem nome'}</h3>
+                                
                                 )}
                                 {order.type === 'ENTREGA' && (
                                   <>
                                     <p className="text-sm text-gray-500 flex items-center gap-1">
                                         <Phone size={12} /> {order.customerPhone || 'Sem telefone'}
-                                        {order.customerPhone && (
-                                            <a 
-                                                href={`https://wa.me/${order.customerPhone.replace(/\D/g, '')}`} 
-                                                target="_blank" 
-                                                rel="noopener noreferrer"
-                                                className="ml-2 text-green-500 hover:text-green-600"
-                                                title="Abrir WhatsApp"
-                                                onClick={e => e.stopPropagation()}
-                                            >
-                                                <MessageCircle size={14} />
-                                            </a>
-                                        )}
                                     </p>
                                     <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
                                         <MapPin size={12} /> {order.deliveryAddress || 'Retirada'}

@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect } from 'react';
 import { StoreSettings, Product } from '../types';
 import { Switch } from '../components/Switch';
@@ -70,6 +69,7 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
   const [showSuccess, setShowSuccess] = useState(false);
   const [productSearch, setProductSearch] = useState('');
   const [cashbackProductSearch, setCashbackProductSearch] = useState('');
+  const [activeTab, setActiveTab] = useState<'store' | 'operation' | 'rules' | 'devices' | 'system'>('store');
 
   const [inactivityDays, setInactivityDays] = useState(90);
   const [analyzedCount, setAnalyzedCount] = useState<number | null>(null);
@@ -336,11 +336,11 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
   const filteredCashbackProducts = products.filter(p => p.name.toLowerCase().includes(cashbackProductSearch.toLowerCase()));
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 pb-12 text-zinc-900">
+    <div className="max-w-6xl mx-auto space-y-8 pb-12 text-zinc-900">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-brand font-bold text-gray-800">Identidade & Configurações</h1>
-          <p className="text-gray-500">Personalize as cores, logo e canais de contato.</p>
+          <p className="text-gray-500 text-sm">Personalize os dados da sua loja, regras, promoções e dispositivos de impressão.</p>
         </div>
         <div className="flex gap-3">
           <button 
@@ -361,11 +361,41 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
-        {/* Coluna 1: Operação e Localização */}
-        <div className="space-y-6">
-          <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
+      {/* Navigation tabs */}
+      <div className="flex border-b border-gray-100 overflow-x-auto scrollbar-none gap-2 pb-1.5">
+        {[
+          { id: 'store', label: 'Loja & Identidade', icon: Store },
+          { id: 'operation', label: 'Horários & Turnos', icon: Clock },
+          { id: 'rules', label: 'Promoções & Pix', icon: Percent },
+          { id: 'devices', label: 'Impressora Térmica', icon: Printer },
+          { id: 'system', label: 'Manutenção de Dados', icon: Database }
+        ].map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`flex items-center gap-2 py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all whitespace-nowrap shrink-0 ${
+                isActive
+                  ? 'bg-orange-600 text-white shadow-md shadow-orange-100'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <Icon size={16} />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tab Panels */}
+      {activeTab === 'store' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-scale-up">
+          {/* Contato & Localização */}
+          <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 space-y-4">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-2 flex items-center gap-2">
               <MapPin size={18} /> Contato & Localização
             </h2>
             <div className="space-y-4">
@@ -415,690 +445,477 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                   <input type="text" placeholder="Ex: 5511999999999" value={localSettings.whatsapp || ''} onChange={(e) => setLocalSettings({...localSettings, whatsapp: e.target.value})} className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none" />
                 </div>
               </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase ml-2">Horário de Funcionamento (Texto Livre)</label>
-                <div className="relative">
-                  <Clock className="absolute left-4 top-4 text-gray-300" size={18} />
-                  <textarea placeholder="Ex: Seg a Sex: 08:00 às 18:00&#10;Sáb: 08:00 às 12:00" value={localSettings.businessHours || ''} onChange={(e) => setLocalSettings({...localSettings, businessHours: e.target.value})} className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none resize-none min-h-[100px]" />
-                </div>
-              </div>
-
-              <div className="space-y-4 pt-4 border-t border-gray-100">
-                <div className="flex items-center justify-between p-4 bg-purple-50 border border-purple-100 rounded-2xl">
-                  <div>
-                    <h3 className="text-xs font-bold text-purple-900">Automação de Turnos</h3>
-                    <p className="text-[10px] text-purple-700">Abre e fecha a loja e o cardápio automaticamente nos horários abaixo.</p>
-                  </div>
-                  <Switch 
-                    checked={localSettings.shiftAutomation ?? false} 
-                    onChange={(v) => setLocalSettings({...localSettings, shiftAutomation: v})} 
-                  />
-                </div>
-
-                {localSettings.shiftAutomation && (
-                  <div className="space-y-2 p-4 bg-gray-50 border border-gray-100 rounded-2xl">
-                    <p className="text-[10px] font-bold text-gray-500 uppercase mb-3">Definir Horários (Dia a Dia)</p>
-                    {dayNames.map((name, idx) => {
-                      const dayConfig = (localSettings.operatingHours && localSettings.operatingHours[idx]) || defaultOperatingHours[idx as keyof typeof defaultOperatingHours];
-                      return (
-                        <div key={idx} className="flex flex-col gap-3 bg-white p-3 rounded-xl border border-gray-200">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <Switch 
-                                checked={dayConfig.isOpen} 
-                                onChange={(v) => {
-                                  const curr = localSettings.operatingHours || defaultOperatingHours;
-                                  setLocalSettings({...localSettings, operatingHours: { ...curr, [idx]: { ...dayConfig, isOpen: v } }});
-                                }} 
-                              />
-                              <span className={`text-xs font-bold ${dayConfig.isOpen ? 'text-gray-800' : 'text-gray-400 line-through'}`}>{name}</span>
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
-                            <input 
-                              type="time" 
-                              value={dayConfig.openTime}
-                              disabled={!dayConfig.isOpen}
-                              onChange={(e) => {
-                                const curr = localSettings.operatingHours || defaultOperatingHours;
-                                setLocalSettings({...localSettings, operatingHours: { ...curr, [idx]: { ...dayConfig, openTime: e.target.value } }});
-                              }}
-                              className="w-full min-w-0 px-2 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg disabled:opacity-50 outline-none focus:border-purple-400 text-center"
-                            />
-                            <span className="text-gray-400 text-[10px] uppercase font-bold text-center">às</span>
-                            <input 
-                              type="time" 
-                              value={dayConfig.closeTime}
-                              disabled={!dayConfig.isOpen}
-                              onChange={(e) => {
-                                const curr = localSettings.operatingHours || defaultOperatingHours;
-                                setLocalSettings({...localSettings, operatingHours: { ...curr, [idx]: { ...dayConfig, closeTime: e.target.value } }});
-                              }}
-                              className="w-full min-w-0 px-2 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg disabled:opacity-50 outline-none focus:border-purple-400 text-center"
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
             </div>
           </section>
 
-          <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col items-center">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
-              <Power size={16} /> Operação
-            </h2>
-            <div className={`p-4 rounded-2xl border-2 transition-all w-full flex items-center justify-between ${localSettings.isStoreOpen ? 'border-green-100 bg-green-50/50' : 'border-red-100 bg-red-50/50'}`}>
-              <span className={`text-sm font-bold ${localSettings.isStoreOpen ? 'text-green-700' : 'text-red-700'}`}>
-                {localSettings.shiftAutomation ? 'AUTOMAÇÃO ATIVA' : (localSettings.isStoreOpen ? 'LOJA ABERTA' : 'LOJA FECHADA')}
-              </span>
-              {!localSettings.shiftAutomation && (
-                <Switch checked={localSettings.isStoreOpen ?? true} onChange={(v) => setLocalSettings({...localSettings, isStoreOpen: v})} />
-              )}
-            </div>
-
-            <div className="w-full mt-6 space-y-3 pt-6 border-t border-gray-100">
-                <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest text-center mb-2">Módulos do Sistema</p>
-                <div className="flex flex-col gap-2 p-3 bg-gray-50 rounded-xl">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Utensils size={16} className="text-orange-500" />
-                            <span className="text-xs font-bold text-gray-600">Módulo Mesas</span>
-                        </div>
-                        <Switch checked={localSettings.isTableOrderActive} onChange={(v) => setLocalSettings({...localSettings, isTableOrderActive: v})} />
-                    </div>
-                    {localSettings.isTableOrderActive && (
-                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-200">
-                            <span className="text-xs text-gray-500">Quantidade de Mesas</span>
-                            <input
-                                type="number"
-                                min="1"
-                                max="1000"
-                                value={localSettings.tableCount || 30}
-                                onChange={(e) => setLocalSettings({...localSettings, tableCount: Number(e.target.value)})}
-                                className="w-20 px-3 py-1 bg-white border border-gray-200 rounded-lg text-xs font-bold text-center outline-none focus:border-orange-500"
-                            />
-                        </div>
-                    )}
-                </div>
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                    <div className="flex items-center gap-2">
-                        <Tag size={16} className="text-purple-500" />
-                        <span className="text-xs font-bold text-gray-600">Módulo Comandas</span>
-                    </div>
-                    <Switch checked={localSettings.isCommandOrderActive ?? true} onChange={(v) => setLocalSettings({...localSettings, isCommandOrderActive: v})} />
-                </div>
-            </div>
-
-            <div className="w-full mt-6 space-y-3 pt-6 border-t border-gray-100">
-                <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest text-center mb-2">Canais de Venda (Menu Digital)</p>
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                    <div className="flex items-center gap-2">
-                        <ShoppingBag size={16} className="text-blue-500" />
-                        <span className="text-xs font-bold text-gray-600">Pedidos Retirada / Viagem</span>
-                    </div>
-                    <Switch checked={localSettings.isCounterPickupActive} onChange={(v) => setLocalSettings({...localSettings, isCounterPickupActive: v})} />
-                </div>
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                    <div className="flex items-center gap-2">
-                        <Truck size={16} className="text-green-500" />
-                        <span className="text-xs font-bold text-gray-600">Pedidos Entrega</span>
-                    </div>
-                    <Switch checked={localSettings.isDeliveryActive} onChange={(v) => setLocalSettings({...localSettings, isDeliveryActive: v})} />
-                </div>
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                    <div className="flex items-center gap-2">
-                        <Clock size={16} className="text-indigo-500" />
-                        <span className="text-xs font-bold text-gray-600">Permitir Agendamento de Pedidos</span>
-                    </div>
-                    <Switch checked={localSettings.allowSchedulingWhenClosed ?? false} onChange={(v) => setLocalSettings({...localSettings, allowSchedulingWhenClosed: v})} />
-                </div>
-                {localSettings.isDeliveryActive && (
-                  <div className="p-3 bg-gray-50 rounded-xl space-y-1 mt-3">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Pedido Mínimo (R$)</label>
-                    <input 
-                      type="text" 
-                      inputMode="decimal"
-                      placeholder="0.00" 
-                      value={localSettings.minDeliveryOrderValue === 0 ? '' : (localSettings.minDeliveryOrderValue || '')} 
-                      onFocus={(e) => e.target.select()}
-                      onChange={(e) => {
-                        const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                        if (!isNaN(val)) setLocalSettings({...localSettings, minDeliveryOrderValue: val});
-                      }} 
-                      className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 outline-none text-sm font-bold" 
-                    />
-                  </div>
-                )}
-            </div>
-          </section>
-          <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 flex items-center justify-center gap-2">
-                  <CreditCard size={18} /> Meios de Pagamento
+          {/* Identidade Visual */}
+          <div className="space-y-6">
+            <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col items-center">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 text-center flex items-center gap-2">
+                <ImageIcon size={18} /> Logotipo do Menu
               </h2>
-              <p className="text-[10px] uppercase text-gray-400 text-center mb-4">No Menu Digital</p>
-              <div className="flex flex-col gap-2">
-                  {allPaymentMethods.map(method => (
-                      <div key={method.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
-                          <span className="text-xs font-bold text-gray-600">{method.label}</span>
-                          <Switch 
-                              checked={localSettings.digitalMenuPaymentMethods ? localSettings.digitalMenuPaymentMethods.includes(method.id as any) : true} 
-                              onChange={(checked) => {
-                                  const current = localSettings.digitalMenuPaymentMethods || ['PIX', 'CARTAO', 'DINHEIRO', 'ONLINE', 'A_PAGAR', 'DEBITO'];
-                                  let next;
-                                  if (checked) {
-                                      next = [...current, method.id];
-                                  } else {
-                                      next = current.filter(m => m !== method.id);
-                                  }
-                                  setLocalSettings({...localSettings, digitalMenuPaymentMethods: next as any});
-                              }} 
-                          />
-                      </div>
-                  ))}
+              <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                <div className="w-40 h-40 rounded-full border-4 border-orange-100 overflow-hidden bg-gray-50 flex items-center justify-center shadow-inner relative transition-transform hover:scale-105">
+                  {localSettings.logoUrl ? (
+                    <img src={localSettings.logoUrl || undefined} alt="Logo Preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <ImageIcon size={48} className="text-gray-200" />
+                  )}
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                     <Camera size={32} className="text-white" />
+                  </div>
+                </div>
+                <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
               </div>
-          </section>
+              <p className="text-[10px] text-gray-400 mt-4 text-center max-w-[200px]">
+                Adicione a sua logomarca para personalizar o cabeçalho do seu cardápio online.
+              </p>
+            </section>
 
-          {localSettings.isDeliveryActive && (
             <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
               <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
-                  <Truck size={18} /> Taxa de Entrega
+                <Palette size={16} /> Cores da Identidade
+              </h2>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                  <span className="text-xs font-bold text-gray-500 uppercase">Cor Principal</span>
+                  <input type="color" value={localSettings.primaryColor} onChange={(e) => setLocalSettings({...localSettings, primaryColor: e.target.value})} className="w-8 h-8 rounded-lg cursor-pointer bg-transparent" />
+                </div>
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                  <span className="text-xs font-bold text-gray-500 uppercase">Cor Destaque</span>
+                  <input type="color" value={localSettings.secondaryColor} onChange={(e) => setLocalSettings({...localSettings, secondaryColor: e.target.value})} className="w-8 h-8 rounded-lg cursor-pointer bg-transparent" />
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'operation' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-scale-up">
+          <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 space-y-4">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-2 flex items-center gap-2">
+              <Clock size={18} /> Horários de Atendimento
+            </h2>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-gray-400 uppercase ml-2">Horário de Funcionamento (Texto Livre)</label>
+              <div className="relative">
+                <Clock className="absolute left-4 top-4 text-gray-300" size={18} />
+                <textarea placeholder="Ex: Seg a Sex: 08:00 às 18:00&#10;Sáb: 08:00 às 12:00" value={localSettings.businessHours || ''} onChange={(e) => setLocalSettings({...localSettings, businessHours: e.target.value})} className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none resize-none min-h-[140px]" />
+              </div>
+            </div>
+          </section>
+
+          <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 space-y-4">
+            <div className="flex items-center justify-between p-4 bg-purple-50 border border-purple-100 rounded-2xl">
+              <div>
+                <h3 className="text-xs font-bold text-purple-900">Automação de Turnos</h3>
+                <p className="text-[10px] text-purple-700">Abre e fecha a loja e o cardápio automaticamente nos horários abaixo.</p>
+              </div>
+              <Switch 
+                checked={localSettings.shiftAutomation ?? false} 
+                onChange={(v) => setLocalSettings({...localSettings, shiftAutomation: v})} 
+              />
+            </div>
+
+            {localSettings.shiftAutomation && (
+              <div className="space-y-2 p-4 bg-gray-50 border border-gray-100 rounded-2xl max-h-[400px] overflow-y-auto custom-scrollbar">
+                <p className="text-[10px] font-bold text-gray-500 uppercase mb-3">Definir Horários (Dia a Dia)</p>
+                {dayNames.map((name, idx) => {
+                  const dayConfig = (localSettings.operatingHours && localSettings.operatingHours[idx]) || defaultOperatingHours[idx as keyof typeof defaultOperatingHours];
+                  return (
+                    <div key={idx} className="flex flex-col gap-3 bg-white p-3 rounded-xl border border-gray-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Switch 
+                            checked={dayConfig.isOpen} 
+                            onChange={(v) => {
+                              const curr = localSettings.operatingHours || defaultOperatingHours;
+                              setLocalSettings({...localSettings, operatingHours: { ...curr, [idx]: { ...dayConfig, isOpen: v } }});
+                            }} 
+                          />
+                          <span className={`text-xs font-bold ${dayConfig.isOpen ? 'text-gray-800' : 'text-gray-400 line-through'}`}>{name}</span>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
+                        <input 
+                          type="time" 
+                          value={dayConfig.openTime}
+                          disabled={!dayConfig.isOpen}
+                          onChange={(e) => {
+                            const curr = localSettings.operatingHours || defaultOperatingHours;
+                            setLocalSettings({...localSettings, operatingHours: { ...curr, [idx]: { ...dayConfig, openTime: e.target.value } }});
+                          }}
+                          className="w-full min-w-0 px-2 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg disabled:opacity-50 outline-none focus:border-purple-400 text-center"
+                        />
+                        <span className="text-gray-400 text-[10px] uppercase font-bold text-center">às</span>
+                        <input 
+                          type="time" 
+                          value={dayConfig.closeTime}
+                          disabled={!dayConfig.isOpen}
+                          onChange={(e) => {
+                            const curr = localSettings.operatingHours || defaultOperatingHours;
+                            setLocalSettings({...localSettings, operatingHours: { ...curr, [idx]: { ...dayConfig, closeTime: e.target.value } }});
+                          }}
+                          className="w-full min-w-0 px-2 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg disabled:opacity-50 outline-none focus:border-purple-400 text-center"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </div>
+      )}
+
+      {activeTab === 'rules' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-scale-up items-start">
+          {/* Cashback & Pix */}
+          <div className="lg:col-span-5 space-y-6">
+            <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
+                <Settings size={16} /> Programa de Cashback
               </h2>
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
                   <div className="flex flex-col">
-                    <span className="text-sm font-bold text-gray-700">Por Distância</span>
-                    <span className="text-[10px] text-gray-400">Calculada via GPS Mapeado.</span>
+                    <span className="text-sm font-bold text-gray-700">Cashback Ativo</span>
+                    <span className="text-[10px] text-gray-400">Ativa o acúmulo de saldo.</span>
                   </div>
                   <Switch 
-                    checked={localSettings.isDeliveryFeeActive === true} 
-                    onChange={(checked) => setLocalSettings({...localSettings, isDeliveryFeeActive: checked})} 
+                    checked={localSettings.isCashbackActive === true} 
+                    onChange={(checked) => setLocalSettings({...localSettings, isCashbackActive: checked})} 
                   />
                 </div>
-
-                {localSettings.isDeliveryFeeActive && (
-                  <div className="space-y-4 p-4 bg-gray-50 rounded-xl border border-gray-100">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Tolerância Entrega Grátis (KM)</label>
+                {localSettings.isCashbackActive && (
+                  <div className="space-y-3 animate-scale-up">
+                    <div className="p-3 bg-gray-50 rounded-xl space-y-1">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Porcentagem (%)</label>
                       <input 
-                        type="text" 
-                        inputMode="numeric"
-                        placeholder="Ex: 2" 
-                        value={localSettings.freeDeliveryToleranceKm === 0 ? '' : (localSettings.freeDeliveryToleranceKm || '')} 
-                        onChange={(e) => {
-                          const val = e.target.value === '' ? 0 : parseInt(e.target.value);
-                          if (!isNaN(val)) setLocalSettings({...localSettings, freeDeliveryToleranceKm: val});
-                        }} 
+                        type="number" 
+                        placeholder="5" 
+                        value={localSettings.cashbackPercentage || ''} 
+                        onChange={(e) => setLocalSettings({...localSettings, cashbackPercentage: Number(e.target.value)})} 
                         className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 outline-none text-sm font-bold" 
                       />
                     </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Taxa Adicional de Retorno (%)</label>
+                    <div className="p-3 bg-gray-50 rounded-xl space-y-1">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Valor Mínimo para Usar (R$)</label>
                       <input 
-                        type="text" 
-                        inputMode="numeric"
-                        placeholder="Ex: 50" 
-                        value={localSettings.returnFeePercent === 0 ? '' : (localSettings.returnFeePercent || '')} 
-                        onChange={(e) => {
-                          const val = e.target.value === '' ? 0 : parseInt(e.target.value);
-                          if (!isNaN(val)) setLocalSettings({...localSettings, returnFeePercent: val});
-                        }} 
+                        type="number" 
+                        placeholder="10" 
+                        value={localSettings.minCashbackToUse || ''} 
+                        onChange={(e) => setLocalSettings({...localSettings, minCashbackToUse: Number(e.target.value)})} 
                         className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 outline-none text-sm font-bold" 
                       />
                     </div>
-
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Regras de Taxa</label>
-                        <button 
-                          onClick={() => {
-                            const rules = localSettings.deliveryFeeRules || [];
-                            setLocalSettings({...localSettings, deliveryFeeRules: [...rules, { upToKm: 5, fee: 5 }]});
-                          }}
-                          className="text-[10px] bg-blue-100 text-blue-600 px-2 py-1 rounded-md font-bold uppercase"
+                    
+                    <div className="p-3 bg-gray-50 rounded-xl space-y-2">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Aplicar Cashback em:</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setLocalSettings({...localSettings, cashbackScope: 'all'})}
+                          className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all ${
+                            (localSettings.cashbackScope || 'all') === 'all'
+                              ? 'bg-emerald-50 border-emerald-500 text-emerald-700'
+                              : 'bg-white border-gray-100 text-gray-600 hover:border-gray-200'
+                          }`}
                         >
-                          + Adicionar Regra
+                          Loja Toda
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setLocalSettings({...localSettings, cashbackScope: 'selected'})}
+                          className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all ${
+                            localSettings.cashbackScope === 'selected'
+                              ? 'bg-emerald-50 border-emerald-500 text-emerald-700'
+                              : 'bg-white border-gray-100 text-gray-600 hover:border-gray-200'
+                          }`}
+                        >
+                          Produtos Selecionados
                         </button>
                       </div>
-                      
-                      {(localSettings.deliveryFeeRules || []).map((rule, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
-                          <div className="flex-1">
-                            <span className="text-[10px] text-gray-400 block ml-1">Até (KM)</span>
-                            <input 
-                              type="text" 
-                              inputMode="numeric"
-                              value={rule.upToKm === 0 ? '' : rule.upToKm} 
-                              onFocus={(e) => e.target.select()}
-                              onChange={(e) => {
-                                const val = e.target.value === '' ? 0 : parseInt(e.target.value);
-                                if (!isNaN(val)) {
-                                  const newRules = [...(localSettings.deliveryFeeRules || [])];
-                                  newRules[idx].upToKm = val;
-                                  setLocalSettings({...localSettings, deliveryFeeRules: newRules});
-                                }
-                              }}
-                              className="w-full px-2 py-1.5 bg-white rounded-lg border border-gray-200 outline-none text-sm font-bold" 
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <span className="text-[10px] text-gray-400 block ml-1">Valor (R$)</span>
-                            <input 
-                              type="text" 
-                              inputMode="decimal"
-                              value={rule.fee === 0 ? '' : rule.fee} 
-                              onFocus={(e) => e.target.select()}
-                              onChange={(e) => {
-                                const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                                if (!isNaN(val)) {
-                                  const newRules = [...(localSettings.deliveryFeeRules || [])];
-                                  newRules[idx].fee = val;
-                                  setLocalSettings({...localSettings, deliveryFeeRules: newRules});
-                                }
-                              }}
-                              className="w-full px-2 py-1.5 bg-white rounded-lg border border-gray-200 outline-none text-sm font-bold" 
-                            />
-                          </div>
-                          <button 
-                            onClick={() => {
-                              const newRules = [...(localSettings.deliveryFeeRules || [])];
-                              newRules.splice(idx, 1);
-                              setLocalSettings({...localSettings, deliveryFeeRules: newRules});
-                            }}
-                            className="mt-4 p-1.5 text-red-500 hover:bg-red-50 rounded-lg"
-                          >
-                            <AlertTriangle size={16} />
-                          </button>
-                        </div>
-                      ))}
-                      {(!localSettings.deliveryFeeRules || localSettings.deliveryFeeRules.length === 0) && (
-                        <p className="text-xs text-gray-400 text-center py-2">Nenhuma regra definida. A taxa será 0.</p>
-                      )}
                     </div>
+
+                    {localSettings.cashbackScope === 'selected' && (
+                      <div className="space-y-3 animate-scale-up border-l-2 border-emerald-500 pl-3">
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                            <input 
+                              type="text" 
+                              placeholder="Buscar produtos..." 
+                              value={cashbackProductSearch}
+                              onChange={(e) => setCashbackProductSearch(e.target.value)}
+                              className="w-full pl-10 pr-4 py-2 bg-white rounded-xl border border-gray-100 outline-none text-xs" 
+                            />
+                          </div>
+                          {localSettings.cashbackProductIds && localSettings.cashbackProductIds.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setLocalSettings({...localSettings, cashbackProductIds: []})}
+                              className="flex items-center gap-1 px-3 bg-red-50 text-red-600 rounded-xl border border-red-100 hover:bg-red-100 transition-colors font-bold text-[10px]"
+                            >
+                              <X size={14} /> Limpar
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto custom-scrollbar pr-1 bg-white p-2 rounded-xl border border-gray-100">
+                          {filteredCashbackProducts.length === 0 ? (
+                            <p className="text-center text-xs text-gray-400 py-4">Nenhum produto</p>
+                          ) : (
+                            filteredCashbackProducts.map(product => {
+                              const isSelected = localSettings.cashbackProductIds?.includes(product.id);
+                              return (
+                                <div 
+                                  key={product.id}
+                                  onClick={() => toggleCashbackProductSelection(product.id)}
+                                  className={`flex items-center justify-between gap-3 p-2 rounded-lg border cursor-pointer transition-all ${
+                                    isSelected ? 'border-emerald-500 bg-emerald-50/50' : 'border-gray-50 bg-white hover:border-gray-200'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <div className="relative shrink-0">
+                                      <img src={product.imageUrl || undefined} className="w-8 h-8 rounded object-cover" />
+                                      {isSelected && (
+                                        <div className="absolute -top-1 -right-1 bg-emerald-500 text-white p-0.5 rounded-full shadow-sm">
+                                          <Check size={8} />
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-xs font-bold text-gray-800 truncate">{product.name}</p>
+                                      <p className="text-[10px] text-gray-400">R$ {product.price.toFixed(2)}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             </section>
-          )}
 
-        </div>
-
-        {/* Coluna 2: Regras e Vendas */}
-        <div className="space-y-6">
-
-          <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
-              <Settings size={16} /> Regras de Negócio
-            </h2>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                <div className="flex flex-col">
-                  <span className="text-sm font-bold text-gray-700">Programa de Cashback</span>
-                  <span className="text-[10px] text-gray-400">Ativa o acúmulo de cashback para clientes no PDV.</span>
+            <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col items-center">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 text-center">QR Code Pix</h2>
+              <div className="relative group cursor-pointer" onClick={() => document.getElementById('pix-upload')?.click()}>
+                <div className="w-40 h-40 rounded-2xl border-4 border-blue-100 overflow-hidden bg-gray-50 flex items-center justify-center shadow-inner relative transition-transform hover:scale-105">
+                  {localSettings.pixQrCodeUrl ? (
+                    <img src={localSettings.pixQrCodeUrl || undefined} alt="QR Code Pix" className="w-full h-full object-contain" />
+                  ) : (
+                    <div className="flex flex-col items-center text-gray-300">
+                      <ImageIcon size={32} />
+                      <span className="text-[10px] font-bold mt-2">Adicionar QR</span>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                     <Camera size={32} className="text-white" />
+                  </div>
                 </div>
-                <Switch 
-                  checked={localSettings.isCashbackActive === true} 
-                  onChange={(checked) => setLocalSettings({...localSettings, isCashbackActive: checked})} 
+                <input 
+                  id="pix-upload"
+                  type="file" 
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      if (file.size > 1024 * 1024) { 
+                        alert("A imagem é muito grande. Escolha uma imagem de até 1MB.");
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onloadend = () => {
+                        const img = new Image();
+                        img.onload = () => {
+                          const canvas = document.createElement('canvas');
+                          const MAX_WIDTH = 400;
+                          const MAX_HEIGHT = 400;
+                          let width = img.width;
+                          let height = img.height;
+
+                          if (width > height) {
+                            if (width > MAX_WIDTH) {
+                              height *= MAX_WIDTH / width;
+                              width = MAX_WIDTH;
+                            }
+                          } else {
+                            if (height > MAX_HEIGHT) {
+                              width *= MAX_HEIGHT / height;
+                              height = MAX_HEIGHT;
+                            }
+                          }
+
+                          canvas.width = width;
+                          canvas.height = height;
+                          const ctx = canvas.getContext('2d');
+                          ctx?.drawImage(img, 0, 0, width, height);
+                          
+                          const base64String = canvas.toDataURL('image/jpeg', 0.7);
+                          setLocalSettings(prev => ({ ...prev, pixQrCodeUrl: base64String }));
+                        };
+                        img.src = reader.result as string;
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }} 
+                  className="hidden" 
+                  accept="image/*" 
                 />
               </div>
-              {localSettings.isCashbackActive && (
-                <div className="space-y-3">
-                  <div className="p-3 bg-gray-50 rounded-xl space-y-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Porcentagem de Cashback (%)</label>
-                    <input 
-                      type="number" 
-                      placeholder="5" 
-                      value={localSettings.cashbackPercentage || ''} 
-                      onChange={(e) => setLocalSettings({...localSettings, cashbackPercentage: Number(e.target.value)})} 
-                      className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 outline-none text-sm font-bold" 
-                    />
-                  </div>
-                  <div className="p-3 bg-gray-50 rounded-xl space-y-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Valor Mínimo para Usar Cashback (R$)</label>
-                    <input 
-                      type="number" 
-                      placeholder="10" 
-                      value={localSettings.minCashbackToUse || ''} 
-                      onChange={(e) => setLocalSettings({...localSettings, minCashbackToUse: Number(e.target.value)})} 
-                      className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 outline-none text-sm font-bold" 
-                    />
-                  </div>
-                  
-                  <div className="p-3 bg-gray-50 rounded-xl space-y-2">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Aplicar Cashback em:</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setLocalSettings({...localSettings, cashbackScope: 'all'})}
-                        className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all ${
-                          (localSettings.cashbackScope || 'all') === 'all'
-                            ? 'bg-emerald-50 border-emerald-500 text-emerald-700'
-                            : 'bg-white border-gray-100 text-gray-600 hover:border-gray-200'
-                        }`}
-                      >
-                        Loja Toda
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setLocalSettings({...localSettings, cashbackScope: 'selected'})}
-                        className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all ${
-                          localSettings.cashbackScope === 'selected'
-                            ? 'bg-emerald-50 border-emerald-500 text-emerald-700'
-                            : 'bg-white border-gray-100 text-gray-600 hover:border-gray-200'
-                        }`}
-                      >
-                        Produtos Selecionados
-                      </button>
+              <p className="text-[10px] text-gray-400 mt-4 text-center max-w-[200px]">
+                Faça upload do QR Code do seu Pix para exibir no PDV.
+              </p>
+            </section>
+          </div>
+
+          {/* Promotional Prices / Coupon discount */}
+          <div className="lg:col-span-7">
+            <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                  <Ticket size={18} /> Preço Promocional & Cupons
+                </h2>
+                <Switch checked={localSettings.isCouponActive || false} onChange={(v) => setLocalSettings({...localSettings, isCouponActive: v})} />
+              </div>
+              
+              <div className={`space-y-6 transition-all ${localSettings.isCouponActive ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-2">Desconto Geral (%)</label>
+                    <div className="relative">
+                      <Percent className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                      <input type="number" placeholder="10" value={localSettings.couponDiscount || ''} onChange={(e) => setLocalSettings({...localSettings, couponDiscount: Number(e.target.value)})} className="w-full pl-4 pr-12 py-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none font-bold" />
                     </div>
                   </div>
+                </div>
 
-                  {localSettings.cashbackScope === 'selected' && (
-                    <div className="space-y-3 animate-scale-up border-l-2 border-emerald-500 pl-3">
+                <div className="pt-4 space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-orange-50 rounded-2xl border border-orange-100">
+                    <div className="flex items-center gap-3">
+                      <Layers className="text-orange-600" size={20} />
+                      <span className="text-sm font-bold text-orange-900">Aplicar em todos os produtos</span>
+                    </div>
+                    <Switch checked={localSettings.isCouponForAllProducts ?? true} onChange={(v) => setLocalSettings({...localSettings, isCouponForAllProducts: v})} />
+                  </div>
+
+                  {!localSettings.isCouponForAllProducts && (
+                    <div className="space-y-4 animate-scale-up">
                       <div className="flex gap-2">
                         <div className="relative flex-1">
-                          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                           <input 
                             type="text" 
-                            placeholder="Buscar produtos para cashback..." 
-                            value={cashbackProductSearch}
-                            onChange={(e) => setCashbackProductSearch(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 bg-white rounded-xl border border-gray-100 outline-none text-xs" 
+                            placeholder="Buscar produtos para a promoção..." 
+                            value={productSearch}
+                            onChange={(e) => setProductSearch(e.target.value)}
+                            className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none" 
                           />
                         </div>
-                        {localSettings.cashbackProductIds && localSettings.cashbackProductIds.length > 0 && (
+                        {localSettings.applicableProductIds && localSettings.applicableProductIds.length > 0 && (
                           <button
                             type="button"
-                            onClick={() => setLocalSettings({...localSettings, cashbackProductIds: []})}
-                            className="flex items-center gap-1 px-3 bg-red-50 text-red-600 rounded-xl border border-red-100 hover:bg-red-100 transition-colors font-bold text-[10px]"
-                            title="Remover todos selecionados"
+                            onClick={() => setLocalSettings({...localSettings, applicableProductIds: []})}
+                            className="flex items-center gap-1.5 px-4 bg-red-50 text-red-600 rounded-2xl border border-red-100 hover:bg-red-100 transition-colors font-bold text-xs"
                           >
-                            <X size={14} /> Limpar
+                            <X size={16} /> Limpar
                           </button>
                         )}
                       </div>
 
-                      <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto custom-scrollbar pr-1 bg-white p-2 rounded-xl border border-gray-100">
-                        {filteredCashbackProducts.length === 0 ? (
-                          <p className="text-center text-xs text-gray-400 py-4">Nenhum produto encontrado</p>
-                        ) : (
-                          filteredCashbackProducts.map(product => {
-                            const isSelected = localSettings.cashbackProductIds?.includes(product.id);
-                            return (
+                      <div className="grid grid-cols-1 gap-3 max-h-96 overflow-y-auto custom-scrollbar pr-2">
+                        {filteredProducts.map(product => {
+                          const isSelected = localSettings.applicableProductIds?.includes(product.id);
+                          const customPct = localSettings.productSpecificDiscounts?.[product.id];
+                          return (
+                            <div 
+                              key={product.id}
+                              className={`flex items-center justify-between gap-3 p-3 rounded-xl border transition-all ${isSelected ? 'border-orange-500 bg-orange-50/50' : 'border-gray-100 bg-white hover:border-gray-200'}`}
+                            >
                               <div 
-                                key={product.id}
-                                onClick={() => toggleCashbackProductSelection(product.id)}
-                                className={`flex items-center justify-between gap-3 p-2 rounded-lg border cursor-pointer transition-all ${
-                                  isSelected ? 'border-emerald-500 bg-emerald-50/50' : 'border-gray-50 bg-white hover:border-gray-200'
-                                }`}
+                                onClick={() => toggleProductSelection(product.id)}
+                                className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
                               >
-                                <div className="flex items-center gap-2 flex-1 min-w-0">
-                                  <div className="relative shrink-0">
-                                    <img src={product.imageUrl || undefined} className="w-8 h-8 rounded object-cover" />
-                                    {isSelected && (
-                                      <div className="absolute -top-1 -right-1 bg-emerald-500 text-white p-0.5 rounded-full shadow-sm">
-                                        <Check size={8} />
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <p className="text-xs font-bold text-gray-800 truncate">{product.name}</p>
-                                    <p className="text-[10px] text-gray-400">R$ {product.price.toFixed(2)}</p>
-                                  </div>
+                                <div className="relative shrink-0">
+                                  <img src={product.imageUrl || undefined} className="w-10 h-10 rounded-lg object-cover" />
+                                  {isSelected && (
+                                    <div className="absolute -top-1 -right-1 bg-orange-500 text-white p-0.5 rounded-full shadow-sm">
+                                      <Check size={10} />
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-xs font-bold text-gray-800 truncate">{product.name}</p>
+                                  <p className="text-[10px] text-gray-400">{product.category} • R$ {product.price.toFixed(2)}</p>
                                 </div>
                               </div>
-                            );
-                          })
-                        )}
+
+                              {isSelected && (
+                                <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                  <span className="text-[10px] font-bold text-orange-600 uppercase">Desc. Fino:</span>
+                                  <div className="relative w-20">
+                                    <input 
+                                      type="number"
+                                      min="1"
+                                      max="100"
+                                      placeholder={String(localSettings.couponDiscount || 10)}
+                                      value={customPct ?? ''}
+                                      onChange={(e) => {
+                                        const val = e.target.value === '' ? undefined : Math.min(100, Math.max(0, Number(e.target.value)));
+                                        const updatedDiscounts = { ...(localSettings.productSpecificDiscounts || {}) };
+                                        if (val === undefined) {
+                                          delete updatedDiscounts[product.id];
+                                        } else {
+                                          updatedDiscounts[product.id] = val;
+                                        }
+                                        setLocalSettings({
+                                          ...localSettings,
+                                          productSpecificDiscounts: updatedDiscounts
+                                        });
+                                      }}
+                                      className="w-full pl-2 pr-6 py-1.5 text-xs font-black bg-white rounded-lg border border-orange-200 outline-none text-right text-orange-700 focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
+                                    />
+                                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-orange-400">%</span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
                 </div>
-              )}
-            </div>
-          </section>
-
-          <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                <Ticket size={18} /> Preço Promocional
-              </h2>
-              <Switch checked={localSettings.isCouponActive || false} onChange={(v) => setLocalSettings({...localSettings, isCouponActive: v})} />
-            </div>
-            
-            <div className={`space-y-6 transition-all ${localSettings.isCouponActive ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
-              <div className="grid grid-cols-1 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-2">Desconto (%)</label>
-                  <div className="relative">
-                    <Percent className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                    <input type="number" placeholder="10" value={localSettings.couponDiscount || ''} onChange={(e) => setLocalSettings({...localSettings, couponDiscount: Number(e.target.value)})} className="w-full pl-4 pr-12 py-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none font-bold" />
-                  </div>
-                </div>
               </div>
-
-              <div className="pt-4 space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-orange-50 rounded-2xl border border-orange-100">
-                      <div className="flex items-center gap-3">
-                          <Layers className="text-orange-600" size={20} />
-                          <span className="text-sm font-bold text-orange-900">Aplicar em todos os produtos</span>
-                      </div>
-                      <Switch checked={localSettings.isCouponForAllProducts ?? true} onChange={(v) => setLocalSettings({...localSettings, isCouponForAllProducts: v})} />
-                  </div>
-
-                  {!localSettings.isCouponForAllProducts && (
-                      <div className="space-y-4 animate-scale-up">
-                          <div className="flex gap-2">
-                              <div className="relative flex-1">
-                                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                                  <input 
-                                      type="text" 
-                                      placeholder="Buscar produtos para a promoção..." 
-                                      value={productSearch}
-                                      onChange={(e) => setProductSearch(e.target.value)}
-                                      className="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none" 
-                                  />
-                              </div>
-                              {localSettings.applicableProductIds && localSettings.applicableProductIds.length > 0 && (
-                                <button
-                                  onClick={() => setLocalSettings({...localSettings, applicableProductIds: []})}
-                                  className="flex items-center gap-1.5 px-4 bg-red-50 text-red-600 rounded-2xl border border-red-100 hover:bg-red-100 transition-colors font-bold text-xs"
-                                  title="Remover todos selecionados"
-                                >
-                                  <X size={16} /> Limpar
-                                </button>
-                              )}
-                          </div>
-
-                          <div className="grid grid-cols-1 gap-3 max-h-80 overflow-y-auto custom-scrollbar pr-2">
-                              {filteredProducts.map(product => {
-                                  const isSelected = localSettings.applicableProductIds?.includes(product.id);
-                                  const customPct = localSettings.productSpecificDiscounts?.[product.id];
-                                  return (
-                                      <div 
-                                          key={product.id}
-                                          className={`flex items-center justify-between gap-3 p-3 rounded-xl border transition-all ${isSelected ? 'border-orange-500 bg-orange-50/50' : 'border-gray-100 bg-white hover:border-gray-200'}`}
-                                      >
-                                          <div 
-                                              onClick={() => toggleProductSelection(product.id)}
-                                              className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
-                                          >
-                                              <div className="relative shrink-0">
-                                                <img src={product.imageUrl || undefined} className="w-10 h-10 rounded-lg object-cover" />
-                                                {isSelected && (
-                                                    <div className="absolute -top-1 -right-1 bg-orange-500 text-white p-0.5 rounded-full shadow-sm">
-                                                        <Check size={10} />
-                                                    </div>
-                                                )}
-                                              </div>
-                                              <div className="min-w-0 flex-1">
-                                                  <p className="text-xs font-bold text-gray-800 truncate">{product.name}</p>
-                                                  <p className="text-[10px] text-gray-400">{product.category} • R$ {product.price.toFixed(2)}</p>
-                                              </div>
-                                          </div>
-
-                                          {isSelected && (
-                                              <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                                                  <span className="text-[10px] font-bold text-orange-600 uppercase">Desc. Personalizado:</span>
-                                                  <div className="relative w-20">
-                                                      <input 
-                                                          type="number"
-                                                          min="1"
-                                                          max="100"
-                                                          placeholder={String(localSettings.couponDiscount || 10)}
-                                                          value={customPct ?? ''}
-                                                          onChange={(e) => {
-                                                              const val = e.target.value === '' ? undefined : Math.min(100, Math.max(0, Number(e.target.value)));
-                                                              const updatedDiscounts = { ...(localSettings.productSpecificDiscounts || {}) };
-                                                              if (val === undefined) {
-                                                                  delete updatedDiscounts[product.id];
-                                                              } else {
-                                                                  updatedDiscounts[product.id] = val;
-                                                              }
-                                                              setLocalSettings({
-                                                                  ...localSettings,
-                                                                  productSpecificDiscounts: updatedDiscounts
-                                                              });
-                                                          }}
-                                                          className="w-full pl-2 pr-6 py-1.5 text-xs font-black bg-white rounded-lg border border-orange-200 outline-none text-right text-orange-700 focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
-                                                      />
-                                                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-orange-400">%</span>
-                                                  </div>
-                                              </div>
-                                          )}
-                                      </div>
-                                  );
-                              })}
-                          </div>
-                      </div>
-                  )}
-              </div>
-            </div>
-          </section>
-
-          <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col items-center">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 text-center">QR Code Pix</h2>
-            <div className="relative group cursor-pointer" onClick={() => document.getElementById('pix-upload')?.click()}>
-              <div className="w-40 h-40 rounded-2xl border-4 border-blue-100 overflow-hidden bg-gray-50 flex items-center justify-center shadow-inner relative transition-transform hover:scale-105">
-                {localSettings.pixQrCodeUrl ? (
-                  <img src={localSettings.pixQrCodeUrl || undefined} alt="QR Code Pix" className="w-full h-full object-contain" />
-                ) : (
-                  <div className="flex flex-col items-center text-gray-300">
-                    <ImageIcon size={32} />
-                    <span className="text-[10px] font-bold mt-2">Adicionar QR</span>
-                  </div>
-                )}
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                   <Camera size={32} className="text-white" />
-                </div>
-              </div>
-              <input 
-                id="pix-upload"
-                type="file" 
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    if (file.size > 1024 * 1024) { 
-                      alert("A imagem é muito grande. Escolha uma imagem de até 1MB.");
-                      return;
-                    }
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                      const img = new Image();
-                      img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        const MAX_WIDTH = 400;
-                        const MAX_HEIGHT = 400;
-                        let width = img.width;
-                        let height = img.height;
-
-                        if (width > height) {
-                          if (width > MAX_WIDTH) {
-                            height *= MAX_WIDTH / width;
-                            width = MAX_WIDTH;
-                          }
-                        } else {
-                          if (height > MAX_HEIGHT) {
-                            width *= MAX_HEIGHT / height;
-                            height = MAX_HEIGHT;
-                          }
-                        }
-
-                        canvas.width = width;
-                        canvas.height = height;
-                        const ctx = canvas.getContext('2d');
-                        ctx?.drawImage(img, 0, 0, width, height);
-                        
-                        const base64String = canvas.toDataURL('image/jpeg', 0.7);
-                        setLocalSettings(prev => ({ ...prev, pixQrCodeUrl: base64String }));
-                      };
-                      img.src = reader.result as string;
-                    };
-                    reader.readAsDataURL(file);
-                  }
-                }} 
-                className="hidden" 
-                accept="image/*" 
-              />
-            </div>
-            <p className="text-[10px] text-gray-400 mt-4 text-center max-w-[200px]">
-              Faça upload do QR Code do seu Pix para exibir no PDV.
-            </p>
-          </section>
+            </section>
+          </div>
         </div>
+      )}
 
-        {/* Coluna 3: Visual e Sistema */}
-        <div className="space-y-6">
-          <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col items-center">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 text-center">Logotipo do Menu</h2>
-            <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-              <div className="w-40 h-40 rounded-full border-4 border-orange-100 overflow-hidden bg-gray-50 flex items-center justify-center shadow-inner relative transition-transform hover:scale-105">
-                {localSettings.logoUrl ? (
-                  <img src={localSettings.logoUrl || undefined} alt="Logo Preview" className="w-full h-full object-cover" />
-                ) : (
-                  <ImageIcon size={48} className="text-gray-200" />
-                )}
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                   <Camera size={32} className="text-white" />
-                </div>
-              </div>
-              <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
-            </div>
-          </section>
-
+      {activeTab === 'devices' && (
+        <div className="max-w-2xl mx-auto animate-scale-up">
           <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
             <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
-              <Palette size={16} /> Cores da Identidade
+              <Printer size={18} /> Impressora Térmica
             </h2>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                <span className="text-xs font-bold text-gray-500 uppercase">Cor Principal</span>
-                <input type="color" value={localSettings.primaryColor} onChange={(e) => setLocalSettings({...localSettings, primaryColor: e.target.value})} className="w-8 h-8 rounded-lg cursor-pointer bg-transparent" />
-              </div>
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                <span className="text-xs font-bold text-gray-500 uppercase">Cor Destaque</span>
-                <input type="color" value={localSettings.secondaryColor} onChange={(e) => setLocalSettings({...localSettings, secondaryColor: e.target.value})} className="w-8 h-8 rounded-lg cursor-pointer bg-transparent" />
-              </div>
-            </div>
-          </section>
-
-          <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
-              <Printer size={16} /> Impressora Térmica
-            </h2>
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-gray-400 uppercase ml-2">Largura do Papel (Padrão)</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button 
+                    type="button"
                     onClick={() => setLocalSettings({...localSettings, thermalPrinterWidth: '58mm', printWidthPx: 180})}
                     className={`py-3 rounded-xl font-bold text-sm transition-all ${localSettings.thermalPrinterWidth === '58mm' ? 'bg-primary text-white shadow-lg' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
                   >
                     58mm
                   </button>
                   <button 
+                    type="button"
                     onClick={() => setLocalSettings({...localSettings, thermalPrinterWidth: '80mm', printWidthPx: 280})}
                     className={`py-3 rounded-xl font-bold text-sm transition-all ${localSettings.thermalPrinterWidth === '80mm' ? 'bg-primary text-white shadow-lg' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
                   >
@@ -1120,9 +937,10 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
 
               <div className="pt-4 border-t border-gray-100">
                 <p className="text-xs text-gray-500 mb-3">
-                  Conecte uma impressora térmica USB para impressão direta de cupons.
+                  Conecte uma impressora térmica USB para impressão direta de cupons de venda.
                 </p>
                 <button 
+                  type="button"
                   onClick={handleConnectUsbPrinter}
                   className="w-full py-3 bg-blue-50 text-blue-600 rounded-xl font-bold text-sm hover:bg-blue-100 transition-colors flex items-center justify-center gap-2"
                 >
@@ -1133,6 +951,7 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                   <div className="p-3 bg-green-50 text-green-700 rounded-xl text-xs font-bold flex items-center justify-between mt-3">
                     <span>Impressora Configurada</span>
                     <button 
+                      type="button"
                       onClick={() => setLocalSettings(prev => ({...prev, usbPrinterVendorId: undefined, usbPrinterProductId: undefined}))}
                       className="text-red-500 hover:text-red-700"
                     >
@@ -1143,22 +962,26 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
               </div>
             </div>
           </section>
+        </div>
+      )}
 
+      {activeTab === 'system' && (
+        <div className="max-w-2xl mx-auto animate-scale-up">
           <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
             <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
-              <Database size={16} /> Manutenção de Dados
+              <Database size={18} /> Manutenção de Dados
             </h2>
             <div className="space-y-6">
               {/* Backup & Restore */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <button onClick={handleBackup} disabled={isExporting} className="flex items-center justify-between p-4 bg-gray-50 hover:bg-orange-50 rounded-2xl border border-gray-100 transition-all group">
+                <button type="button" onClick={handleBackup} disabled={isExporting} className="flex items-center justify-between p-4 bg-gray-50 hover:bg-orange-50 rounded-2xl border border-gray-100 transition-all group">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-white rounded-lg text-orange-500 shadow-sm"><Download size={18} /></div>
                     <span className="text-sm font-bold text-gray-700">Fazer Backup</span>
                   </div>
                   {isExporting ? <Loader2 size={16} className="animate-spin text-orange-500" /> : <Database size={16} className="text-gray-300 group-hover:text-orange-500" />}
                 </button>
-                <button onClick={() => importFileRef.current?.click()} disabled={isImporting} className="flex items-center justify-between p-4 bg-gray-50 hover:bg-blue-50 rounded-2xl border border-gray-100 transition-all group">
+                <button type="button" onClick={() => importFileRef.current?.click()} disabled={isImporting} className="flex items-center justify-between p-4 bg-gray-50 hover:bg-blue-50 rounded-2xl border border-gray-100 transition-all group">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-white rounded-lg text-blue-500 shadow-sm"><Upload size={18} /></div>
                     <span className="text-sm font-bold text-gray-700">Restaurar Dados</span>
@@ -1199,6 +1022,7 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                   </div>
 
                   <button
+                    type="button"
                     onClick={handleAnalyzeInactiveCustomers}
                     disabled={isAnalyzing || isDeleting}
                     className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
@@ -1226,6 +1050,7 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
 
                     {analyzedCount > 0 && (
                       <button
+                        type="button"
                         onClick={handleDeleteInactiveCustomers}
                         disabled={isDeleting}
                         className="w-full py-3.5 bg-rose-600 text-white rounded-xl font-black text-xs uppercase tracking-wider hover:bg-rose-700 transition-colors shadow-lg shadow-rose-600/10 active:scale-95 flex items-center justify-center gap-2"
@@ -1240,7 +1065,7 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
             </div>
           </section>
         </div>
-      </div>
+      )}
     </div>
   );
 };
