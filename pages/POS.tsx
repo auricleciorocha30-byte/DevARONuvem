@@ -45,7 +45,6 @@ import { Product, Order, OrderItem, StoreSettings, Waitstaff, PaymentMethod, Cus
 import { useNavigate } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
 import { ComplementsModal } from '../components/ComplementsModal';
-import { motion, AnimatePresence } from 'motion/react';
 import ManagerPasswordModal from '../components/ManagerPasswordModal';
 
 import InstallPrompt from '../components/InstallPrompt';
@@ -173,22 +172,6 @@ export default function POS({ storeId, user, settings, orders, products: propPro
   const [isGeneratingPix, setIsGeneratingPix] = useState(false);
   const [isPixApproved, setIsPixApproved] = useState(false);
   const [isPixCopied, setIsPixCopied] = useState(false);
-  
-  // Custom Elegant In-App Toast Alert (replaces browser alerts to avoid displaying URL/links)
-  const [posAlert, setPOSAlert] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
-  const showPOSAlert = useCallback((text: string, type: 'success' | 'info' | 'error' = 'info') => {
-    setPOSAlert({ text, type });
-  }, []);
-
-  // Effect to auto-dismiss alert
-  useEffect(() => {
-    if (posAlert) {
-      const timer = setTimeout(() => {
-        setPOSAlert(null);
-      }, 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [posAlert]);
   const [loadedCommandIds, setLoadedCommandIds] = useState<string[]>(() => {
     const saved = localStorage.getItem(`pos-loadedCommandIds-${storeId}`);
     return saved ? JSON.parse(saved) : [];
@@ -820,7 +803,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
   const lookupCommand = async (num: string, type: 'MESA' | 'COMANDA' | 'BALCAO' | 'ENTREGA' = 'COMANDA') => {
     if (!num) return;
     if (isContingencyMode) {
-        showPOSAlert("A busca de comandas/mesas não está disponível no Modo Contingência.", 'error');
+        alert("A busca de comandas/mesas não está disponível no Modo Contingência.");
         return;
     }
     const cleanNum = num.trim();
@@ -875,7 +858,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
             });
             
             if (unpaidData.length === 0) {
-                showPOSAlert(`Todos os pedidos para a ${type === 'MESA' ? 'Mesa' : type === 'COMANDA' ? 'Comanda' : 'Pedido'} ${cleanNum} já foram finalizados.`, 'info');
+                alert(`Todos os pedidos para a ${type === 'MESA' ? 'Mesa' : type === 'COMANDA' ? 'Comanda' : 'Pedido'} ${cleanNum} já foram finalizados.`);
                 return;
             }
 
@@ -1020,14 +1003,14 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                 setOrderType(type);
             }
             
-            showPOSAlert(`${type === 'MESA' ? 'Mesa' : type === 'COMANDA' ? 'Comanda' : 'Pedido'} ${cleanNum} carregada com sucesso.`, 'success');
+            alert(`${type === 'MESA' ? 'Mesa' : type === 'COMANDA' ? 'Comanda' : 'Pedido'} ${cleanNum} carregada com sucesso.`);
             setShowDeliveryModal(false);
         } else {
-            showPOSAlert(`Nenhum pedido em aberto para a ${type === 'MESA' ? 'Mesa' : type === 'COMANDA' ? 'Comanda' : 'Pedido'} ${cleanNum}.`, 'info');
+            alert(`Nenhum pedido em aberto para a ${type === 'MESA' ? 'Mesa' : type === 'COMANDA' ? 'Comanda' : 'Pedido'} ${cleanNum}.`);
         }
     } catch (err) {
       console.error("Erro ao consultar:", err);
-        showPOSAlert("Erro ao consultar.", 'error');
+        alert("Erro ao consultar.");
     } finally {
         setIsLookingUpCommand(false);
     }
@@ -1094,7 +1077,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
             });
             
             if (unpaidData.length === 0) {
-                showPOSAlert(`Nenhum pedido de ${type.toLowerCase()} pendente encontrado.`, 'info');
+                alert(`Nenhum pedido de ${type.toLowerCase()} pendente encontrado.`);
                 return;
             }
 
@@ -1116,11 +1099,11 @@ export default function POS({ storeId, user, settings, orders, products: propPro
             setDeliveryOrdersList(parsedData);
             setShowDeliveryModal(true);
         } else {
-            showPOSAlert(`Nenhum pedido de ${type.toLowerCase()} encontrado.`, 'info');
+            alert(`Nenhum pedido de ${type.toLowerCase()} encontrado.`);
         }
     } catch (err) {
       console.error(err);
-        showPOSAlert("Erro ao buscar pedidos.", 'error');
+        alert("Erro ao buscar pedidos.");
     } finally {
         setIsLookingUpCommand(false);
     }
@@ -4857,17 +4840,40 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider bg-yellow-100 text-yellow-700 flex items-center gap-1">
                                             <Truck size={10} />
                                             {couriers.find(c => c.id === order.deliveryDriverId)?.name || 'Entregador'}
+                                            {couriers.find(c => c.id === order.deliveryDriverId)?.phone && (
+                                              <a 
+                                                href={`https://wa.me/55${couriers.find(c => c.id === order.deliveryDriverId)?.phone?.replace(/\D/g, '')}`}
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                className="ml-1 text-green-600 hover:text-green-700 hover:scale-110 transition-transform"
+                                                onClick={e => e.stopPropagation()}
+                                                title="WhatsApp do Entregador"
+                                              >
+                                                <MessageCircle size={12} />
+                                              </a>
+                                            )}
                                         </span>
                                     )}
                                 </div>
                                 {((order.type !== 'MESA' && order.type !== 'COMANDA') || order.customerName) && (
                                     <h3 className="font-bold text-gray-800">{order.customerName || 'Cliente sem nome'}</h3>
-                                
                                 )}
                                 {order.type === 'ENTREGA' && (
                                   <>
                                     <p className="text-sm text-gray-500 flex items-center gap-1">
                                         <Phone size={12} /> {order.customerPhone || 'Sem telefone'}
+                                        {order.customerPhone && (
+                                            <a 
+                                                href={`https://wa.me/${order.customerPhone.replace(/\D/g, '')}`} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                className="ml-2 text-green-500 hover:text-green-600"
+                                                title="Abrir WhatsApp"
+                                                onClick={e => e.stopPropagation()}
+                                            >
+                                                <MessageCircle size={14} />
+                                            </a>
+                                        )}
                                     </p>
                                     <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
                                         <MapPin size={12} /> {order.deliveryAddress || 'Retirada'}
@@ -5515,39 +5521,6 @@ export default function POS({ storeId, user, settings, orders, products: propPro
         actionDescription={managerModal.actionDescription}
         onSuccess={managerModal.onSuccess}
       />
-
-      {/* Custom Elegant POS Alert Toast */}
-      <AnimatePresence>
-        {posAlert && (
-          <motion.div
-            initial={{ opacity: 0, y: -50, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -20, scale: 0.95 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] max-w-md w-[90vw] md:w-auto shadow-2xl rounded-2xl flex items-center gap-3.5 px-6 py-4 border select-none pointer-events-none"
-            style={{
-              backgroundColor: 
-                posAlert.type === 'success' ? '#f0fdf4' : 
-                posAlert.type === 'error' ? '#fef2f2' : '#f0f9ff',
-              borderColor: 
-                posAlert.type === 'success' ? '#bbf7d0' : 
-                posAlert.type === 'error' ? '#fca5a5' : '#bae6fd',
-              color: 
-                posAlert.type === 'success' ? '#166534' : 
-                posAlert.type === 'error' ? '#991b1b' : '#075985'
-            }}
-          >
-            {posAlert.type === 'success' ? (
-              <CheckCircle2 size={20} className="text-green-600 shrink-0" />
-            ) : posAlert.type === 'error' ? (
-              <AlertCircle size={20} className="text-red-600 shrink-0" />
-            ) : (
-              <Search size={20} className="text-sky-600 shrink-0" />
-            )}
-            <span className="font-bold text-sm tracking-wide leading-tight">{posAlert.text}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

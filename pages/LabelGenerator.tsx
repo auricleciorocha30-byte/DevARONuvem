@@ -251,8 +251,6 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
   const [fontSizePrice, setFontSizePrice] = useState<number>(18);
   const [fontSizeMeta, setFontSizeMeta] = useState<number>(10);
   const [priceColorAccent, setPriceColorAccent] = useState(true);
-  const [fontColor, setFontColor] = useState('#000000');
-  const [fontFamily, setFontFamily] = useState('system-ui, sans-serif');
 
   // Local Categories extracted from products
   const categories = useMemo(() => {
@@ -521,8 +519,6 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
       
       {/* PRINT-ONLY CSS STYLES INJECTOR */}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Montserrat:wght@400;600;700;900&family=Playfair+Display:wght@400;700;900&family=Outfit:wght@400;600;700;900&family=Pacifico&family=Courier+Prime:wght@400;700&family=Plus+Jakarta+Sans:wght@400;700;800&display=swap');
-
         @media print {
           body, html {
             background: #ffffff !important;
@@ -554,7 +550,7 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
             max-width: ${presetConfig.widthMm}mm !important;
             max-height: ${presetConfig.heightMm}mm !important;
             box-sizing: border-box !important;
-            border: ${showBorder ? `0.5px solid ${fontColor}` : 'none'} !important;
+            border: ${showBorder ? '0.5px solid #000000' : 'none'} !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
             display: flex !important;
@@ -565,8 +561,7 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
             padding: 2.5mm !important;
             overflow: hidden !important;
             background: #ffffff !important;
-            color: ${fontColor} !important;
-            font-family: ${fontFamily} !important;
+            color: #000000 !important;
             position: relative !important;
           }
           /* Page size configuration */
@@ -1154,60 +1149,6 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
               </div>
             </div>
 
-            {/* FONT STYLE & COLOR */}
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3.5">
-              <span className="text-xs font-bold text-slate-600 block">Estilo & Cor da Fonte</span>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Tipo de Fonte (Família)</label>
-                  <select
-                    value={fontFamily}
-                    onChange={(e) => setFontFamily(e.target.value)}
-                    className="w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 font-bold"
-                  >
-                    <option value="system-ui, sans-serif">Sans-Serif (Moderna)</option>
-                    <option value="Georgia, serif">Serif (Clássica)</option>
-                    <option value="monospace">Monospace (Técnica)</option>
-                    <option value="'Montserrat', sans-serif">Montserrat</option>
-                    <option value="'Playfair Display', serif">Playfair Display</option>
-                    <option value="'Caveat', cursive">Caveat (Artesanal)</option>
-                    <option value="'Pacifico', cursive">Pacifico (Retro Cursiva)</option>
-                    <option value="'Outfit', sans-serif">Outfit (Geométrica)</option>
-                    <option value="'Courier Prime', monospace">Courier Prime (Máquina de Escrever)</option>
-                    <option value="'Plus Jakarta Sans', sans-serif">Plus Jakarta Sans</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Cor do Texto</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={fontColor}
-                      onChange={(e) => setFontColor(e.target.value)}
-                      className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-0 shrink-0"
-                    />
-                    <select
-                      value={fontColor}
-                      onChange={(e) => setFontColor(e.target.value)}
-                      className="flex-1 px-2 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 font-bold"
-                    >
-                      <option value="#000000">Preto</option>
-                      <option value="#1e293b">Cinza Escuro</option>
-                      <option value="#991b1b">Vermelho Escuro</option>
-                      <option value="#1e3a8a">Azul Marinho</option>
-                      <option value="#064e3b">Verde Escuro</option>
-                      <option value="#b45309">Dourado / Bronze</option>
-                      {!['#000000', '#1e293b', '#991b1b', '#1e3a8a', '#064e3b', '#b45309'].includes(fontColor) && (
-                        <option value={fontColor}>Personalizada ({fontColor})</option>
-                      )}
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {/* FONT SIZING SLIDERS */}
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3.5">
               <span className="text-xs font-bold text-slate-600 block">Tamanho das Fontes (Pixels)</span>
@@ -1296,24 +1237,23 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
                       justifyContent: 'space-between',
                       alignItems: alignment === 'center' ? 'center' : 'flex-start',
                       textAlign: alignment === 'center' ? 'center' : 'left',
-                      border: showBorder ? `1px solid ${fontColor}` : 'none',
+                      border: showBorder ? '1px solid #111111' : 'none',
                       position: 'relative',
                       boxSizing: 'border-box',
                       backgroundColor: '#ffffff',
-                      color: fontColor,
-                      fontFamily: fontFamily,
+                      color: '#000000',
                       overflow: 'hidden'
                     }}
                   >
                     {/* Header: Store Name or free text top */}
                     <div className="w-full flex flex-col items-center select-none">
                       {customText && customTextPosition === 'top' && (
-                        <span style={{ fontSize: `${fontSizeMeta - 1}px` }} className="text-current font-semibold block leading-tight truncate w-full">
+                        <span style={{ fontSize: `${fontSizeMeta - 1}px` }} className="text-black font-semibold block leading-tight truncate w-full">
                           {customText}
                         </span>
                       )}
                       {showStoreName && (
-                        <span style={{ fontSize: `${fontSizeMeta}px` }} className="text-current font-black uppercase tracking-wider block leading-tight truncate w-full">
+                        <span style={{ fontSize: `${fontSizeMeta}px` }} className="text-black font-black uppercase tracking-wider block leading-tight truncate w-full">
                           {settings?.storeName || 'MINHA LOJA'}
                         </span>
                       )}
@@ -1324,35 +1264,35 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
                       {showProductName && (
                         <h3 
                           style={{ fontSize: `${fontSizeTitle}px` }} 
-                          className="font-black text-current leading-tight tracking-tight line-clamp-2 w-full uppercase"
+                          className="font-black text-black leading-tight tracking-tight line-clamp-2 w-full uppercase"
                         >
                           {flattenedLabels[0].title}
                         </h3>
                       )}
                       
                       {flattenedLabels[0].subtitle && (
-                        <span style={{ fontSize: `${fontSizeMeta}px` }} className="opacity-80 font-bold block mt-0.5 leading-tight truncate w-full">
+                        <span style={{ fontSize: `${fontSizeMeta}px` }} className="text-black/80 font-bold block mt-0.5 leading-tight truncate w-full">
                           {flattenedLabels[0].subtitle}
                         </span>
                       )}
 
                       {/* Display Order Details specifically if loaded */}
                       {flattenedLabels[0].orderInfo && (
-                        <div className="mt-1.5 space-y-1 w-full text-left bg-current/[0.03] p-1.5 rounded border border-current/10">
+                        <div className="mt-1.5 space-y-1 w-full text-left bg-black/[0.03] p-1.5 rounded border border-black/10">
                           {flattenedLabels[0].orderInfo.deliveryAddress && (
                             <div className="flex gap-1 items-start">
-                              <MapPin size={9} className="shrink-0 mt-0.5 text-current" />
-                              <span className="text-[9px] font-black leading-tight line-clamp-3 text-current">
+                              <MapPin size={9} className="shrink-0 mt-0.5 text-black" />
+                              <span className="text-[9px] font-black leading-tight line-clamp-3 text-black">
                                 {flattenedLabels[0].orderInfo.deliveryAddress}
                               </span>
                             </div>
                           )}
                           {flattenedLabels[0].orderInfo.notes && (
-                            <div className="text-[8px] font-semibold text-current italic line-clamp-2 leading-tight border-t border-current/10 pt-0.5 mt-0.5 opacity-90">
+                            <div className="text-[8px] font-semibold text-black italic line-clamp-2 leading-tight border-t border-black/5 pt-0.5 mt-0.5">
                               Obs: {flattenedLabels[0].orderInfo.notes}
                             </div>
                           )}
-                          <div className="flex justify-between items-center text-[8px] text-current/75 border-t border-current/10 pt-0.5 font-bold mt-0.5">
+                          <div className="flex justify-between items-center text-[8px] text-black/75 border-t border-black/5 pt-0.5 font-bold mt-0.5">
                             <span>{flattenedLabels[0].orderInfo.tableOrBalcao || 'ENTREGA'}</span>
                             <span>{flattenedLabels[0].orderInfo.createdAt}</span>
                           </div>
@@ -1368,7 +1308,7 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
                         <div 
                           style={{ fontSize: `${fontSizePrice}px` }} 
                           className={`font-black tracking-tight leading-none text-center select-none ${
-                            priceColorAccent ? 'text-red-600' : 'text-current'
+                            priceColorAccent ? 'text-red-600' : 'text-black'
                           }`}
                         >
                           R$ {flattenedLabels[0].price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -1396,7 +1336,7 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
 
                       {/* Custom footer text */}
                       {customText && customTextPosition === 'bottom' && (
-                        <span style={{ fontSize: `${fontSizeMeta - 1}px` }} className="text-current font-semibold block leading-tight text-center truncate w-full">
+                        <span style={{ fontSize: `${fontSizeMeta - 1}px` }} className="text-black font-semibold block leading-tight text-center truncate w-full">
                           {customText}
                         </span>
                       )}
@@ -1494,7 +1434,7 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
                     padding: '1mm', 
                     background: '#f3f4f6', 
                     borderRadius: '1mm', 
-                    border: '0.2px solid ' + fontColor,
+                    border: '0.2px solid #000000',
                     textAlign: 'left'
                   }}>
                     {lbl.orderInfo.deliveryAddress && (
@@ -1507,7 +1447,7 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
                         Obs: {lbl.orderInfo.notes}
                       </span>
                     )}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: `${fontSizeMeta - 2}px`, borderTop: '0.1px solid ' + fontColor, marginTop: '1mm', paddingTop: '0.5mm', fontWeight: 'bold' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: `${fontSizeMeta - 2}px`, borderTop: '0.1px solid #000000', marginTop: '1mm', paddingTop: '0.5mm', fontWeight: 'bold' }}>
                       <span>{lbl.orderInfo.tableOrBalcao || 'DELIVERY'}</span>
                       <span>{lbl.orderInfo.createdAt}</span>
                     </div>
@@ -1537,7 +1477,7 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
 
                 {/* QR Code svg block */}
                 {codeType === 'qrcode' && (lbl.barcode || lbl.qrCodeUrl || lbl.title) && (
-                  <div style={{ padding: '0.5mm', background: '#ffffff', border: '0.1px solid ' + fontColor, borderRadius: '0.5mm' }}>
+                  <div style={{ padding: '0.5mm', background: '#ffffff', border: '0.1px solid #000000', borderRadius: '0.5mm' }}>
                     <QRCodeSVG 
                       value={lbl.barcode || lbl.qrCodeUrl || lbl.title} 
                       size={Math.min(presetConfig.heightMm * 1.5, 45)}
