@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'gc-staff-v1';
+const CACHE_NAME = 'gc-staff-v2';
 const ASSETS = [
   '/',
   '/index.html',
@@ -11,6 +11,22 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS);
     })
+  );
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            console.log('Clearing old cache:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    }).then(() => self.clients.claim())
   );
 });
 
