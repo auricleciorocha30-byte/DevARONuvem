@@ -24,7 +24,9 @@ import {
   Clock,
   User,
   Barcode as BarcodeIcon,
-  QrCode as QrCodeIcon
+  QrCode as QrCodeIcon,
+  Palette,
+  Type
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -251,6 +253,8 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
   const [fontSizePrice, setFontSizePrice] = useState<number>(18);
   const [fontSizeMeta, setFontSizeMeta] = useState<number>(10);
   const [priceColorAccent, setPriceColorAccent] = useState(true);
+  const [fontColor, setFontColor] = useState<string>('#000000');
+  const [fontFamily, setFontFamily] = useState<string>('sans-serif');
 
   // Local Categories extracted from products
   const categories = useMemo(() => {
@@ -550,7 +554,7 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
             max-width: ${presetConfig.widthMm}mm !important;
             max-height: ${presetConfig.heightMm}mm !important;
             box-sizing: border-box !important;
-            border: ${showBorder ? '0.5px solid #000000' : 'none'} !important;
+            border: ${showBorder ? `0.5px solid ${fontColor}` : 'none'} !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
             display: flex !important;
@@ -561,7 +565,8 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
             padding: 2.5mm !important;
             overflow: hidden !important;
             background: #ffffff !important;
-            color: #000000 !important;
+            color: ${fontColor} !important;
+            font-family: ${fontFamily}, sans-serif !important;
             position: relative !important;
           }
           /* Page size configuration */
@@ -1200,6 +1205,50 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
                 </div>
               </div>
             </div>
+
+            {/* COLOR & FONT FAMILY SELECTION */}
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <span className="text-xs font-bold text-slate-600 flex items-center gap-1">
+                  <Palette size={14} /> Cor da Fonte
+                </span>
+                <div className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200">
+                  <input
+                    type="color"
+                    value={fontColor}
+                    onChange={(e) => setFontColor(e.target.value)}
+                    className="w-8 h-8 rounded cursor-pointer border-0 bg-transparent"
+                  />
+                  <input
+                    type="text"
+                    value={fontColor}
+                    onChange={(e) => setFontColor(e.target.value)}
+                    className="flex-1 min-w-0 bg-transparent text-xs font-bold text-slate-700 outline-none uppercase"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <span className="text-xs font-bold text-slate-600 flex items-center gap-1">
+                  <Type size={14} /> Tipo de Fonte
+                </span>
+                <select
+                  value={fontFamily}
+                  onChange={(e) => setFontFamily(e.target.value)}
+                  className="w-full px-2.5 py-2.5 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700 outline-none"
+                >
+                  <option value="sans-serif">Sem Serifa (Padrão)</option>
+                  <option value="serif">Serifa (Clássica)</option>
+                  <option value="monospace">Monoespaçada</option>
+                  <option value="Arial">Arial</option>
+                  <option value="Times New Roman">Times New Roman</option>
+                  <option value="Courier New">Courier New</option>
+                  <option value="Georgia">Georgia</option>
+                  <option value="cursive">Cursiva</option>
+                </select>
+              </div>
+            </div>
+
           </div>
 
         </div>
@@ -1237,23 +1286,24 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
                       justifyContent: 'space-between',
                       alignItems: alignment === 'center' ? 'center' : 'flex-start',
                       textAlign: alignment === 'center' ? 'center' : 'left',
-                      border: showBorder ? '1px solid #111111' : 'none',
+                      border: showBorder ? `1px solid ${fontColor}` : 'none',
                       position: 'relative',
                       boxSizing: 'border-box',
                       backgroundColor: '#ffffff',
-                      color: '#000000',
+                      color: fontColor,
+                      fontFamily: fontFamily,
                       overflow: 'hidden'
                     }}
                   >
                     {/* Header: Store Name or free text top */}
                     <div className="w-full flex flex-col items-center select-none">
                       {customText && customTextPosition === 'top' && (
-                        <span style={{ fontSize: `${fontSizeMeta - 1}px` }} className="text-black font-semibold block leading-tight truncate w-full">
+                        <span style={{ fontSize: `${fontSizeMeta - 1}px` }} className="text-current font-semibold block leading-tight truncate w-full">
                           {customText}
                         </span>
                       )}
                       {showStoreName && (
-                        <span style={{ fontSize: `${fontSizeMeta}px` }} className="text-black font-black uppercase tracking-wider block leading-tight truncate w-full">
+                        <span style={{ fontSize: `${fontSizeMeta}px` }} className="text-current font-black uppercase tracking-wider block leading-tight truncate w-full">
                           {settings?.storeName || 'MINHA LOJA'}
                         </span>
                       )}
@@ -1264,35 +1314,35 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
                       {showProductName && (
                         <h3 
                           style={{ fontSize: `${fontSizeTitle}px` }} 
-                          className="font-black text-black leading-tight tracking-tight line-clamp-2 w-full uppercase"
+                          className="font-black text-current leading-tight tracking-tight line-clamp-2 w-full uppercase"
                         >
                           {flattenedLabels[0].title}
                         </h3>
                       )}
                       
                       {flattenedLabels[0].subtitle && (
-                        <span style={{ fontSize: `${fontSizeMeta}px` }} className="text-black/80 font-bold block mt-0.5 leading-tight truncate w-full">
+                        <span style={{ fontSize: `${fontSizeMeta}px` }} className="opacity-80 text-current font-bold block mt-0.5 leading-tight truncate w-full">
                           {flattenedLabels[0].subtitle}
                         </span>
                       )}
 
                       {/* Display Order Details specifically if loaded */}
                       {flattenedLabels[0].orderInfo && (
-                        <div className="mt-1.5 space-y-1 w-full text-left bg-black/[0.03] p-1.5 rounded border border-black/10">
+                        <div className="mt-1.5 space-y-1 w-full text-left bg-current/5 p-1.5 rounded border border-current/10">
                           {flattenedLabels[0].orderInfo.deliveryAddress && (
                             <div className="flex gap-1 items-start">
-                              <MapPin size={9} className="shrink-0 mt-0.5 text-black" />
-                              <span className="text-[9px] font-black leading-tight line-clamp-3 text-black">
+                              <MapPin size={9} className="shrink-0 mt-0.5 text-current" />
+                              <span className="text-[9px] font-black leading-tight line-clamp-3 text-current">
                                 {flattenedLabels[0].orderInfo.deliveryAddress}
                               </span>
                             </div>
                           )}
                           {flattenedLabels[0].orderInfo.notes && (
-                            <div className="text-[8px] font-semibold text-black italic line-clamp-2 leading-tight border-t border-black/5 pt-0.5 mt-0.5">
+                            <div className="text-[8px] font-semibold text-current italic line-clamp-2 leading-tight border-t border-current/5 pt-0.5 mt-0.5">
                               Obs: {flattenedLabels[0].orderInfo.notes}
                             </div>
                           )}
-                          <div className="flex justify-between items-center text-[8px] text-black/75 border-t border-black/5 pt-0.5 font-bold mt-0.5">
+                          <div className="flex justify-between items-center text-[8px] opacity-75 text-current border-t border-current/5 pt-0.5 font-bold mt-0.5">
                             <span>{flattenedLabels[0].orderInfo.tableOrBalcao || 'ENTREGA'}</span>
                             <span>{flattenedLabels[0].orderInfo.createdAt}</span>
                           </div>
@@ -1308,7 +1358,7 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
                         <div 
                           style={{ fontSize: `${fontSizePrice}px` }} 
                           className={`font-black tracking-tight leading-none text-center select-none ${
-                            priceColorAccent ? 'text-red-600' : 'text-black'
+                            priceColorAccent ? 'text-red-600' : 'text-current'
                           }`}
                         >
                           R$ {flattenedLabels[0].price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -1326,7 +1376,7 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
                       )}
 
                       {codeType === 'qrcode' && (flattenedLabels[0].barcode || flattenedLabels[0].qrCodeUrl || flattenedLabels[0].title) && (
-                        <div className="flex justify-center p-1 bg-white border border-black/10 rounded">
+                        <div className="flex justify-center p-1 bg-white border border-current/10 rounded">
                           <QRCodeSVG 
                             value={flattenedLabels[0].barcode || flattenedLabels[0].qrCodeUrl || flattenedLabels[0].title} 
                             size={Math.min(presetConfig.heightMm * 1.5, 45)}
@@ -1336,7 +1386,7 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
 
                       {/* Custom footer text */}
                       {customText && customTextPosition === 'bottom' && (
-                        <span style={{ fontSize: `${fontSizeMeta - 1}px` }} className="text-black font-semibold block leading-tight text-center truncate w-full">
+                        <span style={{ fontSize: `${fontSizeMeta - 1}px` }} className="text-current font-semibold block leading-tight text-center truncate w-full">
                           {customText}
                         </span>
                       )}
@@ -1432,9 +1482,9 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
                   <div style={{ 
                     marginTop: '1.5mm', 
                     padding: '1mm', 
-                    background: '#f3f4f6', 
+                    background: 'rgba(0, 0, 0, 0.03)', 
                     borderRadius: '1mm', 
-                    border: '0.2px solid #000000',
+                    border: `0.2px solid ${fontColor}`,
                     textAlign: 'left'
                   }}>
                     {lbl.orderInfo.deliveryAddress && (
@@ -1447,7 +1497,7 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
                         Obs: {lbl.orderInfo.notes}
                       </span>
                     )}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: `${fontSizeMeta - 2}px`, borderTop: '0.1px solid #000000', marginTop: '1mm', paddingTop: '0.5mm', fontWeight: 'bold' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: `${fontSizeMeta - 2}px`, borderTop: `0.1px solid ${fontColor}`, marginTop: '1mm', paddingTop: '0.5mm', fontWeight: 'bold' }}>
                       <span>{lbl.orderInfo.tableOrBalcao || 'DELIVERY'}</span>
                       <span>{lbl.orderInfo.createdAt}</span>
                     </div>
@@ -1477,7 +1527,7 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
 
                 {/* QR Code svg block */}
                 {codeType === 'qrcode' && (lbl.barcode || lbl.qrCodeUrl || lbl.title) && (
-                  <div style={{ padding: '0.5mm', background: '#ffffff', border: '0.1px solid #000000', borderRadius: '0.5mm' }}>
+                  <div style={{ padding: '0.5mm', background: '#ffffff', border: `0.1px solid ${fontColor}`, borderRadius: '0.5mm' }}>
                     <QRCodeSVG 
                       value={lbl.barcode || lbl.qrCodeUrl || lbl.title} 
                       size={Math.min(presetConfig.heightMm * 1.5, 45)}

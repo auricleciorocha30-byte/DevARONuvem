@@ -64,6 +64,7 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
   const [localSettings, setLocalSettings] = useState<StoreSettings>(settings);
+  const [activeTab, setActiveTab] = useState<'geral' | 'canais_pagamentos' | 'regras' | 'visual' | 'dados'>('geral');
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -361,9 +362,74 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
-        {/* Coluna 1: Operação e Localização */}
-        <div className="space-y-6">
+      {/* Abas de Navegação */}
+      <div className="flex border-b border-gray-200 overflow-x-auto no-scrollbar gap-2 mb-6">
+        <button
+          type="button"
+          onClick={() => setActiveTab('geral')}
+          className={`flex items-center gap-2 px-5 py-3.5 border-b-2 font-bold text-sm transition-all whitespace-nowrap ${
+            activeTab === 'geral'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          <Store size={18} />
+          Geral & Funcionamento
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('canais_pagamentos')}
+          className={`flex items-center gap-2 px-5 py-3.5 border-b-2 font-bold text-sm transition-all whitespace-nowrap ${
+            activeTab === 'canais_pagamentos'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          <CreditCard size={18} />
+          Canais & Pagamentos
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('regras')}
+          className={`flex items-center gap-2 px-5 py-3.5 border-b-2 font-bold text-sm transition-all whitespace-nowrap ${
+            activeTab === 'regras'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          <Ticket size={18} />
+          Regras & Promoções
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('visual')}
+          className={`flex items-center gap-2 px-5 py-3.5 border-b-2 font-bold text-sm transition-all whitespace-nowrap ${
+            activeTab === 'visual'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          <Palette size={18} />
+          Identidade & Impressão
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('dados')}
+          className={`flex items-center gap-2 px-5 py-3.5 border-b-2 font-bold text-sm transition-all whitespace-nowrap ${
+            activeTab === 'dados'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          <Database size={18} />
+          Segurança & Backups
+        </button>
+      </div>
+
+      <div className="space-y-6">
+        {/* ABA 1: GERAL & FUNCIONAMENTO */}
+        {activeTab === 'geral' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
           <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
             <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
               <MapPin size={18} /> Contato & Localização
@@ -574,6 +640,12 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                 )}
             </div>
           </section>
+        </div>
+      )}
+
+      {/* ABA 2: CANAIS & PAGAMENTOS */}
+      {activeTab === 'canais_pagamentos' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
           <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col">
               <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 flex items-center justify-center gap-2">
                   <CreditCard size={18} /> Meios de Pagamento
@@ -723,11 +795,12 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
               </div>
             </section>
           )}
-
         </div>
+      )}
 
-        {/* Coluna 2: Regras e Vendas */}
-        <div className="space-y-6">
+      {/* ABA 3: REGRAS & PROMOÇÕES */}
+      {activeTab === 'regras' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
 
           <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
             <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
@@ -977,8 +1050,14 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
               </div>
             </div>
           </section>
+        </div>
+      )}
 
-          <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col items-center">
+      {/* ABA 4: IDENTIDADE & IMPRESSÃO */}
+      {activeTab === 'visual' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+          <div className="space-y-6">
+            <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col items-center">
             <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 text-center">QR Code Pix</h2>
             <div className="relative group cursor-pointer" onClick={() => document.getElementById('pix-upload')?.click()}>
               <div className="w-40 h-40 rounded-2xl border-4 border-blue-100 overflow-hidden bg-gray-50 flex items-center justify-center shadow-inner relative transition-transform hover:scale-105">
@@ -1143,7 +1222,13 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
               </div>
             </div>
           </section>
+        </div>
+      </div>
+    )}
 
+      {/* ABA 5: SEGURANÇA & BACKUPS */}
+      {activeTab === 'dados' && (
+        <div className="grid grid-cols-1 gap-6 items-start">
           <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
             <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
               <Database size={16} /> Manutenção de Dados
@@ -1240,6 +1325,7 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
             </div>
           </section>
         </div>
+      )}
       </div>
     </div>
   );
