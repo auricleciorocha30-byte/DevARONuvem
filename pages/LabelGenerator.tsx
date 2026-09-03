@@ -521,6 +521,8 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
       
       {/* PRINT-ONLY CSS STYLES INJECTOR */}
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Montserrat:wght@400;600;700;900&family=Playfair+Display:wght@400;700;900&family=Outfit:wght@400;600;700;900&family=Pacifico&family=Courier+Prime:wght@400;700&family=Plus+Jakarta+Sans:wght@400;700;800&display=swap');
+
         @media print {
           body, html {
             background: #ffffff !important;
@@ -1169,7 +1171,11 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
                     <option value="monospace">Monospace (Técnica)</option>
                     <option value="'Montserrat', sans-serif">Montserrat</option>
                     <option value="'Playfair Display', serif">Playfair Display</option>
-                    <option value="'Caveat', cursive">Artesanal / Cursiva</option>
+                    <option value="'Caveat', cursive">Caveat (Artesanal)</option>
+                    <option value="'Pacifico', cursive">Pacifico (Retro Cursiva)</option>
+                    <option value="'Outfit', sans-serif">Outfit (Geométrica)</option>
+                    <option value="'Courier Prime', monospace">Courier Prime (Máquina de Escrever)</option>
+                    <option value="'Plus Jakarta Sans', sans-serif">Plus Jakarta Sans</option>
                   </select>
                 </div>
 

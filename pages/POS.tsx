@@ -45,6 +45,7 @@ import { Product, Order, OrderItem, StoreSettings, Waitstaff, PaymentMethod, Cus
 import { useNavigate } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
 import { ComplementsModal } from '../components/ComplementsModal';
+import { motion, AnimatePresence } from 'motion/react';
 import ManagerPasswordModal from '../components/ManagerPasswordModal';
 
 import InstallPrompt from '../components/InstallPrompt';
@@ -172,6 +173,22 @@ export default function POS({ storeId, user, settings, orders, products: propPro
   const [isGeneratingPix, setIsGeneratingPix] = useState(false);
   const [isPixApproved, setIsPixApproved] = useState(false);
   const [isPixCopied, setIsPixCopied] = useState(false);
+  
+  // Custom Elegant In-App Toast Alert (replaces browser alerts to avoid displaying URL/links)
+  const [posAlert, setPOSAlert] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
+  const showPOSAlert = useCallback((text: string, type: 'success' | 'info' | 'error' = 'info') => {
+    setPOSAlert({ text, type });
+  }, []);
+
+  // Effect to auto-dismiss alert
+  useEffect(() => {
+    if (posAlert) {
+      const timer = setTimeout(() => {
+        setPOSAlert(null);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [posAlert]);
   const [loadedCommandIds, setLoadedCommandIds] = useState<string[]>(() => {
     const saved = localStorage.getItem(`pos-loadedCommandIds-${storeId}`);
     return saved ? JSON.parse(saved) : [];
@@ -803,7 +820,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
   const lookupCommand = async (num: string, type: 'MESA' | 'COMANDA' | 'BALCAO' | 'ENTREGA' = 'COMANDA') => {
     if (!num) return;
     if (isContingencyMode) {
-        alert("A busca de comandas/mesas não está disponível no Modo Contingência.");
+        showPOSAlert("A busca de comandas/mesas não está disponível no Modo Contingência.", 'error');
         return;
     }
     const cleanNum = num.trim();
@@ -858,7 +875,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
             });
             
             if (unpaidData.length === 0) {
-                alert(`Todos os pedidos para a ${type === 'MESA' ? 'Mesa' : type === 'COMANDA' ? 'Comanda' : 'Pedido'} ${cleanNum} já foram finalizados.`);
+                showPOSAlert(`Todos os pedidos para a ${type === 'MESA' ? 'Mesa' : type === 'COMANDA' ? 'Comanda' : 'Pedido'} ${cleanNum} já foram finalizados.`, 'info');
                 return;
             }
 
@@ -1003,14 +1020,14 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                 setOrderType(type);
             }
             
-            alert(`${type === 'MESA' ? 'Mesa' : type === 'COMANDA' ? 'Comanda' : 'Pedido'} ${cleanNum} carregada com sucesso.`);
+            showPOSAlert(`${type === 'MESA' ? 'Mesa' : type === 'COMANDA' ? 'Comanda' : 'Pedido'} ${cleanNum} carregada com sucesso.`, 'success');
             setShowDeliveryModal(false);
         } else {
-            alert(`Nenhum pedido em aberto para a ${type === 'MESA' ? 'Mesa' : type === 'COMANDA' ? 'Comanda' : 'Pedido'} ${cleanNum}.`);
+            showPOSAlert(`Nenhum pedido em aberto para a ${type === 'MESA' ? 'Mesa' : type === 'COMANDA' ? 'Comanda' : 'Pedido'} ${cleanNum}.`, 'info');
         }
     } catch (err) {
       console.error("Erro ao consultar:", err);
-        alert("Erro ao consultar.");
+        showPOSAlert("Erro ao consultar.", 'error');
     } finally {
         setIsLookingUpCommand(false);
     }
@@ -1077,7 +1094,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
             });
             
             if (unpaidData.length === 0) {
-                alert(`Nenhum pedido de ${type.toLowerCase()} pendente encontrado.`);
+                showPOSAlert(`Nenhum pedido de ${type.toLowerCase()} pendente encontrado.`, 'info');
                 return;
             }
 
@@ -1099,11 +1116,11 @@ export default function POS({ storeId, user, settings, orders, products: propPro
             setDeliveryOrdersList(parsedData);
             setShowDeliveryModal(true);
         } else {
-            alert(`Nenhum pedido de ${type.toLowerCase()} encontrado.`);
+            showPOSAlert(`Nenhum pedido de ${type.toLowerCase()} encontrado.`, 'info');
         }
     } catch (err) {
       console.error(err);
-        alert("Erro ao buscar pedidos.");
+        showPOSAlert("Erro ao buscar pedidos.", 'error');
     } finally {
         setIsLookingUpCommand(false);
     }
@@ -5498,6 +5515,39 @@ export default function POS({ storeId, user, settings, orders, products: propPro
         actionDescription={managerModal.actionDescription}
         onSuccess={managerModal.onSuccess}
       />
+
+      {/* Custom Elegant POS Alert Toast */}
+      <AnimatePresence>
+        {posAlert && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+            className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] max-w-md w-[90vw] md:w-auto shadow-2xl rounded-2xl flex items-center gap-3.5 px-6 py-4 border select-none pointer-events-none"
+            style={{
+              backgroundColor: 
+                posAlert.type === 'success' ? '#f0fdf4' : 
+                posAlert.type === 'error' ? '#fef2f2' : '#f0f9ff',
+              borderColor: 
+                posAlert.type === 'success' ? '#bbf7d0' : 
+                posAlert.type === 'error' ? '#fca5a5' : '#bae6fd',
+              color: 
+                posAlert.type === 'success' ? '#166534' : 
+                posAlert.type === 'error' ? '#991b1b' : '#075985'
+            }}
+          >
+            {posAlert.type === 'success' ? (
+              <CheckCircle2 size={20} className="text-green-600 shrink-0" />
+            ) : posAlert.type === 'error' ? (
+              <AlertCircle size={20} className="text-red-600 shrink-0" />
+            ) : (
+              <Search size={20} className="text-sky-600 shrink-0" />
+            )}
+            <span className="font-bold text-sm tracking-wide leading-tight">{posAlert.text}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
