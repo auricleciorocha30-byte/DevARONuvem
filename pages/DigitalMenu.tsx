@@ -858,7 +858,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
       setTrackedOrders(data || []);
     } catch (err) {
       console.error("Error tracking order:", err);
-      showAlert("Erro ao buscar pedidos.");
+      alert("Erro ao buscar pedidos.");
     } finally {
       setIsTrackingLoading(false);
     }
