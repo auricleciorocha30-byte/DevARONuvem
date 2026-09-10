@@ -319,41 +319,43 @@ export default function SuperAdminPanel() {
           };
         });
         setStores(mapped);
+        setLoading(false); // Renderiza a lista de lojas imediatamente
         
-        // Fetch order counts
-        const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
-        const counts: Record<string, number> = {};
-        
-        // Fetch each store's orders connecting to its specific database if necessary
-        for (const store of mapped) {
-            try {
-                if (store.dbUrl && store.dbAuthToken) {
-                    (supabase as any).connectToStore(store.dbUrl, store.dbAuthToken);
-                } else {
-                    (supabase as any).disconnectStore();
-                }
-                
-                const { data: countData, error: oError } = await supabase
-                    .from('orders')
-                    .select('COUNT(*) as count')
-                    .eq('store_id', store.id)
-                    .gte('createdAt', startOfMonth);
-                    
-                if (countData && countData[0] && !oError) {
-                    counts[store.id] = countData[0].count;
-                }
-            } catch (err) {
-                console.error("Error fetching orders for store", store.slug, err);
-            }
-        }
-        
-        // Reset to master DB connection
-        (supabase as any).disconnectStore();
-        setStoreOrdersCount(counts);
+        // Busca a contagem de pedidos em segundo plano (assincronamente) para não travar o carregamento
+        setTimeout(async () => {
+          const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+          
+          for (const store of mapped) {
+              try {
+                  if (store.dbUrl && store.dbAuthToken) {
+                      (supabase as any).connectToStore(store.dbUrl, store.dbAuthToken);
+                  } else {
+                      (supabase as any).disconnectStore();
+                  }
+                  
+                  const { data: countData, error: oError } = await supabase
+                      .from('orders')
+                      .select('COUNT(*) as count')
+                      .eq('store_id', store.id)
+                      .gte('createdAt', startOfMonth);
+                      
+                  if (countData && countData[0] && !oError) {
+                      setStoreOrdersCount(prev => ({
+                          ...prev,
+                          [store.id]: countData[0].count
+                      }));
+                  }
+              } catch (err) {
+                  console.error("Error fetching orders for store", store.slug, err);
+              }
+          }
+          
+          // Reseta a conexão para o banco principal
+          (supabase as any).disconnectStore();
+        }, 100);
       }
     } catch (err) {
       console.error("Erro ao buscar lojas:", err);
-    } finally {
       setLoading(false);
     }
   };

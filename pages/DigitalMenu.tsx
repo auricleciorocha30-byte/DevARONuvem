@@ -351,7 +351,9 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
 
   const effectiveTable = initialTable || urlTable || null;
 
-  const [isWaitstaff, setIsWaitstaff] = useState(initialIsWaitstaff || !!localStorage.getItem('gc-conveniencia-session-v2'));
+  const [rawIsWaitstaff, setRawIsWaitstaff] = useState(initialIsWaitstaff || !!localStorage.getItem('gc-conveniencia-session-v2'));
+  const [viewAsCustomer, setViewAsCustomer] = useState(false);
+  const isWaitstaff = rawIsWaitstaff && !viewAsCustomer;
 
   const isStoreClosed = settings.isStoreOpen === false && !isWaitstaff;
 
@@ -695,14 +697,14 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
     // Priority: user prop > localStorage
     if (user) {
         setActiveWaitstaff(user);
-        setIsWaitstaff(true);
+        setRawIsWaitstaff(true);
     } else {
         const saved = localStorage.getItem('gc-conveniencia-session-v2');
         if (saved) {
             try {
                 const parsed = JSON.parse(saved);
                 setActiveWaitstaff(parsed);
-                setIsWaitstaff(true);
+                setRawIsWaitstaff(true);
             } catch (e) {
                 console.error("Error parsing session in DigitalMenu:", e);
             }
@@ -1462,8 +1464,22 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
 
   if (!hasSelectedMode && !isWaitstaff) {
     return (
-      <div className="min-h-screen bg-primary flex items-center justify-center p-6 text-zinc-900">
-        <div className="bg-white w-full max-w-md rounded-[3rem] p-8 shadow-2xl space-y-10 border border-orange-100 animate-scale-up relative overflow-hidden">
+      <div className="min-h-screen bg-primary flex flex-col items-center justify-center p-6 text-zinc-900 relative">
+        {rawIsWaitstaff && viewAsCustomer && (
+          <div className="absolute top-0 left-0 right-0 bg-slate-800 text-white text-[11px] font-black uppercase tracking-wider px-4 py-2.5 flex items-center justify-between z-50 shadow-md">
+            <div className="flex items-center gap-2 truncate">
+              <UserRound size={14} className="shrink-0 text-amber-400" />
+              <span className="truncate">Visualizando como Cliente</span>
+            </div>
+            <button 
+              onClick={() => setViewAsCustomer(false)} 
+              className="bg-secondary text-white px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-normal hover:opacity-95 active:scale-95 transition-all cursor-pointer shrink-0 shadow-sm"
+            >
+              Modo Atendente
+            </button>
+          </div>
+        )}
+        <div className="bg-white w-full max-w-md rounded-[3rem] p-8 shadow-2xl space-y-10 border border-orange-100 animate-scale-up relative overflow-hidden mt-8">
           <div className="absolute -top-10 -right-10 w-32 h-32 bg-secondary opacity-10 rounded-full blur-3xl"></div>
           <div className="text-center relative z-10">
             <div className="relative inline-block mb-6">
@@ -1600,6 +1616,36 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
 
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-slate-50 text-slate-900 relative flex flex-col font-sans">
+      {rawIsWaitstaff && !viewAsCustomer && (
+        <div className="bg-amber-500 text-white text-[11px] font-black uppercase tracking-wider px-4 py-2 flex items-center justify-between z-40 sticky top-0 border-b border-amber-600 shadow-sm">
+          <div className="flex items-center gap-2 truncate">
+            <UserRound size={14} className="shrink-0" />
+            <span className="truncate">Modo Atendente Ativo ({activeWaitstaff?.name || 'Funcionário'})</span>
+          </div>
+          <button 
+            onClick={() => setViewAsCustomer(true)} 
+            className="bg-white text-amber-600 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-normal hover:bg-slate-100 active:scale-95 transition-all cursor-pointer shrink-0"
+          >
+            Ver como Cliente
+          </button>
+        </div>
+      )}
+
+      {rawIsWaitstaff && viewAsCustomer && (
+        <div className="bg-slate-800 text-white text-[11px] font-black uppercase tracking-wider px-4 py-2 flex items-center justify-between z-40 sticky top-0 border-b border-slate-900 shadow-sm">
+          <div className="flex items-center gap-2 truncate">
+            <UserRound size={14} className="shrink-0 text-amber-400" />
+            <span className="truncate">Visualizando como Cliente</span>
+          </div>
+          <button 
+            onClick={() => setViewAsCustomer(false)} 
+            className="bg-secondary text-white px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-normal hover:opacity-95 active:scale-95 transition-all cursor-pointer shrink-0"
+          >
+            Modo Atendente
+          </button>
+        </div>
+      )}
+
       <header className={`sticky top-0 z-30 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.1)] ${isWaitstaff ? 'bg-secondary' : 'bg-white'} ${isWaitstaff ? 'text-white' : 'text-slate-800'} p-3 md:p-4 transition-all w-full border-b ${isWaitstaff ? 'border-secondary' : 'border-slate-100'}`}>
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
