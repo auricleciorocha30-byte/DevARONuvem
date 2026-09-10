@@ -557,7 +557,11 @@ function StoreContext() {
     }
     if (cachedCategories) {
       try {
-        setCategories(JSON.parse(cachedCategories));
+        const parsed = JSON.parse(cachedCategories);
+        if (Array.isArray(parsed)) {
+          const cleanCats = parsed.map((item: any) => typeof item === 'object' && item !== null ? item.name : item).filter(Boolean);
+          setCategories(cleanCats);
+        }
       } catch (e) {
         console.error("Error parsing cached categories:", e);
       }
@@ -585,7 +589,7 @@ function StoreContext() {
         } else if (cRes.data) {
           const cats = cRes.data.map((c: any) => c.name);
           setCategories(cats);
-          localStorage.setItem(`categories_cache_${currentStore.id}`, JSON.stringify(cRes.data));
+          localStorage.setItem(`categories_cache_${currentStore.id}`, JSON.stringify(cats));
         }
       } catch (err: any) {
           console.error("Error fetching metadata:", err);
