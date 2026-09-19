@@ -169,6 +169,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
   });
   const [isEmittingNfce, setIsEmittingNfce] = useState(false);
   const [generatedPix, setGeneratedPix] = useState<{ qr_code: string; qr_code_base64: string; id: string } | null>(null);
+  const [pixMode, setPixMode] = useState<'dinamico' | 'estatico'>('dinamico');
   const [isGeneratingPix, setIsGeneratingPix] = useState(false);
   const [isPixApproved, setIsPixApproved] = useState(false);
   const [isPixCopied, setIsPixCopied] = useState(false);
@@ -4564,7 +4565,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                                           onClick={
                                             currentPaymentMethod === 'MAQUININHA' ? handlePointPayment : 
                                             (currentPaymentMethod === 'ONLINE' && !onlineCheckoutUrl ? handleOnlinePayment : 
-                                            (currentPaymentMethod === 'PIX' && settings.onlinePaymentAccessToken && !generatedPix ? handleCreatePixQrCode : handleAddPayment))
+                                            (currentPaymentMethod === 'PIX' && settings.onlinePaymentAccessToken && pixMode === 'dinamico' && !generatedPix ? handleCreatePixQrCode : handleAddPayment))
                                           }
                                           disabled={isPointProcessing || isOnlineProcessing || isGeneratingPix}
                                           className={`py-3 px-6 text-white rounded-xl font-bold flex items-center justify-center gap-2 shrink-0 active:scale-95 transition-all shadow-sm ${
@@ -4574,7 +4575,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                                           {isPointProcessing || isOnlineProcessing || isGeneratingPix ? (
                                             <Loader2 className="animate-spin" size={18} />
                                           ) : (
-                                            ((currentPaymentMethod === 'ONLINE' && !onlineCheckoutUrl) || (currentPaymentMethod === 'PIX' && settings.onlinePaymentAccessToken && !generatedPix)) ? (
+                                            ((currentPaymentMethod === 'ONLINE' && !onlineCheckoutUrl) || (currentPaymentMethod === 'PIX' && settings.onlinePaymentAccessToken && pixMode === 'dinamico' && !generatedPix)) ? (
                                               <>
                                                 <Zap size={16} />
                                                 <span>Gerar</span>
@@ -4657,8 +4658,26 @@ export default function POS({ storeId, user, settings, orders, products: propPro
 
                    {/* Bloco de QR Code / PIX Estático se aplicável */}
                    {currentPaymentMethod === 'PIX' && (!orderType || orderType !== 'ENTREGA' || !deliveryDetails.payOnDelivery) && (
-                     <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex flex-col items-center gap-4 text-center">
-                       {generatedPix ? (
+                     <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex flex-col items-center gap-4 text-center w-full">
+                       {settings.onlinePaymentAccessToken && (
+                         <div className="flex bg-gray-200/50 p-1 rounded-xl w-full">
+                           <button
+                             type="button"
+                             onClick={() => { setPixMode('dinamico'); setGeneratedPix(null); }}
+                             className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${pixMode === 'dinamico' ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                           >
+                             PIX Dinâmico MP
+                           </button>
+                           <button
+                             type="button"
+                             onClick={() => { setPixMode('estatico'); setGeneratedPix(null); }}
+                             className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${pixMode === 'estatico' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                           >
+                             PIX Estático (Ajustes)
+                           </button>
+                         </div>
+                       )}
+                       {settings.onlinePaymentAccessToken && pixMode === "dinamico" && generatedPix ? (
                          <div className="space-y-4 w-full">
                              <div className="flex justify-between items-center px-2">
                                  <span className="text-[10px] font-black uppercase text-purple-600 tracking-widest">PIX Dinâmico MP</span>
@@ -4706,6 +4725,12 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                                      <>Copiar Código PIX</>
                                  )}
                              </button>
+                         </div>
+                       ) : (settings.onlinePaymentAccessToken && pixMode === "dinamico") ? (
+                         <div className="py-4 space-y-2">
+                             <QrCode size={48} className="text-purple-400 mx-auto" />
+                             <p className="text-xs font-bold text-gray-700">PIX Dinâmico Mercado Pago</p>
+                             <p className="text-[10px] text-purple-600 font-medium px-4">Dica: Clique no botão "Gerar" acima para criar um PIX dinâmico com verificação de status automática.</p>
                          </div>
                        ) : settings.pixQrCodeUrl ? (
                          <>
