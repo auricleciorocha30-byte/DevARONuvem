@@ -3100,10 +3100,10 @@ export default function POS({ storeId, user, settings, orders, products: propPro
       }
     }
 
-    const printWidth = settings.printWidthPx ? `${settings.printWidthPx}px` : (settings.thermalPrinterWidth === '58mm' ? '180px' : '280px');
-    const winWidth = settings.printWidthPx ? settings.printWidthPx + 50 : (settings.thermalPrinterWidth === '58mm' ? 300 : 400);
+    const printWidth = settings.printWidthPx ? `${settings.printWidthPx}px` : (settings.thermalPrinterWidth === '58mm' ? '155px' : '260px');
+    const winWidth = settings.printWidthPx ? settings.printWidthPx + 50 : (settings.thermalPrinterWidth === '58mm' ? 240 : 360);
     const content = `
-      <div style="font-family: 'Courier New', Courier, monospace; width: ${printWidth}; padding-right: 5px; font-size: 14px; font-weight: 900; color: black !important; line-height: 1.1; letter-spacing: -0.5px; -webkit-print-color-adjust: exact;">
+      <div style="font-family: 'Courier New', Courier, monospace; width: ${printWidth}; box-sizing: border-box; font-size: 14px; font-weight: 900; color: black !important; line-height: 1.1; letter-spacing: -0.5px; -webkit-print-color-adjust: exact;">
         <h2 style="text-align: center; margin: 0; font-size: 16px; font-weight: 900; color: black !important;">${settings.storeName}</h2>
         ${settings.cnpj ? `<p style="text-align: center; margin: 0 0 5px 0; font-size: 12px; color: black !important;">CNPJ: ${settings.cnpj}</p>` : ''}
         <p style="margin: 2px 0; color: black !important;">Data: ${new Date(order.createdAt).toLocaleString()}</p>
@@ -3203,8 +3203,15 @@ export default function POS({ storeId, user, settings, orders, products: propPro
             <title>Cupom</title>
             <style>
               @page { size: portrait; margin: 0; }
-              body { margin: 0; padding: 5px; background: white; font-family: monospace; }
+              body { 
+                margin: 0; 
+                padding: 4px 12px 25px 12px; 
+                background: white; 
+                font-family: monospace; 
+                box-sizing: border-box;
+              }
               * { 
+                box-sizing: border-box;
                 color: black !important; 
                 font-weight: 900 !important; 
                 -webkit-print-color-adjust: exact; 
@@ -3224,10 +3231,10 @@ export default function POS({ storeId, user, settings, orders, products: propPro
   const printBudget = () => {
     if (cart.length === 0) return;
     
-    const printWidth = settings.printWidthPx ? `${settings.printWidthPx}px` : (settings.thermalPrinterWidth === '58mm' ? '180px' : '280px');
-    const winWidth = settings.printWidthPx ? settings.printWidthPx + 50 : (settings.thermalPrinterWidth === '58mm' ? 300 : 400);
+    const printWidth = settings.printWidthPx ? `${settings.printWidthPx}px` : (settings.thermalPrinterWidth === '58mm' ? '155px' : '260px');
+    const winWidth = settings.printWidthPx ? settings.printWidthPx + 50 : (settings.thermalPrinterWidth === '58mm' ? 240 : 360);
     const content = `
-    <div style="font-family: monospace; width: ${printWidth}; padding-right: 5px; font-size: 14px; font-weight: 900; color: black !important; line-height: 1.1; -webkit-print-color-adjust: exact;">
+    <div style="font-family: monospace; width: ${printWidth}; box-sizing: border-box; font-size: 14px; font-weight: 900; color: black !important; line-height: 1.1; -webkit-print-color-adjust: exact;">
       <h2 style="text-align: center; margin: 0; font-size: 16px; font-weight: 900; color: black !important;">ORCAMENTO</h2>
       <p style="text-align: center; margin: 0 0 10px 0; color: black !important;">${settings.storeName}</p>
       <p style="margin: 2px 0; color: black !important;">Data: ${new Date().toLocaleString()}</p>
@@ -3269,8 +3276,15 @@ export default function POS({ storeId, user, settings, orders, products: propPro
             <title>Orcamento</title>
             <style>
               @page { size: portrait; margin: 0; }
-              body { margin: 0; padding: 5px; background: white; font-family: monospace; }
+              body { 
+                margin: 0; 
+                padding: 4px 12px 25px 12px; 
+                background: white; 
+                font-family: monospace; 
+                box-sizing: border-box;
+              }
               * { 
+                box-sizing: border-box;
                 color: black !important; 
                 font-weight: 900 !important; 
                 -webkit-print-color-adjust: exact; 
@@ -3292,11 +3306,11 @@ export default function POS({ storeId, user, settings, orders, products: propPro
       
       const initial = currentSession?.initial_amount || 0;
       const totalInBox = dailySales.total + initial - dailySales.bleeds - (dailySales.estornos || 0);
-      const printWidth = settings.printWidthPx ? `${settings.printWidthPx}px` : (settings.thermalPrinterWidth === '58mm' ? '180px' : '280px');
-      const winWidth = settings.printWidthPx ? settings.printWidthPx + 50 : (settings.thermalPrinterWidth === '58mm' ? 300 : 400);
+      const printWidth = settings.printWidthPx ? `${settings.printWidthPx}px` : (settings.thermalPrinterWidth === '58mm' ? '155px' : '260px');
+      const winWidth = settings.printWidthPx ? settings.printWidthPx + 50 : (settings.thermalPrinterWidth === '58mm' ? 240 : 360);
 
       const content = `
-      <div style="font-family: monospace; width: ${printWidth}; padding-right: 5px; font-size: 14px; font-weight: 900; color: black !important; line-height: 1.1; -webkit-print-color-adjust: exact;">
+      <div style="font-family: monospace; width: ${printWidth}; box-sizing: border-box; font-size: 14px; font-weight: 900; color: black !important; line-height: 1.1; -webkit-print-color-adjust: exact;">
         <h2 style="text-align: center; margin: 0; font-size: 16px; font-weight: 900; color: black !important;">FECHAMENTO CAIXA</h2>
         <p style="text-align: center; margin: 0 0 10px 0; color: black !important;">${settings.storeName}</p>
         <p style="margin: 2px 0; color: black !important;">Data: ${new Date().toLocaleString()}</p>
@@ -3371,8 +3385,15 @@ export default function POS({ storeId, user, settings, orders, products: propPro
             <title>Relatorio</title>
             <style>
               @page { size: portrait; margin: 0; }
-              body { margin: 0; padding: 5px; background: white; font-family: monospace; }
+              body { 
+                margin: 0; 
+                padding: 4px 12px 25px 12px; 
+                background: white; 
+                font-family: monospace; 
+                box-sizing: border-box;
+              }
               * { 
+                box-sizing: border-box;
                 color: black !important; 
                 font-weight: 900 !important; 
                 -webkit-print-color-adjust: exact; 
