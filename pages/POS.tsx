@@ -3100,15 +3100,12 @@ export default function POS({ storeId, user, settings, orders, products: propPro
       }
     }
 
-    const printWidth = settings.printWidthPx ? `${settings.printWidthPx}px` : (settings.thermalPrinterWidth === '58mm' ? '130px' : '260px');
-    const winWidth = settings.printWidthPx ? settings.printWidthPx + 50 : (settings.thermalPrinterWidth === '58mm' ? 200 : 360);
-    const fontSize = settings.thermalPrinterWidth === '58mm' ? '12px' : '14px';
-    const titleSize = settings.thermalPrinterWidth === '58mm' ? '14px' : '16px';
-    const subSize = settings.thermalPrinterWidth === '58mm' ? '11px' : '12px';
+    const printWidth = settings.printWidthPx ? `${settings.printWidthPx}px` : (settings.thermalPrinterWidth === '58mm' ? '155px' : '260px');
+    const winWidth = settings.printWidthPx ? settings.printWidthPx + 50 : (settings.thermalPrinterWidth === '58mm' ? 240 : 360);
     const content = `
-      <div style="font-family: 'Courier New', Courier, monospace; width: ${printWidth}; box-sizing: border-box; font-size: ${fontSize}; font-weight: 900; color: black !important; line-height: 1.1; letter-spacing: -0.5px; -webkit-print-color-adjust: exact;">
-        <h2 style="text-align: center; margin: 0; font-size: ${titleSize}; font-weight: 900; color: black !important;">${settings.storeName}</h2>
-        ${settings.cnpj ? `<p style="text-align: center; margin: 0 0 5px 0; font-size: ${subSize}; color: black !important;">CNPJ: ${settings.cnpj}</p>` : ''}
+      <div style="font-family: 'Courier New', Courier, monospace; width: ${printWidth}; box-sizing: border-box; font-size: 14px; font-weight: 900; color: black !important; line-height: 1.1; letter-spacing: -0.5px; -webkit-print-color-adjust: exact;">
+        <h2 style="text-align: center; margin: 0; font-size: 16px; font-weight: 900; color: black !important;">${settings.storeName}</h2>
+        ${settings.cnpj ? `<p style="text-align: center; margin: 0 0 5px 0; font-size: 12px; color: black !important;">CNPJ: ${settings.cnpj}</p>` : ''}
         <p style="margin: 2px 0; color: black !important;">Data: ${new Date(order.createdAt).toLocaleString()}</p>
         <p style="margin: 2px 0; color: black !important;">Pedido: #${order.displayId || String(order.id || '').slice(0, 8)}</p>
         <p style="margin: 2px 0; color: black !important;">Cliente: ${order.customerName || 'Consumidor'}</p>
@@ -3160,7 +3157,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                     
                     const aPagar = details.find((p: any) => p.method === 'A_PAGAR');
                     if (aPagar && aPagar.amount > 0) {
-                        paymentInfo += `<p style="margin: 5px 0; font-weight: 900; font-size: ${titleSize}; color: black !important;">TOTAL A RECEBER: ${formatCurrency(aPagar.amount)}</p>`;
+                        paymentInfo += `<p style="margin: 5px 0; font-weight: 900; font-size: 16px; color: black !important;">TOTAL A RECEBER: ${formatCurrency(aPagar.amount)}</p>`;
                     }
                     return paymentInfo;
                 } catch (e) {}
@@ -3208,7 +3205,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
               @page { size: portrait; margin: 0; }
               body { 
                 margin: 0; 
-                padding: 4px 8px 25px 8px; 
+                padding: 4px 10px 25px 24px; 
                 background: white; 
                 font-family: monospace; 
                 box-sizing: border-box;
@@ -3234,18 +3231,15 @@ export default function POS({ storeId, user, settings, orders, products: propPro
   const printBudget = () => {
     if (cart.length === 0) return;
     
-    const printWidth = settings.printWidthPx ? `${settings.printWidthPx}px` : (settings.thermalPrinterWidth === '58mm' ? '130px' : '260px');
-    const winWidth = settings.printWidthPx ? settings.printWidthPx + 50 : (settings.thermalPrinterWidth === '58mm' ? 200 : 360);
-    const fontSize = settings.thermalPrinterWidth === '58mm' ? '12px' : '14px';
-    const titleSize = settings.thermalPrinterWidth === '58mm' ? '14px' : '16px';
-    const subSize = settings.thermalPrinterWidth === '58mm' ? '11px' : '12px';
+    const printWidth = settings.printWidthPx ? `${settings.printWidthPx}px` : (settings.thermalPrinterWidth === '58mm' ? '155px' : '260px');
+    const winWidth = settings.printWidthPx ? settings.printWidthPx + 50 : (settings.thermalPrinterWidth === '58mm' ? 240 : 360);
     const content = `
-    <div style="font-family: monospace; width: ${printWidth}; box-sizing: border-box; font-size: ${fontSize}; font-weight: 900; color: black !important; line-height: 1.1; -webkit-print-color-adjust: exact;">
-      <h2 style="text-align: center; margin: 0; font-size: ${titleSize}; font-weight: 900; color: black !important;">ORCAMENTO</h2>
+    <div style="font-family: monospace; width: ${printWidth}; box-sizing: border-box; font-size: 14px; font-weight: 900; color: black !important; line-height: 1.1; -webkit-print-color-adjust: exact;">
+      <h2 style="text-align: center; margin: 0; font-size: 16px; font-weight: 900; color: black !important;">ORCAMENTO</h2>
       <p style="text-align: center; margin: 0 0 10px 0; color: black !important;">${settings.storeName}</p>
       <p style="margin: 2px 0; color: black !important;">Data: ${new Date().toLocaleString()}</p>
       <div style="border-top: 2px dashed black; margin: 5px 0;"></div>
-      <table style="width: 100%; text-align: left; font-size: ${subSize}; font-weight: 900; color: black !important;">
+      <table style="width: 100%; text-align: left; font-size: 13px; font-weight: 900; color: black !important;">
         <tr>
           <th style="padding-bottom: 5px;">Qtd</th>
           <th style="padding-bottom: 5px;">Item</th>
@@ -3267,7 +3261,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
         `).join('')}
       </table>
       <div style="border-top: 2px dashed black; margin: 5px 0;"></div>
-      <h3 style="text-align: right; margin: 10px 0; font-size: ${titleSize}; font-weight: 900; color: black !important;">Total: ${formatCurrency(total)}</h3>
+      <h3 style="text-align: right; margin: 10px 0; font-size: 16px; font-weight: 900; color: black !important;">Total: ${formatCurrency(total)}</h3>
       <div style="border-top: 1px dashed black; margin: 10px 0;"></div>
       <p style="text-align: center; font-size: 11px; margin-top: 10px; font-weight: 900; color: black !important;">Este documento nao e um cupom fiscal.</p>
       <br /><br />
@@ -3284,7 +3278,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
               @page { size: portrait; margin: 0; }
               body { 
                 margin: 0; 
-                padding: 4px 8px 25px 8px; 
+                padding: 4px 10px 25px 24px; 
                 background: white; 
                 font-family: monospace; 
                 box-sizing: border-box;
@@ -3312,15 +3306,12 @@ export default function POS({ storeId, user, settings, orders, products: propPro
       
       const initial = currentSession?.initial_amount || 0;
       const totalInBox = dailySales.total + initial - dailySales.bleeds - (dailySales.estornos || 0);
-      const printWidth = settings.printWidthPx ? `${settings.printWidthPx}px` : (settings.thermalPrinterWidth === '58mm' ? '130px' : '260px');
-      const winWidth = settings.printWidthPx ? settings.printWidthPx + 50 : (settings.thermalPrinterWidth === '58mm' ? 200 : 360);
-      const fontSize = settings.thermalPrinterWidth === '58mm' ? '12px' : '14px';
-      const titleSize = settings.thermalPrinterWidth === '58mm' ? '14px' : '16px';
-      const subSize = settings.thermalPrinterWidth === '58mm' ? '11px' : '12px';
+      const printWidth = settings.printWidthPx ? `${settings.printWidthPx}px` : (settings.thermalPrinterWidth === '58mm' ? '155px' : '260px');
+      const winWidth = settings.printWidthPx ? settings.printWidthPx + 50 : (settings.thermalPrinterWidth === '58mm' ? 240 : 360);
 
       const content = `
-      <div style="font-family: monospace; width: ${printWidth}; box-sizing: border-box; font-size: ${fontSize}; font-weight: 900; color: black !important; line-height: 1.1; -webkit-print-color-adjust: exact;">
-        <h2 style="text-align: center; margin: 0; font-size: ${titleSize}; font-weight: 900; color: black !important;">FECHAMENTO CAIXA</h2>
+      <div style="font-family: monospace; width: ${printWidth}; box-sizing: border-box; font-size: 14px; font-weight: 900; color: black !important; line-height: 1.1; -webkit-print-color-adjust: exact;">
+        <h2 style="text-align: center; margin: 0; font-size: 16px; font-weight: 900; color: black !important;">FECHAMENTO CAIXA</h2>
         <p style="text-align: center; margin: 0 0 10px 0; color: black !important;">${settings.storeName}</p>
         <p style="margin: 2px 0; color: black !important;">Data: ${new Date().toLocaleString()}</p>
         <p style="margin: 2px 0; color: black !important;">Operador: ${user.name}</p>
@@ -3339,7 +3330,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
         <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
         <p style="margin: 5px 0; color: black !important;"><strong>Produtos:</strong></p>
         ${dailySales.products.sort((a, b) => b.total - a.total).map(p => `
-            <div style="display: flex; justify-content: space-between; font-size: ${subSize}; margin: 1px 0; color: black !important;">
+            <div style="display: flex; justify-content: space-between; font-size: 12px; margin: 1px 0; color: black !important;">
                 <span style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.name}</span>
                 <span style="margin-left: 5px;">${p.isByWeight ? p.quantity.toFixed(3) + 'kg' : p.quantity + 'x'}</span>
                 <span style="margin-left: 5px;">${formatCurrency(p.total)}</span>
@@ -3396,7 +3387,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
               @page { size: portrait; margin: 0; }
               body { 
                 margin: 0; 
-                padding: 4px 8px 25px 8px; 
+                padding: 4px 10px 25px 24px; 
                 background: white; 
                 font-family: monospace; 
                 box-sizing: border-box;
