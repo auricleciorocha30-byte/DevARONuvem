@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { supabase } from '../lib/supabase';
 import { Product, Order } from '../types';
 import { 
   Printer, 
@@ -132,16 +133,35 @@ interface LabelGeneratorProps {
   products: Product[];
   orders: Order[];
   settings?: any;
+  storeId?: string;
 }
 
-export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders, settings }) => {
+const mapProductFromDbLocal = (p: any): Product => ({
+  id: p.id ? p.id.toString() : Math.random().toString(36).substring(2, 9),
+  name: p.name || 'Sem nome',
+  description: p.description || '',
+  price: Number(p.price || 0),
+  costPrice: p.cost_price != null ? Number(p.cost_price) : (p.costPrice != null ? Number(p.costPrice) : 0),
+  category: p.category || 'Geral',
+  imageUrl: p.imageUrl || p.imageurl || p.image_url || '',
+  isActive: p.isActive ?? p.isactive ?? p.is_active ?? true,
+  isByWeight: p.isByWeight ?? p.isbyweight ?? p.is_by_weight ?? false,
+  barcode: p.barcode || undefined,
+  stock: p.stock != null ? Number(p.stock) : undefined
+});
+
+export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders, settings, storeId }) => {
   // Navigation / Tabs
   const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'custom'>('products');
   
-  // Selection States
+  // Selection States & Economical DB Loading
   const [productSearch, setProductSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedProducts, setSelectedProducts] = useState<Record<string, number>>({});
+  const [localProducts, setLocalProducts] = useState<Product[]>([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+  const [localCategories, setLocalCategories] = useState<string[]>([]);
+  const [selectedProductDetails, setSelectedProductDetails] = useState<Record<string, Product>>({});
   
   // Order Selection States
   const [selectedOrderId, setSelectedOrderId] = useState<string>('');
@@ -177,14 +197,66 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
   const [fontColor, setFontColor] = useState<string>('#000000');
   const [fontFamily, setFontFamily] = useState<string>('sans-serif');
 
-  // Local Categories extracted from products
-  const categories = useMemo(() => {
-    const list = new Set<string>();
-    products.forEach(p => {
-      if (p.category) list.add(p.category);
-    });
-    return Array.from(list);
-  }, [products]);
+  // Load all actual categories economically from DB
+  useEffect(() => {
+    if (!storeId) return;
+    const loadCategories = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('categories')
+          .select('name')
+          .eq('store_id', storeId);
+        if (error) throw error;
+        if (data) {
+          setLocalCategories(data.map(c => c.name));
+        }
+      } catch (err) {
+        console.error('Error loading categories economically:', err);
+      }
+    };
+    loadCategories();
+  }, [storeId]);
+
+  // Load initial 5 products and support economical search by query with limit to prevent huge memory or database read load
+  useEffect(() => {
+    if (!storeId) return;
+    
+    setIsLoadingProducts(true);
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        let query = supabase
+          .from('products')
+          .select('*')
+          .eq('store_id', storeId);
+
+        // Economical Search: search filter in DB
+        if (productSearch.trim()) {
+          const searchVal = productSearch.trim();
+          query = query.or(`name.ilike.%${searchVal}%,barcode.eq.${searchVal}`);
+        }
+
+        // Category filter in DB
+        if (selectedCategory && selectedCategory !== 'all') {
+          query = query.eq('category', selectedCategory);
+        }
+
+        // Economy constraint: load only first 5 items by default, or limit search to 10 max matches!
+        const limitAmount = productSearch.trim() || selectedCategory !== 'all' ? 10 : 5;
+        const { data, error } = await query.limit(limitAmount);
+
+        if (error) throw error;
+        if (data) {
+          setLocalProducts(data.map(mapProductFromDbLocal));
+        }
+      } catch (err) {
+        console.error('Error in economical product query:', err);
+      } finally {
+        setIsLoadingProducts(false);
+      }
+    }, productSearch.trim() ? 400 : 0); // 400ms debounce only when typing search to save DB operations!
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [productSearch, selectedCategory, storeId]);
 
   // Current active preset configuration
   const presetConfig = useMemo(() => {
@@ -213,15 +285,8 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
     }
   }, [selectedPreset]);
 
-  // Filtered products list for selector
-  const filteredProducts = useMemo(() => {
-    return products.filter(p => {
-      const matchSearch = p.name.toLowerCase().includes(productSearch.toLowerCase()) || 
-                          (p.barcode && p.barcode.includes(productSearch));
-      const matchCategory = selectedCategory === 'all' || p.category === selectedCategory;
-      return matchSearch && matchCategory;
-    });
-  }, [products, productSearch, selectedCategory]);
+  // Filtered products list is simply the localProducts state (already filtered in the DB query for maximum economy!)
+  const filteredProducts = localProducts;
 
   // Selected Order details
   const selectedOrder = useMemo(() => {
@@ -236,7 +301,8 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
     if (activeTab === 'products') {
       Object.entries(selectedProducts).forEach(([prodId, qty]) => {
         if (qty <= 0) return;
-        const prod = products.find(p => p.id === prodId);
+        // Search in selected details cache first, then localProducts, then fallback to products prop
+        const prod = selectedProductDetails[prodId] || localProducts.find(p => p.id === prodId) || products.find(p => p.id === prodId);
         if (prod) {
           items.push({
             id: `prod-${prod.id}`,
@@ -319,7 +385,7 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
     }
 
     return items;
-  }, [activeTab, selectedProducts, products, selectedOrder, printOrderDeliveryOnly, printOrderItemsSeparately, customTitle, customSubtitle, customPrice, customCode, customCodeType, customQty]);
+  }, [activeTab, selectedProducts, localProducts, selectedProductDetails, products, selectedOrder, printOrderDeliveryOnly, printOrderItemsSeparately, customTitle, customSubtitle, customPrice, customCode, customCodeType, customQty]);
 
   // Total quantity of labels to render on paper
   const totalLabelsCount = useMemo(() => {
@@ -349,18 +415,32 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
       }
       return { ...prev, [productId]: next };
     });
+
+    // Cache the product details so we don't lose them when the search results change
+    const foundProd = localProducts.find(p => p.id === productId) || products.find(p => p.id === productId);
+    if (foundProd) {
+      setSelectedProductDetails(prev => ({
+        ...prev,
+        [productId]: foundProd
+      }));
+    }
   };
 
   const addAllProducts = () => {
-    const next: Record<string, number> = {};
+    const next = { ...selectedProducts };
     filteredProducts.forEach(p => {
       next[p.id] = 1;
+      setSelectedProductDetails(prev => ({
+        ...prev,
+        [p.id]: p
+      }));
     });
     setSelectedProducts(next);
   };
 
   const clearAllProducts = () => {
     setSelectedProducts({});
+    setSelectedProductDetails({});
   };
 
   const handlePrint = () => {
@@ -629,14 +709,21 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
                       className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none text-sm text-slate-700 min-w-[150px]"
                     >
                       <option value="all">Todas Categorias</option>
-                      {categories.map(cat => (
+                      {localCategories.map(cat => (
                         <option key={cat} value={cat}>{cat}</option>
                       ))}
                     </select>
                   </div>
 
                   <div className="flex justify-between items-center text-xs bg-slate-50 p-3 rounded-xl border border-slate-100">
-                    <span className="text-slate-600 font-semibold">{filteredProducts.length} produtos encontrados</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-600 font-semibold">
+                        {isLoadingProducts ? 'Buscando no banco...' : `${filteredProducts.length} produtos localizados`}
+                      </span>
+                      {isLoadingProducts && (
+                        <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+                      )}
+                    </div>
                     <div className="flex gap-2">
                       <button 
                         onClick={addAllProducts}
@@ -655,8 +742,13 @@ export const LabelGenerator: React.FC<LabelGeneratorProps> = ({ products, orders
                   </div>
 
                   {/* PRODUCTS LIST */}
-                  <div className="max-h-[300px] overflow-y-auto border border-slate-100 rounded-xl divide-y divide-slate-100 custom-scrollbar pr-1">
-                    {filteredProducts.length === 0 ? (
+                  <div className="max-h-[300px] overflow-y-auto border border-slate-100 rounded-xl divide-y divide-slate-100 custom-scrollbar pr-1 relative min-h-[100px]">
+                    {isLoadingProducts && filteredProducts.length === 0 ? (
+                      <div className="p-8 text-center text-slate-400 flex flex-col items-center justify-center gap-2">
+                        <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                        <span className="text-xs">Consultando banco de dados...</span>
+                      </div>
+                    ) : filteredProducts.length === 0 ? (
                       <div className="p-8 text-center text-slate-400">
                         Nenhum produto cadastrado ou correspondente à busca.
                       </div>

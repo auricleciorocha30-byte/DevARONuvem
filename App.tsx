@@ -1209,7 +1209,7 @@ function StoreContext() {
         <Route path="clientes" element={<CustomerManagement storeId={currentStore?.id} />} />
         <Route path="integracoes" element={<IntegrationsPage settings={settings} onSave={handleUpdateSettings} storeId={currentStore?.id} />} />
         <Route path="configuracoes" element={<StoreSettingsPage settings={settings} products={products} onSave={handleUpdateSettings} storeId={currentStore?.id} />} />
-        <Route path="etiquetas" element={<LabelGenerator products={products} orders={orders} settings={settings} />} />
+        <Route path="etiquetas" element={<LabelGenerator products={products} orders={orders} settings={settings} storeId={currentStore?.id} />} />
       </Route>
 
       <Route path="*" element={<Navigate to={storeSlug ? `/cardapio${lojaParam}` : "/"} />} />
