@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Product, Order } from '../types';
 import { 
   Printer, 
@@ -29,132 +29,53 @@ import {
   Type
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import JsBarcode from 'jsbarcode';
 
-// === HIGH PRECIZION CODE 128 (B) BARCODE GENERATOR ===
-// Code 128 structure consists of Start B (104), Stop (106), Data, Checksum, and Quiet Zones.
-// Let's implement the complete, standard pattern mapping for Code 128.
-// Each pattern is represented as the width of 6 alternating bars and spaces (B S B S B S).
-const CODE128_PATTERNS = [
-  "212222", "222122", "222221", "121223", "121322", "131222", "122213", "122312", "132212", "221213", // 0-9
-  "221312", "231212", "112232", "122132", "122231", "113222", "123122", "123221", "223211", "221132", // 10-19
-  "221231", "213212", "223112", "312131", "311222", "321122", "321221", "312212", "322112", "322211", // 20-29
-  "212123", "212312", "232112", "111332", "113132", "113312", "111233", "111323", "113123", "112313", // 30-39
-  "113213", "112331", "131132", "131312", "133112", "112214", "112412", "114212", "141122", "141221", // 40-49
-  "112241", "112421", "114221", "122114", "122411", "142112", "142211", "241211", "221114", "213113", // 50-59
-  "214112", "211214", "211412", "231112", "211133", "211313", "211331", "221114", "221411", "211142", // 60-69
-  "211241", "211421", "224111", "221141", "221241", "221124", "224112", "134111", "111242", "111422", // 70-79
-  "114112", "112241", "112421", "114221", "122114", "122411", "142112", "142211", "241211", "221114", // 80-89
-  "213113", "214112", "211214", "211412", "231112", "211133", "211313", "224112", "221142", "221241", // 90-99
-  "211214", "211412", "231112", "211133", "211313", "211331", "2331112" // 100-106 (106 is Stop - includes extra bar of width 2)
-];
-
-// Helper to encode string into Code 128 (Code B) barcode and render as React SVG elements
+// === HIGH PRECISION CODE 128 (B) BARCODE GENERATOR ===
+// Utilizes industry-standard JsBarcode to generate 100% compliant, hardware-readable barcodes.
 const Code128Barcode: React.FC<{ value: string; width?: number; height?: number; showText?: boolean }> = ({ 
   value, 
   width = 160, 
   height = 50, 
   showText = true 
 }) => {
-  const barcodeSvgContent = useMemo(() => {
-    if (!value) return null;
-    
-    // Code 128 B supports standard ASCII 32 to 127
-    const chars = value.split("").filter(c => {
-      const code = c.charCodeAt(0);
-      return code >= 32 && code <= 127;
-    });
+  const svgRef = useRef<SVGSVGElement | null>(null);
 
-    if (chars.length === 0) return null;
-
-    // Start Code B is index 104
-    const sequence: number[] = [104];
-    
-    // Add data characters (ASCII value - 32)
-    chars.forEach(c => {
-      sequence.push(c.charCodeAt(0) - 32);
-    });
-
-    // Calculate checksum: (StartValue + Sum(CharValue * Position)) % 103
-    let checksum = 104;
-    for (let i = 1; i < sequence.length; i++) {
-      checksum += sequence[i] * i;
-    }
-    checksum = checksum % 103;
-    sequence.push(checksum);
-
-    // Stop Code is index 106
-    sequence.push(106);
-
-    // Convert sequence of indices into bar-width string
-    let barPattern = "";
-    sequence.forEach((index, pos) => {
-      const pattern = CODE128_PATTERNS[index];
-      if (pattern) {
-        barPattern += pattern;
+  useEffect(() => {
+    if (svgRef.current && value) {
+      try {
+        // Calculate appropriate bar width based on container space
+        // Standard CODE128 needs clean multiples of pixels for hardware reader accuracy.
+        // We set format: "CODE128" and displayValue: false to use our custom styled text.
+        JsBarcode(svgRef.current, value, {
+          format: "CODE128",
+          width: value.length > 10 ? 1.2 : 1.6, // clean pixel module size to prevent blurry lines
+          height: height,
+          displayValue: false,
+          margin: 0,
+          background: "transparent",
+          lineColor: "#000000"
+        });
+      } catch (e) {
+        console.error("Error generating barcode:", e);
       }
-    });
-
-    // Translate widths into SVG rects
-    // Odd digits represent bars (black), Even digits represent spaces (white)
-    const elements: { isBar: boolean; width: number }[] = [];
-    for (let i = 0; i < barPattern.length; i++) {
-      const w = parseInt(barPattern[i], 10);
-      if (isNaN(w)) continue;
-      elements.push({
-        isBar: i % 2 === 0,
-        width: w
-      });
     }
+  }, [value, width, height]);
 
-    // Calculate total module width
-    const totalModules = elements.reduce((sum, el) => sum + el.width, 0);
-    
-    return {
-      elements,
-      totalModules
-    };
-  }, [value]);
-
-  if (!barcodeSvgContent) {
+  if (!value) {
     return (
       <div className="flex flex-col items-center justify-center p-2 border border-dashed border-red-200 bg-red-50 rounded-lg text-xs text-red-600">
         <AlertCircle size={14} className="mb-1" />
-        Código inválido para Barcode
+        Código vazio
       </div>
     );
   }
 
-  const { elements, totalModules } = barcodeSvgContent;
-  const moduleWidth = width / totalModules;
-
-  let currentX = 0;
-
   return (
-    <div className="flex flex-col items-center justify-center w-full">
-      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="mx-auto select-none">
-        <g>
-          {elements.map((el, idx) => {
-            const elWidth = el.width * moduleWidth;
-            const x = currentX;
-            currentX += elWidth;
-
-            if (el.isBar) {
-              return (
-                <rect 
-                  key={idx} 
-                  x={x} 
-                  y={0} 
-                  width={elWidth} 
-                  height={height} 
-                  fill="#000000" 
-                  shapeRendering="crispEdges"
-                />
-              );
-            }
-            return null;
-          })}
-        </g>
-      </svg>
+    <div className="flex flex-col items-center justify-center w-full overflow-hidden">
+      <div className="flex justify-center items-center p-1 bg-white rounded">
+        <svg ref={svgRef} className="mx-auto select-none" />
+      </div>
       {showText && (
         <span className="text-[10px] font-mono tracking-[0.2em] mt-1 text-black font-semibold text-center select-none block">
           {value}
