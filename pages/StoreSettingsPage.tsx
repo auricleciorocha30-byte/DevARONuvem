@@ -38,6 +38,7 @@ import {
   Clock,
   CreditCard,
   Trash2,
+  Gift,
   X 
 } from 'lucide-react';
 
@@ -71,6 +72,15 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
   const [showSuccess, setShowSuccess] = useState(false);
   const [productSearch, setProductSearch] = useState('');
   const [cashbackProductSearch, setCashbackProductSearch] = useState('');
+
+  // States para edição de prêmios da Roleta
+  const [editingPrizeId, setEditingPrizeId] = useState<string | null>(null);
+  const [isAddingPrize, setIsAddingPrize] = useState(false);
+  const [prizeLabel, setPrizeLabel] = useState('');
+  const [prizeType, setPrizeType] = useState<'discount' | 'item' | 'try_again'>('try_again');
+  const [prizeValue, setPrizeValue] = useState<number>(0);
+  const [prizeProductId, setPrizeProductId] = useState<string>('');
+  const [prizeProbability, setPrizeProbability] = useState<number>(10);
 
   const [inactivityDays, setInactivityDays] = useState(90);
   const [analyzedCount, setAnalyzedCount] = useState<number | null>(null);
@@ -226,6 +236,85 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleStartAddPrize = () => {
+    setEditingPrizeId(null);
+    setPrizeLabel('');
+    setPrizeType('try_again');
+    setPrizeValue(0);
+    setPrizeProductId('');
+    setPrizeProbability(10);
+    setIsAddingPrize(true);
+  };
+
+  const handleStartEditPrize = (prize: any) => {
+    setEditingPrizeId(prize.id);
+    setPrizeLabel(prize.label);
+    setPrizeType(prize.type);
+    setPrizeValue(prize.value || 0);
+    setPrizeProductId(prize.productId || '');
+    setPrizeProbability(prize.probability || 0);
+    setIsAddingPrize(false);
+  };
+
+  const handleCancelPrizeEdit = () => {
+    setEditingPrizeId(null);
+    setIsAddingPrize(false);
+  };
+
+  const handleSavePrize = () => {
+    if (!prizeLabel.trim()) {
+      alert("Por favor, digite o nome do prêmio.");
+      return;
+    }
+    if (prizeProbability <= 0 || prizeProbability > 100) {
+      alert("A probabilidade deve ser entre 1% e 100%.");
+      return;
+    }
+
+    const currentPrizes = localSettings.roulettePrizes || [
+      { id: '1', label: '5% de Desconto', type: 'discount', value: 5, probability: 30 },
+      { id: '2', label: '10% de Desconto', type: 'discount', value: 10, probability: 10 },
+      { id: '3', label: 'Tente Novamente 🍀', type: 'try_again', value: 0, probability: 50 },
+      { id: '4', label: 'Brinde da Loja! 🎁', type: 'try_again', value: 0, probability: 10 },
+    ];
+
+    let newPrizes;
+    if (editingPrizeId) {
+      newPrizes = currentPrizes.map(p => p.id === editingPrizeId ? {
+        id: p.id,
+        label: prizeLabel,
+        type: prizeType,
+        value: prizeType === 'discount' ? Number(prizeValue) : 0,
+        productId: prizeType === 'item' ? prizeProductId : undefined,
+        probability: Number(prizeProbability)
+      } : p);
+    } else {
+      newPrizes = [...currentPrizes, {
+        id: Math.random().toString(36).substring(2, 9),
+        label: prizeLabel,
+        type: prizeType,
+        value: prizeType === 'discount' ? Number(prizeValue) : 0,
+        productId: prizeType === 'item' ? prizeProductId : undefined,
+        probability: Number(prizeProbability)
+      }];
+    }
+
+    setLocalSettings({ ...localSettings, roulettePrizes: newPrizes });
+    setEditingPrizeId(null);
+    setIsAddingPrize(false);
+  };
+
+  const handleDeletePrize = (id: string) => {
+    const currentPrizes = localSettings.roulettePrizes || [
+      { id: '1', label: '5% de Desconto', type: 'discount', value: 5, probability: 30 },
+      { id: '2', label: '10% de Desconto', type: 'discount', value: 10, probability: 10 },
+      { id: '3', label: 'Tente Novamente 🍀', type: 'try_again', value: 0, probability: 50 },
+      { id: '4', label: 'Brinde da Loja! 🎁', type: 'try_again', value: 0, probability: 10 },
+    ];
+    const newPrizes = currentPrizes.filter(p => p.id !== id);
+    setLocalSettings({ ...localSettings, roulettePrizes: newPrizes });
   };
 
   const handleSave = async () => {
@@ -931,6 +1020,226 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                 </div>
               )}
             </div>
+          </section>
+
+          <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                <Gift size={18} /> Roleta de Sorteios (Cardápio)
+              </h2>
+              <Switch 
+                checked={localSettings.isRouletteActive === true} 
+                onChange={(checked) => setLocalSettings({...localSettings, isRouletteActive: checked})} 
+              />
+            </div>
+
+            {localSettings.isRouletteActive && (
+              <div className="space-y-6">
+                <div className="p-3 bg-gray-50 rounded-xl space-y-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Valor Mínimo da Compra para Girar (R$)</label>
+                  <input 
+                    type="number" 
+                    placeholder="30" 
+                    value={localSettings.rouletteMinPurchaseValue || ''} 
+                    onChange={(e) => setLocalSettings({...localSettings, rouletteMinPurchaseValue: Number(e.target.value)})} 
+                    className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 outline-none text-sm font-bold" 
+                  />
+                </div>
+
+                {/* Lista de Prêmios */}
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Prêmios da Roleta</h3>
+                    {!editingPrizeId && !isAddingPrize && (
+                      <button
+                        type="button"
+                        onClick={handleStartAddPrize}
+                        className="text-xs bg-primary text-white px-3 py-1.5 rounded-xl font-bold flex items-center gap-1 hover:opacity-90"
+                      >
+                        + Adicionar Prêmio
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Form de Edição / Adição */}
+                  {(isAddingPrize || editingPrizeId) && (
+                    <div className="p-4 bg-orange-50/50 rounded-2xl border border-orange-100 space-y-4 animate-scale-up">
+                      <h4 className="text-xs font-bold text-orange-800 uppercase tracking-wider">
+                        {editingPrizeId ? 'Editar Prêmio' : 'Adicionar Novo Prêmio'}
+                      </h4>
+                      
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-[10px] font-bold text-gray-400 uppercase">Nome do Prêmio (Exibido na Roleta)</label>
+                          <input 
+                            type="text" 
+                            placeholder="Ex: Coca-Cola Lata Grátis, 10% de Desconto" 
+                            value={prizeLabel} 
+                            onChange={(e) => setPrizeLabel(e.target.value)} 
+                            className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 outline-none text-sm font-bold"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-[10px] font-bold text-gray-400 uppercase">Tipo de Prêmio</label>
+                            <select 
+                              value={prizeType} 
+                              onChange={(e) => {
+                                const val = e.target.value as 'discount' | 'item' | 'try_again';
+                                setPrizeType(val);
+                                if (val === 'try_again') {
+                                  setPrizeValue(0);
+                                  setPrizeProductId('');
+                                }
+                              }} 
+                              className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 outline-none text-sm font-bold"
+                            >
+                              <option value="discount">Desconto (%)</option>
+                              <option value="item">Produto Grátis</option>
+                              <option value="try_again">Tente Novamente (Sem Prêmio)</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] font-bold text-gray-400 uppercase">Probabilidade de Sair (%)</label>
+                            <input 
+                              type="number" 
+                              placeholder="25" 
+                              value={prizeProbability || ''} 
+                              onChange={(e) => setPrizeProbability(Number(e.target.value))} 
+                              className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 outline-none text-sm font-bold"
+                            />
+                          </div>
+                        </div>
+
+                        {prizeType === 'discount' && (
+                          <div className="animate-scale-up">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase">Porcentagem do Desconto (%)</label>
+                            <input 
+                              type="number" 
+                              placeholder="10" 
+                              value={prizeValue || ''} 
+                              onChange={(e) => setPrizeValue(Number(e.target.value))} 
+                              className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 outline-none text-sm font-bold"
+                            />
+                          </div>
+                        )}
+
+                        {prizeType === 'item' && (
+                          <div className="animate-scale-up">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase">Selecionar Produto</label>
+                            <select 
+                              value={prizeProductId} 
+                              onChange={(e) => {
+                                setPrizeProductId(e.target.value);
+                                const selectedProd = products.find(p => p.id === e.target.value);
+                                if (selectedProd && !prizeLabel.trim()) {
+                                  setPrizeLabel(`${selectedProd.name} Grátis!`);
+                                }
+                              }} 
+                              className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 outline-none text-sm font-bold"
+                            >
+                              <option value="">Selecione um produto...</option>
+                              {products.map(p => (
+                                <option key={p.id} value={p.id}>{p.name} - R$ {p.price.toFixed(2)}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-2 border-t border-orange-100">
+                        <button
+                          type="button"
+                          onClick={handleCancelPrizeEdit}
+                          className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-xl font-bold text-xs"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSavePrize}
+                          className="px-3 py-1.5 bg-orange-500 text-white rounded-xl font-bold text-xs hover:bg-orange-600"
+                        >
+                          Salvar Prêmio
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Lista de Prêmios */}
+                  <div className="space-y-2">
+                    {(localSettings.roulettePrizes || [
+                      { id: '1', label: '5% de Desconto', type: 'discount', value: 5, probability: 30 },
+                      { id: '2', label: '10% de Desconto', type: 'discount', value: 10, probability: 10 },
+                      { id: '3', label: 'Tente Novamente 🍀', type: 'try_again', value: 0, probability: 50 },
+                      { id: '4', label: 'Brinde da Loja! 🎁', type: 'try_again', value: 0, probability: 10 },
+                    ]).map((prize) => {
+                      return (
+                        <div key={prize.id} className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-xl hover:border-gray-200 transition-colors">
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
+                              {prize.type === 'discount' && <Percent size={14} className="text-emerald-500" />}
+                              {prize.type === 'item' && <ShoppingBag size={14} className="text-blue-500" />}
+                              {prize.type === 'try_again' && <X size={14} className="text-gray-400" />}
+                              {prize.label}
+                            </span>
+                            <span className="text-[10px] text-gray-400 mt-0.5">
+                              {prize.type === 'discount' && `Desconto de ${prize.value}%`}
+                              {prize.type === 'item' && `Produto Grátis: ${products.find(p => p.id === prize.productId)?.name || 'Produto Removido'}`}
+                              {prize.type === 'try_again' && `Sem prêmio / Sorte de novo`}
+                              {` • Chance: ${prize.probability}%`}
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => handleStartEditPrize(prize)}
+                              className="text-xs text-blue-600 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded-lg font-bold"
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePrize(prize.id)}
+                              className="text-xs text-red-600 bg-red-50 hover:bg-red-100 px-2 py-1 rounded-lg font-bold"
+                            >
+                              Excluir
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Somatório de Probabilidades */}
+                  {(() => {
+                    const currentPrizes = localSettings.roulettePrizes || [
+                      { id: '1', label: '5% de Desconto', type: 'discount', value: 5, probability: 30 },
+                      { id: '2', label: '10% de Desconto', type: 'discount', value: 10, probability: 10 },
+                      { id: '3', label: 'Tente Novamente 🍀', type: 'try_again', value: 0, probability: 50 },
+                      { id: '4', label: 'Brinde da Loja! 🎁', type: 'try_again', value: 0, probability: 10 },
+                    ];
+                    const totalProb = currentPrizes.reduce((acc, p) => acc + (Number(p.probability) || 0), 0);
+                    return (
+                      <div className={`p-3 rounded-xl border text-xs font-bold ${
+                        totalProb === 100 
+                          ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+                          : 'bg-red-50 border-red-200 text-red-800'
+                      }`}>
+                        {totalProb === 100 ? (
+                          <span>✅ Soma das Probabilidades: 100% (Configuração correta!)</span>
+                        ) : (
+                          <span>⚠️ Soma das Probabilidades: {totalProb}% (Deve ser exatamente 100% para funcionar.)</span>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
           </section>
 
           <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">

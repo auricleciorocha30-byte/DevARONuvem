@@ -300,11 +300,28 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
 
     let cashbackTotal = 0;
     let couponDiscountsTotal = 0;
+    let rouletteDiscountsTotal = 0;
+    let rouletteItemsCostTotal = 0;
 
     filteredOrders
       .filter(o => o.status !== 'CANCELADO' && o.status !== 'PREPARANDO')
       .forEach(order => {
         couponDiscountsTotal += Number(order.discountAmount || 0);
+        if (order.couponApplied?.startsWith('Roleta:')) {
+          rouletteDiscountsTotal += Number(order.discountAmount || 0);
+        }
+
+        // Calcular custo de itens ganhos na roleta
+        (order.items || []).forEach(item => {
+          if ((item as any).isRoulettePrize) {
+            const targetProductId = item.originalProductId || item.productId || 'unknown';
+            const qty = Number(item.quantity) || 0;
+            const productInfo = products.find(p => p.id === targetProductId);
+            let unitCost = productInfo ? getProductCost(productInfo) : 0;
+            rouletteItemsCostTotal += unitCost * qty;
+          }
+        });
+
         if (order.paymentDetails) {
           try {
             const payments = JSON.parse(order.paymentDetails);
@@ -335,6 +352,8 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
       productsProfitDetails,
       cashbackTotal,
       couponDiscountsTotal,
+      rouletteDiscountsTotal,
+      rouletteItemsCostTotal,
       faturamentoLiquido
     };
   }, [filteredOrders, products, totalSales]);
@@ -577,6 +596,8 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
 
                                                 <div class="explanation-box">
                                                     * Os descontos de cupons e promoções aplicados aos itens totalizaram <strong>R$ ${profitData.couponDiscountsTotal.toFixed(2)}</strong> neste período e já foram deduzidos diretamente do faturamento de cada pedido. O Cashback utilizado funcionou como meio de pagamento e foi deduzido no Faturamento Líquido e Lucro Líquido Real.
+                                                     ${profitData.rouletteDiscountsTotal > 0 ? `<br />* Os descontos concedidos pela Roleta de Sorteios totalizaram <strong>R$ ${profitData.rouletteDiscountsTotal.toFixed(2)}</strong>.` : ''}
+                                                     ${profitData.rouletteItemsCostTotal > 0 ? `<br />* O custo de brindes entregues pela Roleta de Sorteios totalizou <strong>R$ ${profitData.rouletteItemsCostTotal.toFixed(2)}</strong>.` : ''}
                                                 </div>
 
                                                 <table>
@@ -652,6 +673,16 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
                     <p>
                         • <strong>Cashback</strong>: Totalizou <strong>R$ {profitData.cashbackTotal.toFixed(2)}</strong> de saldo utilizado como pagamento pelos clientes. Ele funciona como um desconto de fidelidade oferecido pela loja, sendo por isso deduzido integralmente do faturamento líquido e do Lucro Líquido Real da loja.
                     </p>
+                    {profitData.rouletteDiscountsTotal > 0 && (
+                      <p>
+                          • <strong>Descontos da Roleta</strong>: Totalizaram <strong>R$ {profitData.rouletteDiscountsTotal.toFixed(2)}</strong> em descontos concedidos aos clientes que giraram a roleta no cardápio externo. Estes descontos já estão deduzidos do faturamento bruto dos pedidos.
+                      </p>
+                    )}
+                    {profitData.rouletteItemsCostTotal > 0 && (
+                      <p>
+                          • <strong>Custo de Prêmios da Roleta</strong>: Representou um custo real de <strong>R$ {profitData.rouletteItemsCostTotal.toFixed(2)}</strong> em produtos concedidos gratuitamente como brinde (reduzindo o lucro líquido real sem gerar receita).
+                      </p>
+                    )}
                 </div>
 
                 <div className="overflow-x-auto max-h-[400px] overflow-y-auto custom-scrollbar print:h-auto print:max-h-none print:overflow-visible">

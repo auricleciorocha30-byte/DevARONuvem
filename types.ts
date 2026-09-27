@@ -106,6 +106,8 @@ export interface OrderItem {
   }[];
   complements?: CartComplementItem[];
   returnedQuantity?: number;
+  isRoulettePrize?: boolean;
+  originalPrice?: number;
 }
 
 export interface Order {
@@ -242,6 +244,11 @@ export interface StoreSettings {
   digitalMenuPaymentMethods?: PaymentMethod[];
   allowSchedulingWhenClosed?: boolean;
   
+  // Roleta de Sorteios
+  isRouletteActive?: boolean;
+  rouletteMinPurchaseValue?: number;
+  roulettePrizes?: RoulettePrize[];
+  
   // Integrações
   focusNfeToken?: string;
   focusNfeEnvironment?: 'production' | 'homologation';
@@ -270,4 +277,13 @@ export interface StoreSettings {
   maxUsers?: number;
   dataRetentionDays?: number;
   lockedFeatures?: ('ONLINE_PAYMENT' | 'NFE')[];
+}
+
+export interface RoulettePrize {
+  id: string;
+  label: string;
+  type: 'discount' | 'item' | 'try_again';
+  value: number; // percentage value if discount
+  productId?: string; // product id if free item
+  probability: number; // percentage probability, e.g. 20 for 20%
 }
