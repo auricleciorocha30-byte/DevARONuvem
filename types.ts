@@ -246,6 +246,7 @@ export interface StoreSettings {
   
   // Roleta de Sorteios
   isRouletteActive?: boolean;
+  isRouletteActivePos?: boolean;
   rouletteMinPurchaseValue?: number;
   roulettePrizes?: RoulettePrize[];
   

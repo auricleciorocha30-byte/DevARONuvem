@@ -1023,17 +1023,35 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
           </section>
 
           <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                <Gift size={18} /> Roleta de Sorteios (Cardápio)
-              </h2>
-              <Switch 
-                checked={localSettings.isRouletteActive === true} 
-                onChange={(checked) => setLocalSettings({...localSettings, isRouletteActive: checked})} 
-              />
+            <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
+              <Gift size={18} /> Roleta de Sorteios
+            </h2>
+            
+            <div className="space-y-4 mb-6">
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold text-gray-700">Roleta no Cardápio Externo</span>
+                  <span className="text-[10px] text-gray-400">Ativa o jogo de sorteios para os clientes no menu digital.</span>
+                </div>
+                <Switch 
+                  checked={localSettings.isRouletteActive === true} 
+                  onChange={(checked) => setLocalSettings({...localSettings, isRouletteActive: checked})} 
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold text-gray-700">Roleta no PDV (Frente de Caixa)</span>
+                  <span className="text-[10px] text-gray-400">Ativa o jogo de sorteios no caixa para os operadores oferecerem ao cliente.</span>
+                </div>
+                <Switch 
+                  checked={localSettings.isRouletteActivePos === true} 
+                  onChange={(checked) => setLocalSettings({...localSettings, isRouletteActivePos: checked})} 
+                />
+              </div>
             </div>
 
-            {localSettings.isRouletteActive && (
+            {(localSettings.isRouletteActive || localSettings.isRouletteActivePos) && (
               <div className="space-y-6">
                 <div className="p-3 bg-gray-50 rounded-xl space-y-1">
                   <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Valor Mínimo da Compra para Girar (R$)</label>

@@ -38,7 +38,8 @@ import {
   RotateCcw,
   Undo2,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Gift
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Product, Order, OrderItem, StoreSettings, Waitstaff, PaymentMethod, Customer, OrderStatus, CartComplementItem, ComplementCategory } from '../types';
@@ -114,6 +115,22 @@ export default function POS({ storeId, user, settings, orders, products: propPro
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  
+  // Estados da Roleta no PDV
+  const [hasSpunRoulettePos, setHasSpunRoulettePos] = useState(false);
+  const [showRouletteModalPos, setShowRouletteModalPos] = useState(false);
+  const [rouletteRotationPos, setRouletteRotationPos] = useState(0);
+  const [isRouletteSpinningPos, setIsRouletteSpinningPos] = useState(false);
+  const [roulettePrizeWonPos, setRoulettePrizeWonPos] = useState<any | null>(null);
+  const [rouletteDiscountPercentagePos, setRouletteDiscountPercentagePos] = useState(0);
+
+  const resetRoulettePos = () => {
+    setHasSpunRoulettePos(false);
+    setRouletteRotationPos(0);
+    setIsRouletteSpinningPos(false);
+    setRoulettePrizeWonPos(null);
+    setRouletteDiscountPercentagePos(0);
+  };
   
   // Checkout State
   const [orderType, setOrderType] = useState<'BALCAO' | 'ENTREGA' | 'COMANDA' | 'MESA'>(() => {
@@ -1672,6 +1689,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
   };
 
   const subtotal = cart.reduce((acc, item) => acc + ((item.price || 0) * (item.quantity || 0)), 0);
+  const rouletteDiscountAmount = rouletteDiscountPercentagePos > 0 ? subtotal * (rouletteDiscountPercentagePos / 100) : 0;
   const commissionRate = (user && (user.role === 'ATENDENTE' || user.role === 'GERENTE') && settings.waitstaffCommissions?.[user.id]) || 0;
   
   const newItemsSubtotal = cart.reduce((acc, item) => {
@@ -1694,7 +1712,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
       ? adjustedLoadedServiceFee + (newItemsSubtotal * (commissionRate / 100))
       : 0;
 
-  const total = subtotal + serviceFee + (orderType === 'ENTREGA' ? (deliveryFee || 0) : 0);
+  const total = Math.max(0, subtotal - rouletteDiscountAmount) + serviceFee + (orderType === 'ENTREGA' ? (deliveryFee || 0) : 0);
   const totalPaid = payments.reduce((acc, p) => acc + (p.amount || 0), 0);
   const remaining = Math.max(0, total - totalPaid);
   const change = Math.max(0, totalPaid - total);
@@ -2361,7 +2379,9 @@ export default function POS({ storeId, user, settings, orders, products: propPro
         deliveryFee: orderType === 'ENTREGA' ? deliveryFee : undefined,
         stockDeducted: true,
         hasReturn: orderType === 'ENTREGA' ? (deliveryDetails.hasReturn ? 1 : 0) : undefined,
-        returnStatus: orderType === 'ENTREGA' && deliveryDetails.hasReturn ? 'PENDING' : undefined
+        returnStatus: orderType === 'ENTREGA' && deliveryDetails.hasReturn ? 'PENDING' : undefined,
+        couponApplied: rouletteDiscountPercentagePos > 0 ? `Roleta POS: ${rouletteDiscountPercentagePos}% Desconto` : undefined,
+        discountAmount: rouletteDiscountPercentagePos > 0 ? rouletteDiscountAmount : undefined
       };
 
       if (isContingencyMode) {
@@ -2388,6 +2408,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
         setCustomerSearchTerm('');
         setIsCheckoutOpen(false);
         setIsProcessing(false);
+        resetRoulettePos();
         return;
       }
 
@@ -2583,6 +2604,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
       setSelectedCustomer(null);
       setCustomerSearchTerm('');
       setIsCheckoutOpen(false);
+      resetRoulettePos();
 
       setProducts(prev => prev.map(p => {
           const diff = stockUpdates.get(p.id);
@@ -4496,6 +4518,39 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                                 Usar Cashback: {formatCurrency(selectedCustomer.points)}
                             </button>
                         )}
+
+                        {/* Roleta de Sorteios no PDV */}
+                        {settings.isRouletteActivePos && (
+                          <div className="mt-2.5">
+                            {subtotal < (settings.rouletteMinPurchaseValue || 0) ? (
+                              <div className="text-[10px] text-gray-400 font-bold border border-dashed border-gray-200 rounded-xl p-1.5 flex items-center justify-center gap-1 select-none">
+                                <Gift size={12} /> Roleta: Falta {formatCurrency((settings.rouletteMinPurchaseValue || 0) - subtotal)} para liberar
+                              </div>
+                            ) : !hasSpunRoulettePos ? (
+                              <button 
+                                type="button"
+                                onClick={() => setShowRouletteModalPos(true)}
+                                className="w-full flex items-center justify-center gap-2 p-2.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-xl border border-amber-600 hover:brightness-105 active:scale-95 transition-all text-xs font-black uppercase tracking-wider animate-pulse shadow-md"
+                              >
+                                <Gift size={14} className="animate-bounce" />
+                                Oferecer Roleta da Sorte 🎰
+                              </button>
+                            ) : (
+                              <div className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl p-2 font-bold flex flex-col items-center justify-center gap-0.5 shadow-sm text-center">
+                                <span className="flex items-center gap-1">
+                                  <Gift size={13} className="text-emerald-500 animate-pulse" />
+                                  ✓ Roleta Sorteada
+                                </span>
+                                <span className="text-gray-500 text-[9px] uppercase font-black tracking-wider">
+                                  {rouletteDiscountPercentagePos > 0 
+                                    ? `Desconto de ${rouletteDiscountPercentagePos}%`
+                                    : `Prêmio: ${cart.find(item => item.isRoulettePrize)?.name || 'Produto Grátis'}`
+                                  }
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       {/* Card de Pagamentos Lançados */}
@@ -4789,6 +4844,196 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                 Finalizar Venda
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DA ROLETA DE SORTEIOS NO PDV */}
+      {showRouletteModalPos && (
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-[3rem] shadow-2xl p-6 text-center border border-orange-100 animate-scale-up relative">
+            
+            {/* Fechar botão apenas se não estiver girando */}
+            {!isRouletteSpinningPos && (
+              <button 
+                onClick={() => setShowRouletteModalPos(false)} 
+                className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 bg-gray-50 rounded-full"
+              >
+                <X size={20} />
+              </button>
+            )}
+
+            <div className="p-2 bg-gradient-to-r from-amber-500 to-orange-600 rounded-2xl text-white inline-block mb-4 shadow-md">
+              <Gift size={28} />
+            </div>
+            
+            <h3 className="text-xl font-brand font-black text-gray-800 mb-1 uppercase tracking-wide">Roleta da Sorte! 🎰</h3>
+            <p className="text-xs text-gray-500 mb-6">Ofereça ao cliente o giro da sorte no caixa para ganhar descontos ou brindes especiais!</p>
+
+            {/* Container da Roleta Física */}
+            <div className="relative w-64 h-64 mx-auto mb-8 flex items-center justify-center">
+              
+              {/* Ponteiro de Seleção */}
+              <div className="absolute top-[-10px] left-1/2 -translate-x-1/2 z-50 w-0 h-0 border-l-[12px] border-l-transparent border-r-[12px] border-r-transparent border-t-[20px] border-t-amber-500 drop-shadow-md"></div>
+              
+              {/* O Círculo da Roleta */}
+              <div 
+                style={{
+                  transform: `rotate(${rouletteRotationPos}deg)`,
+                  transition: isRouletteSpinningPos ? 'transform 5000ms cubic-bezier(0.1, 0.8, 0.1, 1)' : 'none',
+                  background: (() => {
+                    const prizes = settings.roulettePrizes || [
+                      { id: '1', label: '5% Desc', type: 'discount', value: 5, probability: 30 },
+                      { id: '2', label: '10% Desc', type: 'discount', value: 10, probability: 10 },
+                      { id: '3', label: 'Tente Novamente 🍀', type: 'try_again', value: 0, probability: 50 },
+                      { id: '4', label: 'Brinde Especial! 🎁', type: 'try_again', value: 0, probability: 10 },
+                    ];
+                    const colors = ['#f59e0b', '#3b82f6', '#10b981', '#ec4899', '#8b5cf6', '#ef4444', '#14b8a6'];
+                    const conicParts = prizes.map((p, idx) => {
+                      const from = idx * (360 / prizes.length);
+                      const to = (idx + 1) * (360 / prizes.length);
+                      return `${colors[idx % colors.length]} ${from}deg ${to}deg`;
+                    });
+                    return `conic-gradient(${conicParts.join(', ')})`;
+                  })()
+                }}
+                className="w-full h-full rounded-full border-[8px] border-amber-400 shadow-2xl relative overflow-hidden"
+              >
+                {/* Rótulos dos Prêmios */}
+                {(() => {
+                  const prizes = settings.roulettePrizes || [
+                    { id: '1', label: '5% Desc', type: 'discount', value: 5, probability: 30 },
+                    { id: '2', label: '10% Desc', type: 'discount', value: 10, probability: 10 },
+                    { id: '3', label: 'Tente Novamente 🍀', type: 'try_again', value: 0, probability: 50 },
+                    { id: '4', label: 'Brinde Especial! 🎁', type: 'try_again', value: 0, probability: 10 },
+                  ];
+                  return prizes.map((p, idx) => {
+                    const angle = idx * (360 / prizes.length) + (360 / prizes.length) / 2;
+                    return (
+                      <div
+                        key={p.id}
+                        style={{
+                          transform: `rotate(${angle}deg) translateY(-85px)`,
+                          position: 'absolute',
+                          top: '50%',
+                          left: '50%',
+                          marginTop: '-12px',
+                          marginLeft: '-45px',
+                          width: '90px',
+                          textAlign: 'center',
+                          fontSize: '9px',
+                          fontWeight: 900,
+                          color: 'white',
+                          textShadow: '0 1.5px 3px rgba(0,0,0,0.9)',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}
+                      >
+                        {p.label}
+                      </div>
+                    );
+                  });
+                })()}
+
+                {/* Pino Central */}
+                <div className="absolute inset-0 m-auto w-10 h-10 bg-amber-400 border-4 border-white rounded-full shadow-md z-30 flex items-center justify-center">
+                  <div className="w-2 h-2 bg-gray-800 rounded-full"></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Ações e Mensagens */}
+            {!roulettePrizeWonPos ? (
+              <button
+                type="button"
+                disabled={isRouletteSpinningPos}
+                onClick={async () => {
+                  if (isRouletteSpinningPos) return;
+                  setIsRouletteSpinningPos(true);
+                  
+                  const prizes = settings.roulettePrizes || [
+                    { id: '1', label: '5% de Desconto', type: 'discount', value: 5, probability: 30 },
+                    { id: '2', label: '10% de Desconto', type: 'discount', value: 10, probability: 10 },
+                    { id: '3', label: 'Tente Novamente 🍀', type: 'try_again', value: 0, probability: 50 },
+                    { id: '4', label: 'Brinde da Loja! 🎁', type: 'try_again', value: 0, probability: 10 },
+                  ];
+
+                  // Escolher prêmio com base na probabilidade
+                  const rand = Math.random() * 100;
+                  let cumulative = 0;
+                  let selectedPrize = prizes[prizes.length - 1];
+                  let selectedIndex = prizes.length - 1;
+                  for (let i = 0; i < prizes.length; i++) {
+                    cumulative += Number(prizes[i].probability) || 0;
+                    if (rand <= cumulative) {
+                      selectedPrize = prizes[i];
+                      selectedIndex = i;
+                      break;
+                    }
+                  }
+
+                  // Calcular rotação final
+                  const sliceAngle = 360 / prizes.length;
+                  const prizeAngle = selectedIndex * sliceAngle + sliceAngle / 2;
+                  const finalRotation = 360 * 6 - prizeAngle; // 6 spins completos + posicionamento inverso
+                  setRouletteRotationPos(finalRotation);
+
+                  // Aguardar fim do giro
+                  setTimeout(() => {
+                    setIsRouletteSpinningPos(false);
+                    setHasSpunRoulettePos(true);
+                    setRoulettePrizeWonPos(selectedPrize);
+
+                    // Aplicar prêmio
+                    if (selectedPrize.type === 'discount') {
+                      setRouletteDiscountPercentagePos(selectedPrize.value);
+                    } else if (selectedPrize.type === 'item' && selectedPrize.productId) {
+                      const prizeProduct = products.find(p => p.id === selectedPrize.productId);
+                      if (prizeProduct) {
+                        const prizeItem: OrderItem = {
+                          productId: prizeProduct.id,
+                          name: `${prizeProduct.name} (Prêmio Roleta)`,
+                          price: 0,
+                          quantity: 1,
+                          isRoulettePrize: true,
+                          originalPrice: prizeProduct.price,
+                        };
+                        setCart(prev => {
+                          const listWithoutPrize = prev.filter(item => !item.isRoulettePrize);
+                          return [...listWithoutPrize, prizeItem];
+                        });
+                      }
+                    }
+                  }, 5000);
+                }}
+                className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:brightness-105 active:scale-95 transition-all shadow-xl shadow-orange-500/10 disabled:opacity-50"
+              >
+                {isRouletteSpinningPos ? 'Girando a Roleta...' : 'Girar Agora! 🍀'}
+              </button>
+            ) : (
+              <div className="space-y-4 animate-scale-up">
+                <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-zinc-900 text-left">
+                  <p className="text-sm font-black text-emerald-800">
+                    {roulettePrizeWonPos.type === 'try_again' ? '🍀 Não foi dessa vez!' : '🎉 Sorteio Concluído! Prêmio:'}
+                  </p>
+                  <p className="text-lg font-black text-emerald-600 mt-1">{roulettePrizeWonPos.label}</p>
+                  <p className="text-[11px] text-gray-500 mt-2">
+                    {roulettePrizeWonPos.type === 'discount' && 'O desconto foi aplicado diretamente ao total da venda!'}
+                    {roulettePrizeWonPos.type === 'item' && 'O item grátis foi adicionado como brinde (R$ 0.00) ao pedido!'}
+                    {roulettePrizeWonPos.type === 'try_again' && 'Nenhum prêmio sorteado para este giro. Prossiga com o checkout.'}
+                  </p>
+                </div>
+                
+                <button
+                  type="button"
+                  onClick={() => setShowRouletteModalPos(false)}
+                  className="w-full py-4 bg-primary text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl"
+                >
+                  Confirmar e Fechar
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
