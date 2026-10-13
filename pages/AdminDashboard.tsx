@@ -302,13 +302,82 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
     let couponDiscountsTotal = 0;
     let rouletteDiscountsTotal = 0;
     let rouletteItemsCostTotal = 0;
+    let totalCardFees = 0;
+    let creditTotal = 0;
+    let creditFeesTotal = 0;
+    let debitTotal = 0;
+    let debitFeesTotal = 0;
+    let pixTotal = 0;
+    let cashTotal = 0;
+    let valesTotal = 0;
 
     filteredOrders
       .filter(o => o.status !== 'CANCELADO' && o.status !== 'PREPARANDO')
       .forEach(order => {
         couponDiscountsTotal += Number(order.discountAmount || 0);
-        if (order.couponApplied?.startsWith('Roleta:')) {
+        if (order.couponApplied?.startsWith('Roleta')) {
           rouletteDiscountsTotal += Number(order.discountAmount || 0);
+        }
+
+        let orderDebitFees = 0;
+        let orderCreditFees = 0;
+
+        if (order.paymentDetails) {
+          try {
+            const payments = JSON.parse(order.paymentDetails);
+            if (Array.isArray(payments)) {
+              payments.forEach((p: any) => {
+                const amt = Number(p.amount) || 0;
+                const fAmt = Number(p.feeAmount) || 0;
+                if (p.method === 'CARTAO') {
+                  creditTotal += amt;
+                  creditFeesTotal += fAmt;
+                  orderCreditFees += fAmt;
+                } else if (p.method === 'DEBITO') {
+                  debitTotal += amt;
+                  debitFeesTotal += fAmt;
+                  orderDebitFees += fAmt;
+                } else if (p.method === 'PIX') {
+                  pixTotal += amt;
+                } else if (p.method === 'DINHEIRO') {
+                  cashTotal += amt;
+                } else if (p.method === 'VALES') {
+                  valesTotal += amt;
+                } else if (p.method === 'CASHBACK') {
+                  cashbackTotal += amt;
+                }
+              });
+            }
+          } catch (e) {
+            console.error("Error parsing paymentDetails:", e);
+          }
+        } else if (order.paymentMethod) {
+          const amt = Number(order.total) || 0;
+          const fee = Number(order.cardFee) || 0;
+          if (order.paymentMethod === 'CARTAO') {
+            creditTotal += amt;
+            creditFeesTotal += fee;
+            orderCreditFees += fee;
+          } else if (order.paymentMethod === 'DEBITO') {
+            debitTotal += amt;
+            debitFeesTotal += fee;
+            orderDebitFees += fee;
+          } else if (order.paymentMethod === 'PIX') {
+            pixTotal += amt;
+          } else if (order.paymentMethod === 'DINHEIRO') {
+            cashTotal += amt;
+          } else if (order.paymentMethod === 'VALES') {
+            valesTotal += amt;
+          } else if (order.paymentMethod === 'CASHBACK') {
+            cashbackTotal += amt;
+          }
+        }
+
+        const calculatedFees = orderCreditFees + orderDebitFees;
+        if (calculatedFees > 0) {
+          totalCardFees += calculatedFees;
+        } else if (order.cardFee && Number(order.cardFee) > 0) {
+          totalCardFees += Number(order.cardFee);
         }
 
         // Calcular custo de itens ganhos na roleta
@@ -321,23 +390,6 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
             rouletteItemsCostTotal += unitCost * qty;
           }
         });
-
-        if (order.paymentDetails) {
-          try {
-            const payments = JSON.parse(order.paymentDetails);
-            if (Array.isArray(payments)) {
-              payments.forEach((p: any) => {
-                if (p.method === 'CASHBACK') {
-                  cashbackTotal += Number(p.amount || 0);
-                }
-              });
-            }
-          } catch (e) {
-            console.error("Error parsing paymentDetails for cashback:", e);
-          }
-        } else if (order.paymentMethod === 'CASHBACK') {
-          cashbackTotal += Number(order.total || 0);
-        }
       });
 
     const productsProfitDetails = Array.from(itemMap.values()).sort((a, b) => b.profit - a.profit);
@@ -354,6 +406,14 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
       couponDiscountsTotal,
       rouletteDiscountsTotal,
       rouletteItemsCostTotal,
+      totalCardFees,
+      creditTotal,
+      creditFeesTotal,
+      debitTotal,
+      debitFeesTotal,
+      pixTotal,
+      cashTotal,
+      valesTotal,
       faturamentoLiquido
     };
   }, [filteredOrders, products, totalSales]);
@@ -588,6 +648,10 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
                                                         <div class="summary-label">Custo de Aquisição</div>
                                                         <div class="summary-value">R$ ${profitData.costTotal.toFixed(2)}</div>
                                                     </div>
+                                                    <div class="summary-card border-blue-200 bg-blue-50/20">
+                                                        <div class="summary-label">Taxas Cartão Repassadas</div>
+                                                        <div class="summary-value text-blue">R$ ${profitData.totalCardFees.toFixed(2)}</div>
+                                                    </div>
                                                     <div class="summary-card">
                                                         <div class="summary-label">Lucro Líquido Real</div>
                                                         <div class="summary-value text-green">R$ ${profitData.profitTotal.toFixed(2)}</div>
@@ -641,7 +705,7 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
                 </div>
                 <p className="text-xs text-gray-500 mb-4 no-print">Análise detalhada de custos, receitas e lucratividade real por produto.</p>
                 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 no-print">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6 no-print">
                     <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex flex-col">
                         <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Faturamento Bruto</span>
                         <span className="text-lg font-black text-gray-700 mt-1">R$ {totalSales.toFixed(2)}</span>
@@ -649,6 +713,10 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
                     <div className="bg-amber-50/40 p-4 rounded-2xl border border-amber-100/50 flex flex-col">
                         <span className="text-[10px] font-black uppercase text-amber-600 tracking-widest">Cashback Utilizado</span>
                         <span className="text-lg font-black text-amber-700 mt-1">R$ {profitData.cashbackTotal.toFixed(2)}</span>
+                    </div>
+                    <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100 flex flex-col">
+                        <span className="text-[10px] font-black uppercase text-blue-600 tracking-widest">Taxas de Cartão</span>
+                        <span className="text-lg font-black text-blue-800 mt-1">R$ {profitData.totalCardFees.toFixed(2)}</span>
                     </div>
                     <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex flex-col">
                         <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Custo de Aquisição</span>
@@ -673,6 +741,11 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
                     <p>
                         • <strong>Cashback</strong>: Totalizou <strong>R$ {profitData.cashbackTotal.toFixed(2)}</strong> de saldo utilizado como pagamento pelos clientes. Ele funciona como um desconto de fidelidade oferecido pela loja, sendo por isso deduzido integralmente do faturamento líquido e do Lucro Líquido Real da loja.
                     </p>
+                    {profitData.totalCardFees > 0 && (
+                      <p>
+                          • <strong>Taxas de Cartão (Débito e Crédito Parcelado)</strong>: Totalizaram <strong>R$ {profitData.totalCardFees.toFixed(2)}</strong> em taxas de maquininha repassadas aos clientes no PDV, Painel do Vendedor e Cardápios.
+                      </p>
+                    )}
                     {profitData.rouletteDiscountsTotal > 0 && (
                       <p>
                           • <strong>Descontos da Roleta</strong>: Totalizaram <strong>R$ {profitData.rouletteDiscountsTotal.toFixed(2)}</strong> em descontos concedidos aos clientes que giraram a roleta no cardápio externo. Estes descontos já estão deduzidos do faturamento bruto dos pedidos.
@@ -683,6 +756,68 @@ const AdminDashboard: React.FC<Props> = ({ orders, products, settings, storeId, 
                           • <strong>Custo de Prêmios da Roleta</strong>: Representou um custo real de <strong>R$ {profitData.rouletteItemsCostTotal.toFixed(2)}</strong> em produtos concedidos gratuitamente como brinde (reduzindo o lucro líquido real sem gerar receita).
                       </p>
                     )}
+                </div>
+
+                {/* DISTRIBUIÇÃO POR MEIO DE PAGAMENTO & TAXAS */}
+                <div className="mb-6 no-print">
+                    <h3 className="text-xs font-black uppercase tracking-wider text-gray-500 mb-3 flex items-center gap-1.5">
+                        <span>💳</span> Meios de Pagamento & Taxas de Cartão
+                    </h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                        <div className="bg-indigo-50/50 p-3.5 rounded-2xl border border-indigo-100 flex flex-col justify-between">
+                            <div>
+                                <span className="text-[10px] font-black uppercase text-indigo-700 tracking-wider block">Crédito</span>
+                                <span className="text-base font-black text-indigo-950 mt-0.5 block">R$ {profitData.creditTotal.toFixed(2)}</span>
+                            </div>
+                            {profitData.creditFeesTotal > 0 && (
+                                <span className="text-[10px] font-bold text-indigo-600 bg-indigo-100/60 px-2 py-0.5 rounded-lg mt-2 inline-block">
+                                    Taxas: +R$ {profitData.creditFeesTotal.toFixed(2)}
+                                </span>
+                            )}
+                        </div>
+
+                        <div className="bg-teal-50/50 p-3.5 rounded-2xl border border-teal-100 flex flex-col justify-between">
+                            <div>
+                                <span className="text-[10px] font-black uppercase text-teal-700 tracking-wider block">Débito</span>
+                                <span className="text-base font-black text-teal-950 mt-0.5 block">R$ {profitData.debitTotal.toFixed(2)}</span>
+                            </div>
+                            {profitData.debitFeesTotal > 0 && (
+                                <span className="text-[10px] font-bold text-teal-600 bg-teal-100/60 px-2 py-0.5 rounded-lg mt-2 inline-block">
+                                    Taxas: +R$ {profitData.debitFeesTotal.toFixed(2)}
+                                </span>
+                            )}
+                        </div>
+
+                        <div className="bg-cyan-50/50 p-3.5 rounded-2xl border border-cyan-100 flex flex-col justify-between">
+                            <div>
+                                <span className="text-[10px] font-black uppercase text-cyan-700 tracking-wider block">PIX</span>
+                                <span className="text-base font-black text-cyan-950 mt-0.5 block">R$ {profitData.pixTotal.toFixed(2)}</span>
+                            </div>
+                            <span className="text-[10px] font-bold text-cyan-600 bg-cyan-100/60 px-2 py-0.5 rounded-lg mt-2 inline-block">
+                                Instantâneo
+                            </span>
+                        </div>
+
+                        <div className="bg-emerald-50/50 p-3.5 rounded-2xl border border-emerald-100 flex flex-col justify-between">
+                            <div>
+                                <span className="text-[10px] font-black uppercase text-emerald-700 tracking-wider block">Dinheiro</span>
+                                <span className="text-base font-black text-emerald-950 mt-0.5 block">R$ {profitData.cashTotal.toFixed(2)}</span>
+                            </div>
+                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100/60 px-2 py-0.5 rounded-lg mt-2 inline-block">
+                                Em Espécie
+                            </span>
+                        </div>
+
+                        <div className="bg-orange-50/50 p-3.5 rounded-2xl border border-orange-100 flex flex-col justify-between">
+                            <div>
+                                <span className="text-[10px] font-black uppercase text-orange-700 tracking-wider block">Vales / Outros</span>
+                                <span className="text-base font-black text-orange-950 mt-0.5 block">R$ {profitData.valesTotal.toFixed(2)}</span>
+                            </div>
+                            <span className="text-[10px] font-bold text-orange-600 bg-orange-100/60 px-2 py-0.5 rounded-lg mt-2 inline-block">
+                                Convênios / Tickets
+                            </span>
+                        </div>
+                    </div>
                 </div>
 
                 <div className="overflow-x-auto max-h-[400px] overflow-y-auto custom-scrollbar print:h-auto print:max-h-none print:overflow-visible">

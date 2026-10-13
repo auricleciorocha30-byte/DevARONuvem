@@ -762,6 +762,122 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
               </div>
           </section>
 
+          {/* SEÇÃO TAXAS DE PAGAMENTO NO LOCAL (DÉBITO & CRÉDITO PARCELADO) */}
+          <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col">
+              <div className="flex justify-between items-center mb-4">
+                  <div className="flex items-center gap-2">
+                      <CreditCard className="text-blue-600" size={20} />
+                      <div>
+                          <h2 className="text-sm font-bold uppercase tracking-wider text-gray-800">
+                              Taxas de Cartão no Pagamento Local
+                          </h2>
+                          <p className="text-[10px] text-gray-500">
+                              Acrescentar taxas de maquininha (Débito e Crédito Parcelado) no PDV, Vendedor e Cardápios
+                          </p>
+                      </div>
+                  </div>
+                  <Switch 
+                      checked={localSettings.applyCardFeesOnLocalPayment === true}
+                      onChange={(checked) => setLocalSettings({...localSettings, applyCardFeesOnLocalPayment: checked})}
+                  />
+              </div>
+
+              {localSettings.applyCardFeesOnLocalPayment && (
+                  <div className="space-y-5 pt-3 border-t border-gray-100">
+                      {/* TAXA DE DÉBITO */}
+                      <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div>
+                              <span className="text-xs font-bold text-blue-900 block">Taxa de Débito (%)</span>
+                              <span className="text-[10px] text-blue-600">Acréscimo percentual cobrado nas vendas em cartão de débito</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                              <input 
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  max="100"
+                                  placeholder="0.00"
+                                  value={localSettings.debitFeePercent !== undefined ? localSettings.debitFeePercent : ''}
+                                  onChange={(e) => setLocalSettings({...localSettings, debitFeePercent: e.target.value === '' ? 0 : Number(e.target.value)})}
+                                  className="w-24 px-3 py-2 bg-white rounded-lg border border-blue-200 outline-none text-sm font-bold text-right"
+                              />
+                              <span className="text-xs font-bold text-blue-900">%</span>
+                          </div>
+                      </div>
+
+                      {/* LIMITE DE PARCELAS */}
+                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                          <div>
+                              <span className="text-xs font-bold text-gray-700 block">Parcelamento Máximo no Crédito</span>
+                              <span className="text-[10px] text-gray-400">Quantidade máxima de parcelas disponíveis</span>
+                          </div>
+                          <select 
+                              value={localSettings.maxCreditInstallments || 12}
+                              onChange={(e) => setLocalSettings({...localSettings, maxCreditInstallments: Number(e.target.value)})}
+                              className="px-3 py-2 bg-white rounded-lg border border-gray-200 font-bold text-xs outline-none"
+                          >
+                              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(n => (
+                                  <option key={n} value={n}>Até {n}x {n === 1 ? '(Apenas à vista)' : ''}</option>
+                              ))}
+                          </select>
+                      </div>
+
+                      {/* GRADE DE TAXAS POR PARCELA */}
+                      <div>
+                          <div className="flex justify-between items-center mb-2">
+                              <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                                  Taxas de Crédito por Parcela (%)
+                              </span>
+                              <button 
+                                  type="button"
+                                  onClick={() => {
+                                      const defaultRates: Record<string, number> = {
+                                          '1': 2.99, '2': 3.99, '3': 4.49, '4': 4.99,
+                                          '5': 5.49, '6': 5.99, '7': 6.99, '8': 7.49,
+                                          '9': 7.99, '10': 8.49, '11': 8.99, '12': 9.49
+                                      };
+                                      setLocalSettings({...localSettings, creditInstallmentFees: defaultRates, debitFeePercent: 1.99});
+                                  }}
+                                  className="text-[10px] font-bold text-blue-600 hover:text-blue-800 underline"
+                              >
+                                  Preencher Sugestão Padrão
+                              </button>
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                              {Array.from({ length: localSettings.maxCreditInstallments || 12 }, (_, i) => i + 1).map(n => {
+                                  const key = String(n);
+                                  const fee = (localSettings.creditInstallmentFees && localSettings.creditInstallmentFees[key] !== undefined) 
+                                      ? localSettings.creditInstallmentFees[key] 
+                                      : (n === 1 ? 2.99 : +(2.99 + (n - 1) * 0.6).toFixed(2));
+                                  return (
+                                      <div key={n} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl border border-gray-100">
+                                          <span className="text-xs font-bold text-gray-700">{n}x {n === 1 ? '(à vista)' : ''}</span>
+                                          <div className="flex items-center gap-1">
+                                              <input 
+                                                  type="number"
+                                                  step="0.01"
+                                                  min="0"
+                                                  max="100"
+                                                  value={fee}
+                                                  onChange={(e) => {
+                                                      const val = e.target.value === '' ? 0 : Number(e.target.value);
+                                                      const updated = { ...(localSettings.creditInstallmentFees || {}) };
+                                                      updated[key] = val;
+                                                      setLocalSettings({...localSettings, creditInstallmentFees: updated});
+                                                  }}
+                                                  className="w-16 px-2 py-1 bg-white rounded border border-gray-200 text-xs font-bold text-right outline-none"
+                                              />
+                                              <span className="text-[10px] text-gray-500 font-bold">%</span>
+                                          </div>
+                                      </div>
+                                  );
+                              })}
+                          </div>
+                      </div>
+                  </div>
+              )}
+          </section>
+
           {localSettings.isDeliveryActive && (
             <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
               <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">

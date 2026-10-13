@@ -143,6 +143,8 @@ export interface Order {
   nfce_status?: string;
   customerCpf?: string;
   scheduledTime?: string;
+  cardFee?: number;
+  installments?: number;
   hasReturn?: boolean | number;
   returnStatus?: 'PENDING' | 'RETORNANDO' | 'RETURNED';
 }
@@ -249,6 +251,12 @@ export interface StoreSettings {
   isRouletteActivePos?: boolean;
   rouletteMinPurchaseValue?: number;
   roulettePrizes?: RoulettePrize[];
+  
+  // Taxas de Pagamento no Local (Débito e Crédito Parcelado)
+  applyCardFeesOnLocalPayment?: boolean;
+  debitFeePercent?: number;
+  creditInstallmentFees?: Record<string, number>;
+  maxCreditInstallments?: number;
   
   // Integrações
   focusNfeToken?: string;

@@ -71,6 +71,8 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
   const [isSplitMode, setIsSplitMode] = useState(false);
   const [splitPayments, setSplitPayments] = useState<{ method: string; amount: string }[]>([]);
   const [pendingPaymentConfirm, setPendingPaymentConfirm] = useState<{ methodId: string; detailsStr: string; label: string } | null>(null);
+  const [attendantInstallments, setAttendantInstallments] = useState(1);
+  const [attendantApplyFee, setAttendantApplyFee] = useState(true);
 
   useEffect(() => {
     if (!paymentModalData) {
@@ -999,44 +1001,149 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
               );
             })()}
 
-            {pendingPaymentConfirm ? (
-              <div className="flex flex-col items-center justify-center py-6 text-center animate-scale-up space-y-4 flex-1">
-                <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center text-amber-500 border border-amber-100 mb-2">
-                  <AlertTriangle size={32} className="animate-pulse" />
+            {pendingPaymentConfirm ? (() => {
+              const baseAmount = paymentModalData.totalAmount;
+              let feePercent = 0;
+              let feeAmount = 0;
+              let finalAmount = baseAmount;
+
+              if (settings.applyCardFeesOnLocalPayment && attendantApplyFee) {
+                if (pendingPaymentConfirm.methodId === 'CARTAO') {
+                  feePercent = (settings.creditInstallmentFees && settings.creditInstallmentFees[String(attendantInstallments)] !== undefined)
+                    ? Number(settings.creditInstallmentFees[String(attendantInstallments)])
+                    : (attendantInstallments === 1 ? 2.99 : +(2.99 + (attendantInstallments - 1) * 0.6).toFixed(2));
+                  feeAmount = +(baseAmount * (feePercent / 100)).toFixed(2);
+                  finalAmount = +(baseAmount + feeAmount).toFixed(2);
+                } else if (pendingPaymentConfirm.methodId === 'DEBITO') {
+                  feePercent = Number(settings.debitFeePercent || 0);
+                  feeAmount = feePercent > 0 ? +(baseAmount * (feePercent / 100)).toFixed(2) : 0;
+                  finalAmount = +(baseAmount + feeAmount).toFixed(2);
+                }
+              }
+
+              const resolvedDetailsStr = JSON.stringify([{
+                method: pendingPaymentConfirm.methodId,
+                amount: finalAmount,
+                originalAmount: baseAmount,
+                feeAmount,
+                feePercent,
+                installments: pendingPaymentConfirm.methodId === 'CARTAO' ? attendantInstallments : 1
+              }]);
+
+              return (
+                <div className="flex flex-col items-center justify-center py-4 text-center animate-scale-up space-y-3 flex-1 overflow-y-auto">
+                  <div className="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center text-amber-500 border border-amber-100">
+                    <AlertTriangle size={24} className="animate-pulse" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-black text-gray-800 uppercase tracking-wider">Confirmar Pagamento</h4>
+                    <p className="text-xs text-gray-500 leading-snug">
+                      Valor total a registrar:
+                    </p>
+                    <p className="text-2xl font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-xl inline-block mt-1">
+                      R$ {finalAmount.toFixed(2)}
+                    </p>
+                    <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mt-1">
+                      Via: {pendingPaymentConfirm.methodId === 'CARTAO' ? `Cartão Crédito (${attendantInstallments}x)` : pendingPaymentConfirm.methodId === 'DEBITO' ? 'Cartão Débito' : pendingPaymentConfirm.label}
+                    </p>
+                  </div>
+
+                  {/* Opções de parcelas para Cartão de Crédito */}
+                  {pendingPaymentConfirm.methodId === 'CARTAO' && (
+                    <div className="w-full bg-blue-50/70 p-3 rounded-2xl border border-blue-100 text-left space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-black uppercase text-blue-900">Parcelas no Crédito:</span>
+                        {settings.applyCardFeesOnLocalPayment && (
+                          <label className="flex items-center gap-1 cursor-pointer text-[9px] font-bold text-blue-800">
+                            <input 
+                              type="checkbox" 
+                              checked={attendantApplyFee} 
+                              onChange={e => setAttendantApplyFee(e.target.checked)} 
+                              className="rounded w-3 h-3 text-blue-600"
+                            />
+                            Repassar taxa
+                          </label>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-4 gap-1 max-h-32 overflow-y-auto p-0.5">
+                        {Array.from({ length: settings.maxCreditInstallments || 12 }, (_, idx) => idx + 1).map(i => {
+                          const rate = (settings.applyCardFeesOnLocalPayment && attendantApplyFee)
+                            ? ((settings.creditInstallmentFees && settings.creditInstallmentFees[String(i)] !== undefined)
+                              ? Number(settings.creditInstallmentFees[String(i)])
+                              : (i === 1 ? 2.99 : +(2.99 + (i - 1) * 0.6).toFixed(2)))
+                            : 0;
+                          const instTot = baseAmount * (1 + rate / 100);
+                          const isSel = attendantInstallments === i;
+                          return (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => setAttendantInstallments(i)}
+                              className={`p-1.5 rounded-lg border text-center transition-all ${
+                                isSel 
+                                  ? 'bg-blue-600 text-white border-blue-600 font-black shadow-sm' 
+                                  : 'bg-white text-gray-700 border-blue-100 text-[10px]'
+                              }`}
+                            >
+                              <div className="font-bold text-[11px]">{i}x</div>
+                              <div className="text-[9px] leading-tight">R$ {(instTot / i).toFixed(2)}</div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {feeAmount > 0 && (
+                        <p className="text-[10px] text-blue-700 font-bold text-center">
+                          Taxa maquininha (+{feePercent}%): +R$ {feeAmount.toFixed(2)}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Opções de taxa para Cartão de Débito */}
+                  {pendingPaymentConfirm.methodId === 'DEBITO' && settings.applyCardFeesOnLocalPayment && (
+                    <div className="w-full bg-teal-50 p-2.5 rounded-xl border border-teal-100 text-center space-y-1">
+                      <div className="flex justify-between items-center text-[10px] text-teal-900 font-bold">
+                        <span>Taxa Débito (+{settings.debitFeePercent || 0}%):</span>
+                        <label className="flex items-center gap-1 cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            checked={attendantApplyFee} 
+                            onChange={e => setAttendantApplyFee(e.target.checked)} 
+                            className="rounded w-3 h-3 text-teal-600"
+                          />
+                          <span>Repassar</span>
+                        </label>
+                      </div>
+                      {feeAmount > 0 && (
+                        <p className="text-[10px] text-teal-700 font-bold">
+                          Acréscimo: +R$ {feeAmount.toFixed(2)}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex w-full gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setPendingPaymentConfirm(null)}
+                      className="flex-1 py-3 px-4 border border-gray-200 text-gray-500 hover:bg-gray-50 font-black rounded-2xl text-xs uppercase transition-all tracking-wider"
+                    >
+                      Não, Voltar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        paymentModalData.onSuccess(pendingPaymentConfirm.methodId, resolvedDetailsStr);
+                        setPendingPaymentConfirm(null);
+                      }}
+                      className="flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-black rounded-2xl text-xs uppercase transition-all tracking-wider shadow-md"
+                    >
+                      Sim, Confirmar
+                    </button>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <h4 className="text-sm font-black text-gray-800 uppercase tracking-wider">Confirmar Pagamento?</h4>
-                  <p className="text-xs text-gray-500 leading-snug">
-                    Deseja mesmo registrar o pagamento de:
-                  </p>
-                  <p className="text-xl font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-xl inline-block mt-1">
-                    R$ {paymentModalData.totalAmount.toFixed(2)}
-                  </p>
-                  <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mt-1">
-                    Via: {pendingPaymentConfirm.label}
-                  </p>
-                </div>
-                <div className="flex w-full gap-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setPendingPaymentConfirm(null)}
-                    className="flex-1 py-3 px-4 border border-gray-200 text-gray-500 hover:bg-gray-50 font-black rounded-2xl text-xs uppercase transition-all tracking-wider"
-                  >
-                    Não, Voltar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      paymentModalData.onSuccess(pendingPaymentConfirm.methodId, pendingPaymentConfirm.detailsStr);
-                      setPendingPaymentConfirm(null);
-                    }}
-                    className="flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-black rounded-2xl text-xs uppercase transition-all tracking-wider shadow-md"
-                  >
-                    Sim, Confirmar
-                  </button>
-                </div>
-              </div>
-            ) : isSplitMode ? (
+              );
+            })() : isSplitMode ? (
               <div className="flex flex-col flex-1 overflow-hidden">
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 text-center">
                   Combinar Diferentes Meios
@@ -1360,6 +1467,7 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
               <p style={{ fontSize: '9pt' }}>SUBTOTAL: R$ {(printOrder.subtotal || (printOrder.total - (printOrder.serviceFee || 0) + (printOrder.discountAmount || 0))).toFixed(2)}</p>
               {printOrder.discountAmount ? <p style={{ fontSize: '9pt', color: '#000' }}>DESCONTO: -R$ {printOrder.discountAmount.toFixed(2)}</p> : null}
               {printOrder.serviceFee ? <p style={{ fontSize: '9pt', color: '#000' }}>COMISSÃO: R$ {printOrder.serviceFee.toFixed(2)}</p> : null}
+              {printOrder.cardFee && printOrder.cardFee > 0 ? <p style={{ fontSize: '9pt', color: '#000' }}>TAXA CARTÃO {printOrder.installments ? `(${printOrder.installments}x)` : ''}: +R$ {printOrder.cardFee.toFixed(2)}</p> : null}
               <p style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: '1mm' }}>TOTAL: R$ {printOrder.total.toFixed(2)}</p>
               <p style={{ fontSize: '8pt', marginTop: '1mm' }}>PAGAMENTO: {printOrder.paymentMethod || (printOrder.isConferencia ? 'A CONFERIR' : 'A DEFINIR')}</p>
               

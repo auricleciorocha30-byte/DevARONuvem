@@ -50,6 +50,8 @@ interface GroupedOrder {
   couponApplied?: string;
   discountAmount?: number;
   deliveryFee?: number;
+  cardFee?: number;
+  installments?: number;
   nfceReference?: string;
   nfceStatus?: string;
   scheduledTime?: string;
@@ -135,6 +137,8 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                 couponApplied: order.couponApplied,
                 discountAmount: order.discountAmount,
                 deliveryFee: order.deliveryFee,
+                cardFee: order.cardFee,
+                installments: order.installments,
                 nfceReference: order.nfce_reference,
                 nfceStatus: order.nfce_status,
                 scheduledTime: order.scheduledTime
@@ -610,8 +614,15 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                    <div className="p-2 bg-gray-50 rounded-lg">{getPaymentIcon(group.paymentMethod)}</div>
                    <div>
                       <p className="text-[8px] font-black text-gray-300 uppercase leading-none">Pagamento</p>
-                      <div className="flex items-center gap-1">
-                        <p className="text-[10px] font-bold text-gray-700 uppercase">{group.paymentMethod || 'A Definir'}</p>
+                      <div className="flex flex-col">
+                        <p className="text-[10px] font-bold text-gray-700 uppercase">
+                          {group.paymentMethod === 'CARTAO' && group.installments ? `Crédito (${group.installments}x)` : group.paymentMethod || 'A Definir'}
+                        </p>
+                        {group.cardFee && group.cardFee > 0 ? (
+                          <span className="text-[9px] text-blue-600 font-bold leading-tight">
+                            taxa: +R$ {group.cardFee.toFixed(2)}
+                          </span>
+                        ) : null}
                       </div>
                    </div>
                 </div>
@@ -830,6 +841,9 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                   ) : null}
                   {printOrder.deliveryFee ? (
                     <p style={{ fontSize: '9pt', color: '#000' }}>TAXA DE ENTREGA: R$ {printOrder.deliveryFee.toFixed(2)}</p>
+                  ) : null}
+                  {printOrder.cardFee ? (
+                    <p style={{ fontSize: '9pt', color: '#000' }}>TAXA CARTÃO {printOrder.installments ? `(${printOrder.installments}x)` : ''}: +R$ {printOrder.cardFee.toFixed(2)}</p>
                   ) : null}
                   <p style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: '1mm' }}>TOTAL: R$ {printOrder.total.toFixed(2)}</p>
                   <p style={{ fontSize: '8pt', marginTop: '1mm' }}>PAGAMENTO: {printOrder.paymentMethod || 'A DEFINIR'}</p>

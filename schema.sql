@@ -78,5 +78,17 @@ CREATE TABLE IF NOT EXISTS orders (
     waitstaffName TEXT,
     couponApplied TEXT,
     discountAmount REAL,
-    customerCpf TEXT
+    customerCpf TEXT,
+    cardFee REAL,
+    installments INTEGER,
+    paymentDetails TEXT,
+    session_id TEXT,
+    stockDeducted INTEGER DEFAULT 1
 );
+
+-- Índices de Alto Desempenho para Economia de Leituras e Buscas
+CREATE INDEX IF NOT EXISTS idx_orders_store_created ON orders (store_id, createdAt DESC);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders (store_id, status);
+CREATE INDEX IF NOT EXISTS idx_products_store ON products (store_id, isActive);
+CREATE INDEX IF NOT EXISTS idx_customers_store_phone ON customers (store_id, phone);
+CREATE INDEX IF NOT EXISTS idx_categories_store ON categories (store_id);

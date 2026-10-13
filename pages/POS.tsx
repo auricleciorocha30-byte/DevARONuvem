@@ -84,6 +84,10 @@ interface POSProps {
 interface Payment {
   method: PaymentMethod;
   amount: number;
+  originalAmount?: number;
+  feeAmount?: number;
+  feePercent?: number;
+  installments?: number;
 }
 
 export default function POS({ storeId, user, settings, orders, products: propProducts, onLogout, updateStatus, isOffline, ecosystemUsage, refreshEcosystemUsage }: POSProps) {
@@ -172,6 +176,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
   const [currentPaymentMethod, setCurrentPaymentMethod] = useState<PaymentMethod>('DINHEIRO');
   const [currentPaymentAmount, setCurrentPaymentAmount] = useState('');
   const [installments, setInstallments] = useState(1);
+  const [applyCardFee, setApplyCardFee] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPointProcessing, setIsPointProcessing] = useState(false);
   const [isOnlineProcessing, setIsOnlineProcessing] = useState(false);
@@ -1712,7 +1717,8 @@ export default function POS({ storeId, user, settings, orders, products: propPro
       ? adjustedLoadedServiceFee + (newItemsSubtotal * (commissionRate / 100))
       : 0;
 
-  const total = Math.max(0, subtotal - rouletteDiscountAmount) + serviceFee + (orderType === 'ENTREGA' ? (deliveryFee || 0) : 0);
+  const totalCardFee = payments.reduce((acc, p) => acc + (p.feeAmount || 0), 0);
+  const total = Math.max(0, subtotal - rouletteDiscountAmount) + serviceFee + (orderType === 'ENTREGA' ? (deliveryFee || 0) : 0) + totalCardFee;
   const totalPaid = payments.reduce((acc, p) => acc + (p.amount || 0), 0);
   const remaining = Math.max(0, total - totalPaid);
   const change = Math.max(0, totalPaid - total);
@@ -1724,10 +1730,38 @@ export default function POS({ storeId, user, settings, orders, products: propPro
   }, [total, isCheckoutOpen, remaining]);
 
   const handleAddPayment = () => {
-    const amount = parseFloat(currentPaymentAmount);
-    if (isNaN(amount) || amount <= 0) return;
+    const rawAmount = parseFloat(currentPaymentAmount);
+    if (isNaN(rawAmount) || rawAmount <= 0) return;
 
-    setPayments(prev => [...prev, { method: currentPaymentMethod, amount }]);
+    let feePercent = 0;
+    let feeAmount = 0;
+    let finalAmount = rawAmount;
+    let numInstallments = 1;
+
+    if (settings.applyCardFeesOnLocalPayment && applyCardFee) {
+      if (currentPaymentMethod === 'CARTAO') {
+        numInstallments = installments || 1;
+        feePercent = (settings.creditInstallmentFees && settings.creditInstallmentFees[String(numInstallments)] !== undefined)
+          ? Number(settings.creditInstallmentFees[String(numInstallments)])
+          : (numInstallments === 1 ? 2.99 : +(2.99 + (numInstallments - 1) * 0.6).toFixed(2));
+        feeAmount = +(rawAmount * (feePercent / 100)).toFixed(2);
+        finalAmount = +(rawAmount + feeAmount).toFixed(2);
+      } else if (currentPaymentMethod === 'DEBITO') {
+        numInstallments = 1;
+        feePercent = Number(settings.debitFeePercent || 0);
+        feeAmount = feePercent > 0 ? +(rawAmount * (feePercent / 100)).toFixed(2) : 0;
+        finalAmount = +(rawAmount + feeAmount).toFixed(2);
+      }
+    }
+
+    setPayments(prev => [...prev, { 
+      method: currentPaymentMethod, 
+      amount: finalAmount,
+      originalAmount: rawAmount,
+      feeAmount,
+      feePercent,
+      installments: currentPaymentMethod === 'CARTAO' ? numInstallments : 1
+    }]);
     setCurrentPaymentAmount('');
   };
 
@@ -2381,7 +2415,9 @@ export default function POS({ storeId, user, settings, orders, products: propPro
         hasReturn: orderType === 'ENTREGA' ? (deliveryDetails.hasReturn ? 1 : 0) : undefined,
         returnStatus: orderType === 'ENTREGA' && deliveryDetails.hasReturn ? 'PENDING' : undefined,
         couponApplied: rouletteDiscountPercentagePos > 0 ? `Roleta POS: ${rouletteDiscountPercentagePos}% Desconto` : undefined,
-        discountAmount: rouletteDiscountPercentagePos > 0 ? rouletteDiscountAmount : undefined
+        discountAmount: rouletteDiscountPercentagePos > 0 ? rouletteDiscountAmount : undefined,
+        cardFee: totalCardFee > 0 ? totalCardFee : undefined,
+        installments: (finalPayments.find((p: any) => p.installments)?.installments) || 1
       };
 
       if (isContingencyMode) {
@@ -3167,6 +3203,13 @@ export default function POS({ storeId, user, settings, orders, products: propPro
         </div>
         <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
         ` : ''}
+        ${order.cardFee && order.cardFee > 0 ? `
+        <div style="display: flex; justify-content: space-between; color: black !important;">
+          <span>Taxa Cartao ${order.installments ? `(${order.installments}x)` : ''}</span>
+          <span>${formatCurrency(order.cardFee)}</span>
+        </div>
+        <div style="border-top: 1px dashed black; margin: 5px 0;"></div>
+        ` : ''}
         <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 16px; margin: 5px 0; color: black !important;">
           <span>TOTAL</span>
           <span>${formatCurrency(order.total)}</span>
@@ -3175,7 +3218,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
             if (order.paymentMethod === 'MISTO' && order.paymentDetails) {
                 try {
                     const details = JSON.parse(order.paymentDetails);
-                    let paymentInfo = `<p style="margin: 2px 0; color: black !important;">Pagamento:</p>` + details.map((p: any) => `<p style="margin: 0 0 0 10px; color: black !important;">${p.method}: ${formatCurrency(p.amount)}</p>`).join('');
+                    let paymentInfo = `<p style="margin: 2px 0; color: black !important;">Pagamento:</p>` + details.map((p: any) => `<p style="margin: 0 0 0 10px; color: black !important;">${p.method === 'CARTAO' && p.installments ? `Cartão Crédito (${p.installments}x)` : p.method}: ${formatCurrency(p.amount)}${p.feeAmount ? ` (taxa: ${formatCurrency(p.feeAmount)})` : ''}</p>`).join('');
                     
                     const aPagar = details.find((p: any) => p.method === 'A_PAGAR');
                     if (aPagar && aPagar.amount > 0) {
@@ -3184,7 +3227,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                     return paymentInfo;
                 } catch (e) {}
             }
-            return `<p style="margin: 2px 0; color: black !important;">Pagamento: ${order.paymentMethod}</p>`;
+            return `<p style="margin: 2px 0; color: black !important;">Pagamento: ${order.paymentMethod === 'CARTAO' && order.installments ? `Cartão Crédito (${order.installments}x)` : order.paymentMethod}</p>`;
         })()}
         ${order.changeFor ? `<p style="margin: 1px 0; color: black !important;">Pago em Dinheiro: ${formatCurrency(order.changeFor)}</p><p style="margin: 1px 0; color: black !important;">Troco: ${formatCurrency(order.changeFor - order.total)}</p>` : ''}
         <div style="border-top: 2px dashed black; margin: 10px 0;"></div>
@@ -4572,7 +4615,12 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                                               {p.method === 'PIX' && <QrCode size={14} className="text-purple-600" />}
                                               {p.method === 'CASHBACK' && <Award size={14} className="text-orange-500" />}
                                               {p.method === 'MAQUININHA' && <Zap size={14} className="text-blue-600" />}
-                                              <span className="font-extrabold text-[11px]">{p.method === 'CASHBACK' ? 'CASHBACK' : p.method === 'A_PAGAR' ? 'NÃO PAGO' : p.method}</span>
+                                              <div className="flex flex-col">
+                                                  <span className="font-extrabold text-[11px]">{p.method === 'CARTAO' ? `CRÉDITO ${p.installments ? `(${p.installments}x)` : ''}` : p.method === 'DEBITO' ? 'DÉBITO' : p.method === 'CASHBACK' ? 'CASHBACK' : p.method === 'A_PAGAR' ? 'NÃO PAGO' : p.method}</span>
+                                                  {p.feeAmount && p.feeAmount > 0 ? (
+                                                      <span className="text-[9px] text-blue-600 font-bold leading-none">taxa +{formatCurrency(p.feeAmount)} ({p.feePercent}%)</span>
+                                                  ) : null}
+                                              </div>
                                           </div>
                                           <div className="flex items-center gap-2">
                                               <span className="font-black text-xs text-gray-800">{formatCurrency(p.amount)}</span>
@@ -4715,16 +4763,128 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                                        </div>
                                    )}
                                    
-                                   {currentPaymentMethod === 'CARTAO' && currentPaymentAmount && !isNaN(parseFloat(currentPaymentAmount)) && (
-                                       <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 text-xs text-blue-800 space-y-1">
-                                           <p className="font-bold uppercase">Simulação de Parcelamento</p>
-                                           <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                                               {[1, 2, 3, 4, 5, 6].map(i => (
-                                                   <div key={i} className="bg-white p-1 rounded border border-blue-100 text-center text-[11px]">
-                                                       <span className="font-bold">{i}x</span> {formatCurrency(parseFloat(currentPaymentAmount) / i)}
-                                                   </div>
-                                               ))}
+                                   {currentPaymentMethod === 'CARTAO' && currentPaymentAmount && !isNaN(parseFloat(currentPaymentAmount)) && parseFloat(currentPaymentAmount) > 0 && (
+                                       <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 text-xs text-blue-900 space-y-2.5">
+                                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                                               <p className="font-black uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                                                   <CreditCard size={14} className="text-blue-600" />
+                                                   Parcelamento no Cartão de Crédito
+                                               </p>
+                                               {settings.applyCardFeesOnLocalPayment && (
+                                                   <label className="flex items-center gap-1.5 cursor-pointer select-none bg-white px-2 py-1 rounded-lg border border-blue-200">
+                                                       <input 
+                                                           type="checkbox" 
+                                                           checked={applyCardFee} 
+                                                           onChange={e => setApplyCardFee(e.target.checked)}
+                                                           className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                                                       />
+                                                       <span className="text-[10px] font-bold text-blue-800">Repassar taxa da maquininha</span>
+                                                   </label>
+                                               )}
                                            </div>
+
+                                           <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-1.5 max-h-36 overflow-y-auto p-0.5">
+                                               {Array.from({ length: settings.maxCreditInstallments || 12 }, (_, idx) => idx + 1).map(i => {
+                                                   const baseVal = parseFloat(currentPaymentAmount);
+                                                   const feePercent = (settings.applyCardFeesOnLocalPayment && applyCardFee)
+                                                       ? ((settings.creditInstallmentFees && settings.creditInstallmentFees[String(i)] !== undefined)
+                                                           ? Number(settings.creditInstallmentFees[String(i)])
+                                                           : (i === 1 ? 2.99 : +(2.99 + (i - 1) * 0.6).toFixed(2)))
+                                                       : 0;
+                                                   const feeVal = feePercent > 0 ? +(baseVal * (feePercent / 100)).toFixed(2) : 0;
+                                                   const totalVal = baseVal + feeVal;
+                                                   const instVal = totalVal / i;
+                                                   const isSelected = installments === i;
+
+                                                   return (
+                                                       <button
+                                                           key={i}
+                                                           type="button"
+                                                           onClick={() => setInstallments(i)}
+                                                           className={`p-2 rounded-xl border text-center transition-all ${
+                                                               isSelected 
+                                                                   ? 'bg-blue-600 border-blue-600 text-white shadow-sm ring-2 ring-blue-300' 
+                                                                   : 'bg-white border-blue-100 hover:border-blue-300 text-gray-700'
+                                                           }`}
+                                                       >
+                                                           <div className="font-black text-xs">{i}x</div>
+                                                           <div className={`text-[10px] font-bold leading-tight ${isSelected ? 'text-blue-100' : 'text-gray-900'}`}>
+                                                               {formatCurrency(instVal)}
+                                                           </div>
+                                                           {feePercent > 0 && (
+                                                               <div className={`text-[8px] font-semibold mt-0.5 ${isSelected ? 'text-blue-200' : 'text-blue-600'}`}>
+                                                                   +{feePercent}%
+                                                               </div>
+                                                           )}
+                                                       </button>
+                                                   );
+                                               })}
+                                           </div>
+
+                                           {(() => {
+                                               const baseVal = parseFloat(currentPaymentAmount);
+                                               const feePercent = (settings.applyCardFeesOnLocalPayment && applyCardFee)
+                                                   ? ((settings.creditInstallmentFees && settings.creditInstallmentFees[String(installments)] !== undefined)
+                                                       ? Number(settings.creditInstallmentFees[String(installments)])
+                                                       : (installments === 1 ? 2.99 : +(2.99 + (installments - 1) * 0.6).toFixed(2)))
+                                                   : 0;
+                                               const feeVal = feePercent > 0 ? +(baseVal * (feePercent / 100)).toFixed(2) : 0;
+                                               const totalVal = baseVal + feeVal;
+                                               const instVal = totalVal / (installments || 1);
+
+                                               return (
+                                                   <div className="bg-white p-2 rounded-xl border border-blue-200 flex flex-wrap justify-between items-center text-[11px] font-bold text-blue-900">
+                                                       <span>Cobrança: <strong>{installments}x de {formatCurrency(instVal)}</strong></span>
+                                                       {feeVal > 0 ? (
+                                                           <span className="text-blue-700 font-extrabold">
+                                                               Taxa ({feePercent}%): +{formatCurrency(feeVal)} | Total: {formatCurrency(totalVal)}
+                                                           </span>
+                                                       ) : (
+                                                           <span className="text-gray-500">Sem taxa aplicada (Total: {formatCurrency(totalVal)})</span>
+                                                       )}
+                                                   </div>
+                                               );
+                                           })()}
+                                       </div>
+                                   )}
+
+                                   {currentPaymentMethod === 'DEBITO' && currentPaymentAmount && !isNaN(parseFloat(currentPaymentAmount)) && parseFloat(currentPaymentAmount) > 0 && settings.applyCardFeesOnLocalPayment && (
+                                       <div className="p-3 bg-teal-50 rounded-xl border border-teal-100 text-xs text-teal-900 space-y-2">
+                                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                                               <p className="font-black uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                                                   <CreditCard size={14} className="text-teal-600" />
+                                                   Taxa de Cartão de Débito
+                                               </p>
+                                               <label className="flex items-center gap-1.5 cursor-pointer select-none bg-white px-2 py-1 rounded-lg border border-teal-200">
+                                                   <input 
+                                                       type="checkbox" 
+                                                       checked={applyCardFee} 
+                                                       onChange={e => setApplyCardFee(e.target.checked)}
+                                                       className="rounded text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
+                                                   />
+                                                   <span className="text-[10px] font-bold text-teal-800">Repassar taxa de débito</span>
+                                               </label>
+                                           </div>
+
+                                           {(() => {
+                                               const baseVal = parseFloat(currentPaymentAmount);
+                                               const feePercent = applyCardFee ? Number(settings.debitFeePercent || 0) : 0;
+                                               const feeVal = feePercent > 0 ? +(baseVal * (feePercent / 100)).toFixed(2) : 0;
+                                               const totalVal = baseVal + feeVal;
+
+                                               return (
+                                                   <div className="bg-white p-2 rounded-xl border border-teal-200 flex flex-wrap justify-between items-center text-[11px] font-bold text-teal-900">
+                                                       <span>Total no Débito: <strong>{formatCurrency(totalVal)}</strong></span>
+                                                       {feeVal > 0 ? (
+                                                           <span className="text-teal-700 font-extrabold">
+                                                               Taxa Débito ({feePercent}%): +{formatCurrency(feeVal)}
+                                                           </span>
+                                                       ) : (
+                                                           <span className="text-gray-500">Sem taxa aplicada</span>
+                                                       )}
+                                                   </div>
+                                               );
+                                           })()}
                                        </div>
                                    )}
                                </div>

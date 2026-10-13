@@ -475,6 +475,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
 
   const [manualTable, setManualTable] = useState(effectiveTable || '');
   const [payment, setPayment] = useState<PaymentMethod | 'CASHBACK' | ''>('');
+  const [creditInstallments, setCreditInstallments] = useState(1);
   const [combinedPayment, setCombinedPayment] = useState<PaymentMethod | ''>('');
   const [changeFor, setChangeFor] = useState<string>('');
   const [notes, setNotes] = useState('');
@@ -1073,7 +1074,24 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
 
   const commissionRate = (isWaitstaff && (activeWaitstaff?.role === 'ATENDENTE' || activeWaitstaff?.role === 'GERENTE') && settings.waitstaffCommissions?.[activeWaitstaff.id]) || 0;
   const serviceFee = (orderType === 'MESA' || orderType === 'COMANDA') ? cartTotalWithDiscount * (commissionRate / 100) : 0;
-  const finalTotal = cartTotalWithDiscount + serviceFee + (orderType === 'ENTREGA' && deliveryFee ? deliveryFee : 0);
+  const baseOrderTotal = cartTotalWithDiscount + serviceFee + (orderType === 'ENTREGA' && deliveryFee ? deliveryFee : 0);
+
+  const cardFeeAmount = useMemo(() => {
+    if (!settings.applyCardFeesOnLocalPayment) return 0;
+    if (payment === 'CARTAO') {
+      const feePercent = (settings.creditInstallmentFees && settings.creditInstallmentFees[String(creditInstallments)] !== undefined)
+        ? Number(settings.creditInstallmentFees[String(creditInstallments)])
+        : (creditInstallments === 1 ? 2.99 : +(2.99 + (creditInstallments - 1) * 0.6).toFixed(2));
+      return +(baseOrderTotal * (feePercent / 100)).toFixed(2);
+    }
+    if (payment === 'DEBITO') {
+      const feePercent = Number(settings.debitFeePercent || 0);
+      return feePercent > 0 ? +(baseOrderTotal * (feePercent / 100)).toFixed(2) : 0;
+    }
+    return 0;
+  }, [settings.applyCardFeesOnLocalPayment, settings.creditInstallmentFees, settings.debitFeePercent, payment, creditInstallments, baseOrderTotal]);
+
+  const finalTotal = baseOrderTotal + cardFeeAmount;
 
   const handleCheckout = async () => {
     if (cart.length === 0) return;
@@ -1244,7 +1262,16 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
         } else if (payment === 'A_PAGAR') {
             paymentDetailsArray.push({ method: 'A_PAGAR', amount: finalTotal });
         } else {
-            paymentDetailsArray.push({ method: payment, amount: finalTotal });
+            paymentDetailsArray.push({ 
+                method: payment, 
+                amount: finalTotal,
+                originalAmount: baseOrderTotal,
+                feeAmount: cardFeeAmount,
+                feePercent: payment === 'CARTAO' 
+                  ? ((settings.creditInstallmentFees && settings.creditInstallmentFees[String(creditInstallments)] !== undefined) ? Number(settings.creditInstallmentFees[String(creditInstallments)]) : (creditInstallments === 1 ? 2.99 : +(2.99 + (creditInstallments - 1) * 0.6).toFixed(2)))
+                  : (payment === 'DEBITO' ? Number(settings.debitFeePercent || 0) : 0),
+                installments: payment === 'CARTAO' ? creditInstallments : 1
+            });
         }
 
         if (settings.isCashbackActive && finalCustomerId) {
@@ -1386,6 +1413,8 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
               waitstaffName: activeWaitstaff?.name || undefined,
               couponApplied: rouletteDiscountPercentage > 0 ? `Roleta: ${rouletteDiscountPercentage}% Desconto` : undefined,
               discountAmount: rouletteDiscountPercentage > 0 ? rouletteDiscountAmount : undefined,
+              cardFee: cardFeeAmount > 0 ? cardFeeAmount : undefined,
+              installments: payment === 'CARTAO' ? creditInstallments : 1,
               stockDeducted: true,
               scheduledTime: isSchedulingMode && selectedScheduledDate && selectedScheduledTime 
                 ? `${selectedScheduledDate.split('-').reverse().join('/')} às ${selectedScheduledTime}` 
@@ -2310,8 +2339,8 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                   return settings.digitalMenuPaymentMethods.includes(m.id as any);
                                 }
                                 
-                                // Default hide DEBITO as it's redundant with CARTAO usually
-                                if (m.id === 'DEBITO') return false;
+                                // Allow DEBITO if card fees active or explicitly configured in digitalMenuPaymentMethods
+                                if (m.id === 'DEBITO' && !settings.applyCardFeesOnLocalPayment && (!settings.digitalMenuPaymentMethods || !settings.digitalMenuPaymentMethods.includes('DEBITO'))) return false;
                                 
                                 return true;
                               })
@@ -2349,7 +2378,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                     if (settings.digitalMenuPaymentMethods && settings.digitalMenuPaymentMethods.length > 0) {
                                       return settings.digitalMenuPaymentMethods.includes(m.id as any);
                                     }
-                                    if (m.id === 'DEBITO') return false;
+                                    if (m.id === 'DEBITO' && !settings.applyCardFeesOnLocalPayment && (!settings.digitalMenuPaymentMethods || !settings.digitalMenuPaymentMethods.includes('DEBITO'))) return false;
                                     return true;
                                   }).map(m => (
                                    <button key={m.id} onClick={() => setCombinedPayment(m.id as any)} className={`flex flex-col items-center justify-center w-[100px] h-[80px] gap-2 p-2 rounded-2xl border transition-all ${combinedPayment === m.id ? 'bg-primary border-primary text-white shadow-lg' : 'bg-white border-gray-100 text-gray-400'}`}>
@@ -2365,6 +2394,69 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                            <div className="space-y-2 animate-scale-up">
                               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Troco para quanto?</label>
                               <input type="number" value={changeFor} onChange={e => setChangeFor(e.target.value)} className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none font-bold" placeholder="Deixe vazio se não precisar" />
+                           </div>
+                        )}
+
+                        {payment === 'CARTAO' && (
+                           <div className="space-y-2 animate-scale-up bg-blue-50/70 p-4 rounded-2xl border border-blue-100">
+                              <div className="flex justify-between items-center mb-1">
+                                 <label className="text-[10px] font-black text-blue-900 uppercase tracking-widest flex items-center gap-1.5">
+                                    <CreditCard size={14} className="text-blue-600" />
+                                    Parcelamento no Cartão
+                                 </label>
+                                 <span className="text-[10px] text-blue-700 font-extrabold">
+                                    {creditInstallments}x de R$ {(finalTotal / creditInstallments).toFixed(2)}
+                                 </span>
+                              </div>
+                              <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 max-h-40 overflow-y-auto p-0.5">
+                                 {Array.from({ length: settings.maxCreditInstallments || 12 }, (_, idx) => idx + 1).map(i => {
+                                    const feeRate = (settings.applyCardFeesOnLocalPayment)
+                                       ? ((settings.creditInstallmentFees && settings.creditInstallmentFees[String(i)] !== undefined)
+                                          ? Number(settings.creditInstallmentFees[String(i)])
+                                          : (i === 1 ? 2.99 : +(2.99 + (i - 1) * 0.6).toFixed(2)))
+                                       : 0;
+                                    const instVal = (baseOrderTotal * (1 + feeRate / 100)) / i;
+                                    const isSel = creditInstallments === i;
+                                    return (
+                                       <button
+                                          key={i}
+                                          type="button"
+                                          onClick={() => setCreditInstallments(i)}
+                                          className={`p-2 rounded-xl border text-center transition-all ${
+                                             isSel 
+                                                ? 'bg-blue-600 border-blue-600 text-white shadow-sm ring-1 ring-blue-300' 
+                                                : 'bg-white border-blue-100 text-gray-700 hover:border-blue-300'
+                                          }`}
+                                       >
+                                          <div className="font-black text-xs">{i}x</div>
+                                          <div className={`text-[9px] font-bold ${isSel ? 'text-blue-100' : 'text-gray-900'}`}>
+                                             R$ {instVal.toFixed(2)}
+                                          </div>
+                                          {feeRate > 0 && (
+                                             <div className={`text-[8px] ${isSel ? 'text-blue-200' : 'text-blue-600'} font-semibold mt-0.5`}>
+                                                +{feeRate}%
+                                             </div>
+                                          )}
+                                       </button>
+                                    );
+                                 })}
+                              </div>
+                              {cardFeeAmount > 0 && (
+                                 <div className="p-2 bg-white rounded-xl border border-blue-100 text-center">
+                                    <p className="text-[10px] text-blue-700 font-bold">
+                                       Taxa da maquininha: <strong>+R$ {cardFeeAmount.toFixed(2)}</strong> | Total no cartão: <strong>R$ {finalTotal.toFixed(2)}</strong>
+                                    </p>
+                                 </div>
+                              )}
+                           </div>
+                        )}
+
+                        {payment === 'DEBITO' && cardFeeAmount > 0 && (
+                           <div className="p-3 bg-teal-50 border border-teal-100 rounded-2xl animate-scale-up text-center">
+                              <p className="text-[11px] font-bold text-teal-800">
+                                 Cartão de Débito com taxa da maquininha (+{settings.debitFeePercent}%): 
+                                 <strong className="text-teal-900 ml-1">+R$ {cardFeeAmount.toFixed(2)}</strong>
+                              </p>
                            </div>
                         )}
 
@@ -2536,6 +2628,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                     {rouletteDiscountPercentage > 0 && <div className="flex justify-between text-xs text-secondary font-bold"><span>Desconto Roleta ({rouletteDiscountPercentage}%)</span><span>-R$ {rouletteDiscountAmount.toFixed(2)}</span></div>}
                     {serviceFee > 0 && <div className="flex justify-between text-xs text-secondary font-bold"><span>Comissão ({commissionRate > 0 ? `${commissionRate}%` : 'Atendente'})</span><span>R$ {serviceFee.toFixed(2)}</span></div>}
                     {orderType === 'ENTREGA' && deliveryFee !== null && <div className="flex justify-between text-xs text-secondary font-bold"><span>Taxa de Entrega (Itens + Taxa)</span><span>R$ {deliveryFee.toFixed(2)} (R$ {(cartTotal + deliveryFee).toFixed(2)})</span></div>}
+                    {cardFeeAmount > 0 && <div className="flex justify-between text-xs text-secondary font-bold"><span>Taxa Cartão {payment === 'CARTAO' ? `(${creditInstallments}x)` : '(Débito)'}</span><span>+R$ {cardFeeAmount.toFixed(2)}</span></div>}
                     <div className="flex justify-between items-end pt-2">
                        <span className="text-sm font-bold uppercase tracking-widest">Total</span>
                        <span className="text-3xl font-black text-secondary">R$ {finalTotal.toFixed(2)}</span>

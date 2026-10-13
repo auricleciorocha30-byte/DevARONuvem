@@ -383,7 +383,29 @@ function StoreContext() {
       deliveryFee: Number(dbOrder.deliveryFee || dbOrder.deliveryfee || dbOrder.delivery_fee || 0),
       serviceFee: Number(dbOrder.serviceFee || dbOrder.servicefee || dbOrder.service_fee || 0),
       originAddress: dbOrder.originAddress || dbOrder.originaddress || dbOrder.origin_address,
-      customerId: dbOrder.customerId || dbOrder.customerid || dbOrder.customer_id,
+      cardFee: Number(dbOrder.cardFee || dbOrder.cardfee || dbOrder.card_fee || (() => {
+        if (dbOrder.paymentDetails) {
+          try {
+            const parsed = JSON.parse(dbOrder.paymentDetails);
+            if (Array.isArray(parsed)) {
+              return parsed.reduce((acc: number, p: any) => acc + (Number(p.feeAmount) || 0), 0);
+            }
+          } catch (e) {}
+        }
+        return 0;
+      })()),
+      installments: dbOrder.installments || dbOrder.installments_count || (() => {
+        if (dbOrder.paymentDetails) {
+          try {
+            const parsed = JSON.parse(dbOrder.paymentDetails);
+            if (Array.isArray(parsed)) {
+              const cardP = parsed.find((p: any) => p.installments);
+              if (cardP) return Number(cardP.installments);
+            }
+          } catch (e) {}
+        }
+        return undefined;
+      })(),
       stockDeducted: dbOrder.stockDeducted === 1 || dbOrder.stockdeducted === 1 || dbOrder.stock_deducted === 1 || dbOrder.stockDeducted === true || dbOrder.stockdeducted === true || dbOrder.stock_deducted === true,
       hasReturn: dbOrder.hasReturn === 1 || dbOrder.hasreturn === 1 || dbOrder.has_return === 1 || dbOrder.hasReturn === true || dbOrder.hasreturn === true || dbOrder.has_return === true,
       returnStatus: dbOrder.returnStatus || dbOrder.returnstatus || dbOrder.return_status
@@ -831,6 +853,22 @@ function StoreContext() {
           }
           if (paymentDetails) {
               updatePayload.paymentDetails = paymentDetails;
+              try {
+                  const parsed = JSON.parse(paymentDetails);
+                  if (Array.isArray(parsed)) {
+                      const totalFees = parsed.reduce((acc: number, p: any) => acc + (Number(p.feeAmount) || 0), 0);
+                      if (totalFees > 0) {
+                          updatePayload.cardFee = totalFees;
+                          if (order) {
+                              updatePayload.total = Number(order.total || 0) + totalFees;
+                          }
+                      }
+                      const cardP = parsed.find((p: any) => p.installments);
+                      if (cardP) {
+                          updatePayload.installments = Number(cardP.installments);
+                      }
+                  }
+              } catch (e) {}
           }
           
           if ((status === 'ENTREGUE') && !id.startsWith('local_')) {
@@ -934,6 +972,22 @@ function StoreContext() {
           }
           if (paymentDetails) {
               updatePayload.paymentDetails = paymentDetails;
+              try {
+                  const parsed = JSON.parse(paymentDetails);
+                  if (Array.isArray(parsed)) {
+                      const totalFees = parsed.reduce((acc: number, p: any) => acc + (Number(p.feeAmount) || 0), 0);
+                      if (totalFees > 0) {
+                          updatePayload.cardFee = totalFees;
+                          if (order) {
+                              updatePayload.total = Number(order.total || 0) + totalFees;
+                          }
+                      }
+                      const cardP = parsed.find((p: any) => p.installments);
+                      if (cardP) {
+                          updatePayload.installments = Number(cardP.installments);
+                      }
+                  }
+              } catch (e) {}
           }
           
           if ((status === 'ENTREGUE') && !id.startsWith('local_')) {
