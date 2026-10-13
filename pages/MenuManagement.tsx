@@ -124,8 +124,55 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [editingCategoryValue, setEditingCategoryValue] = useState('');
   const [isSavingCategoryEdit, setIsSavingCategoryEdit] = useState(false);
+  const [isAddingCategoryInline, setIsAddingCategoryInline] = useState(false);
+  const [inlineCategoryName, setInlineCategoryName] = useState('');
+  const [isSavingInlineCategory, setIsSavingInlineCategory] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [productTab, setProductTab] = useState<'INFO' | 'OPCOES'>('INFO');
+
+  const handleCreateCategoryInline = async () => {
+    const trimmed = inlineCategoryName.trim();
+    if (!trimmed) return;
+
+    if (categories.some(c => c.toLowerCase() === trimmed.toLowerCase())) {
+      const existing = categories.find(c => c.toLowerCase() === trimmed.toLowerCase()) || trimmed;
+      setEditingProduct(prev => prev ? { ...prev, category: existing } : prev);
+      setIsAddingCategoryInline(false);
+      setInlineCategoryName('');
+      return;
+    }
+
+    if (!storeId) {
+      alert("Erro: Loja não identificada. Recarregue a página.");
+      return;
+    }
+
+    setIsSavingInlineCategory(true);
+    try {
+      const { error } = await supabase.from('categories').insert([{ name: trimmed, store_id: storeId }]);
+      if (error) {
+        if (String(error.code) === '23505' || String(error).includes('UNIQUE constraint failed') || error.message?.includes('UNIQUE constraint failed')) {
+          if (!categories.includes(trimmed)) {
+            setCategories([...categories, trimmed]);
+          }
+        } else {
+          throw error;
+        }
+      } else {
+        setCategories([...categories, trimmed]);
+        if (onCategoryChange) onCategoryChange();
+      }
+
+      setEditingProduct(prev => prev ? { ...prev, category: trimmed } : prev);
+      setIsAddingCategoryInline(false);
+      setInlineCategoryName('');
+    } catch (err: any) {
+      console.error(err);
+      alert(`Erro ao adicionar categoria: ${err.message}`);
+    } finally {
+      setIsSavingInlineCategory(false);
+    }
+  };
 
   const [isSearchingBarcode, setIsSearchingBarcode] = useState(false);
 
@@ -896,7 +943,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
           <div className="bg-white w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-scale-up">
             <div className="p-6 border-b flex items-center justify-between bg-gray-50">
               <h2 className="text-xl font-bold">{editingProduct?.id ? 'Editar Produto' : 'Cadastrar Produto'}</h2>
-              <button onClick={() => setShowProductModal(false)} className="text-gray-400 p-2 hover:bg-gray-100 rounded-full transition-colors"><X /></button>
+              <button onClick={() => { setShowProductModal(false); setIsAddingCategoryInline(false); setInlineCategoryName(''); }} className="text-gray-400 p-2 hover:bg-gray-100 rounded-full transition-colors"><X /></button>
             </div>
             
             <div className="flex border-b">
@@ -1065,10 +1112,92 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                   <input type="number" step={editingProduct?.isByWeight ? "0.001" : "1"} value={editingProduct?.stock ?? ''} onFocus={(e) => e.target.select()} onChange={(e) => setEditingProduct({...editingProduct, stock: e.target.value === '' ? undefined : parseFloat(e.target.value)})} className="w-full p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500" placeholder="Opcional" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Categoria</label>
-                  <select required value={editingProduct?.category || ''} onChange={(e) => setEditingProduct({...editingProduct, category: e.target.value})} className="w-full p-2 border border-gray-200 rounded-lg bg-white outline-none">
-                      {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                  </select>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-gray-500 uppercase">Categoria</label>
+                    {!isAddingCategoryInline && (
+                      <button
+                        type="button"
+                        onClick={() => setIsAddingCategoryInline(true)}
+                        className="text-[10px] font-bold text-orange-600 hover:text-orange-700 flex items-center gap-0.5 transition-colors hover:underline"
+                      >
+                        <Plus size={11} className="stroke-[3]" />
+                        <span>Nova</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {isAddingCategoryInline ? (
+                    <div className="space-y-1.5 animate-scale-up">
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="text"
+                          autoFocus
+                          placeholder="Nome da categoria..."
+                          value={inlineCategoryName}
+                          onChange={(e) => setInlineCategoryName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleCreateCategoryInline();
+                            } else if (e.key === 'Escape') {
+                              e.preventDefault();
+                              setIsAddingCategoryInline(false);
+                              setInlineCategoryName('');
+                            }
+                          }}
+                          className="flex-1 p-2 border-2 border-orange-500 rounded-lg outline-none text-xs font-bold bg-white focus:ring-2 focus:ring-orange-200"
+                        />
+                        <button
+                          type="button"
+                          disabled={isSavingInlineCategory || !inlineCategoryName.trim()}
+                          onClick={handleCreateCategoryInline}
+                          className="p-2 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white rounded-lg transition-colors flex items-center justify-center shadow-sm shrink-0"
+                          title="Salvar e selecionar categoria"
+                        >
+                          {isSavingInlineCategory ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} className="stroke-[3]" />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsAddingCategoryInline(false);
+                            setInlineCategoryName('');
+                          }}
+                          className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition-colors flex items-center justify-center shrink-0"
+                          title="Cancelar"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                      <p className="text-[9px] text-gray-400 font-medium">Enter para salvar</p>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <select 
+                        required 
+                        value={editingProduct?.category || ''} 
+                        onChange={(e) => {
+                          if (e.target.value === '__NEW__') {
+                            setIsAddingCategoryInline(true);
+                          } else {
+                            setEditingProduct({...editingProduct, category: e.target.value});
+                          }
+                        }} 
+                        className="flex-1 p-2 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-orange-500 text-sm font-medium"
+                      >
+                        {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                        <option value="__NEW__" className="text-orange-600 font-bold bg-orange-50">+ Nova Categoria...</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setIsAddingCategoryInline(true)}
+                        className="p-2 bg-orange-50 hover:bg-orange-100 text-orange-600 border border-orange-200 rounded-lg transition-all flex items-center justify-center shrink-0 active:scale-95 shadow-sm"
+                        title="Adicionar nova categoria"
+                      >
+                        <Plus size={16} className="stroke-[2.5]" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1321,7 +1450,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
               )}
 
               <div className="pt-4 flex gap-3">
-                <button type="button" onClick={() => setShowProductModal(false)} className="flex-1 py-3 text-gray-400 font-bold">Cancelar</button>
+                <button type="button" onClick={() => { setShowProductModal(false); setIsAddingCategoryInline(false); setInlineCategoryName(''); }} className="flex-1 py-3 text-gray-400 font-bold hover:text-gray-600 transition-colors">Cancelar</button>
                 <button type="submit" disabled={isSaving} className="flex-1 py-3 bg-[#3d251e] text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2"> 
                     {isSaving ? <Loader2 className="animate-spin" size={20} /> : 'Salvar Produto'} 
                 </button>
