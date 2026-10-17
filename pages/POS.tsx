@@ -3594,7 +3594,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                     <span className="text-xs font-bold hidden md:inline">Sincronizar ({contingencyOrders.length})</span>
                   </button>
                )}
-               <InstallPrompt />
+               <InstallPrompt appType="pdv" />
                {lastOrder && (
                  <div className="flex gap-2 shrink-0">
                    <button onClick={() => printReceipt(lastOrder)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-xl border border-blue-100" 

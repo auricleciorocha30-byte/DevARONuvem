@@ -81,26 +81,48 @@ export default function LoginPage({ onLoginSuccess }: Props) {
     const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     setIsIOS(isIOSDevice);
 
+    if ((window as any).deferredPWAInstallPrompt) {
+      setDeferredPrompt((window as any).deferredPWAInstallPrompt);
+      setIsInstallable(true);
+    }
+
+    const onPromptAvailable = (e: any) => {
+      setDeferredPrompt(e.detail || (window as any).deferredPWAInstallPrompt);
+      setIsInstallable(true);
+    };
+
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
+      (window as any).deferredPWAInstallPrompt = e;
       setDeferredPrompt(e);
       setIsInstallable(true);
     };
 
+    window.addEventListener('pwa-prompt-available', onPromptAvailable);
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
     return () => {
+      window.removeEventListener('pwa-prompt-available', onPromptAvailable);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
   }, []);
 
   const handleInstallClick = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setIsInstallable(false);
-      setDeferredPrompt(null);
+    const promptEvent = deferredPrompt || (window as any).deferredPWAInstallPrompt;
+    if (promptEvent && typeof promptEvent.prompt === 'function') {
+      try {
+        await promptEvent.prompt();
+        const { outcome } = await promptEvent.userChoice;
+        if (outcome === 'accepted') {
+          setIsInstallable(false);
+          setDeferredPrompt(null);
+          (window as any).deferredPWAInstallPrompt = null;
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    } else {
+      window.open(`${window.location.origin}/?auto_install=1`, '_blank');
     }
   };
 

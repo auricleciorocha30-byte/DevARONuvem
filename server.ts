@@ -66,6 +66,88 @@ async function startServer() {
     next();
   });
 
+  // Dynamic Web App Manifest tailored to context (PDV, Atendimento, Entregas, Cardápio)
+  app.get('/manifest.json', (req, res) => {
+    const type = (req.query.type as string || '').toLowerCase();
+    const loja = (req.query.loja as string || '').trim();
+
+    let name = loja ? `DevARONuvem - ${loja}` : "DevARONuvem - Gestão & PDV";
+    let short_name = "DevARO";
+    let start_url = loja ? `/#/?loja=${encodeURIComponent(loja)}` : "/";
+
+    if (type === 'pdv') {
+      name = loja ? `PDV - ${loja}` : "PDV Frente de Caixa";
+      short_name = "PDV";
+      start_url = `/#/pdv${loja ? '?loja=' + encodeURIComponent(loja) : ''}`;
+    } else if (type === 'atendente' || type === 'atendimento') {
+      name = loja ? `Atendimento - ${loja}` : "Painel Atendente";
+      short_name = "Atendente";
+      start_url = `/#/atendimento${loja ? '?loja=' + encodeURIComponent(loja) : ''}`;
+    } else if (type === 'entregador' || type === 'entregas') {
+      name = loja ? `Entregas - ${loja}` : "Painel Entregas";
+      short_name = "Entregas";
+      start_url = `/#/entregas${loja ? '?loja=' + encodeURIComponent(loja) : ''}`;
+    } else if (type === 'cardapio') {
+      name = loja ? `Cardápio - ${loja}` : "Cardápio Digital";
+      short_name = "Cardápio";
+      start_url = `/#/cardapio${loja ? '?loja=' + encodeURIComponent(loja) : ''}`;
+    }
+
+    const manifest = {
+      id: "/",
+      name,
+      short_name,
+      description: `Aplicativo oficial ${name}.`,
+      start_url,
+      scope: "/",
+      display: "standalone",
+      background_color: "#ffffff",
+      theme_color: "#001F3F",
+      orientation: "any",
+      icons: [
+        {
+          src: "/icon-192.png",
+          sizes: "192x192",
+          type: "image/png",
+          purpose: "any"
+        },
+        {
+          src: "/icon-512.png",
+          sizes: "512x512",
+          type: "image/png",
+          purpose: "any"
+        },
+        {
+          src: "/icon-maskable-512.png",
+          sizes: "512x512",
+          type: "image/png",
+          purpose: "maskable"
+        }
+      ],
+      shortcuts: [
+        { name: "PDV Frente de Caixa", short_name: "PDV", url: "/#/pdv", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
+        { name: "Atendimento", short_name: "Atendimento", url: "/#/atendimento", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
+        { name: "Entregas", short_name: "Entregas", url: "/#/entregas", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
+        { name: "Cardápio Digital", short_name: "Cardápio", url: "/#/cardapio", icons: [{ src: "/icon-192.png", sizes: "192x192" }] }
+      ]
+    };
+
+    res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.json(manifest);
+  });
+
+  // Service Worker route with root scope allowance
+  app.get('/sw.js', (req, res) => {
+    res.setHeader('Content-Type', 'text/javascript; charset=utf-8');
+    res.setHeader('Service-Worker-Allowed', '/');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.sendFile(path.join(process.cwd(), 'sw.js'));
+  });
+
+  // Serve static PWA icons from root directory
+  app.use(express.static(process.cwd(), { maxAge: '1d' }));
+
   // Mount the router on /api IMMEDIATELY to ensure priority
   app.use('/api', apiRouter);
 
