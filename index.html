@@ -13,109 +13,86 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="G&C Staff">
     <meta name="theme-color" content="#001F3F">
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
-    <link rel="manifest" id="app-manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='120' fill='%23041434'/%3E%3Cg transform='translate(80, 80) scale(0.7)'%3E%3Cpath d='M150 256 L400 100 L250 256 L400 412 Z' fill='%2300b4d8'/%3E%3Ccircle cx='80' cy='180' r='25' fill='%2300b4d8'/%3E%3Ccircle cx='50' cy='256' r='25' fill='%2300b4d8'/%3E%3Ccircle cx='80' cy='332' r='25' fill='%2300b4d8'/%3E%3Crect x='80' y='165' width='100' height='30' rx='15' fill='%2300b4d8'/%3E%3Crect x='50' y='241' width='150' height='30' rx='15' fill='%2300b4d8'/%3E%3Crect x='80' y='317' width='100' height='30' rx='15' fill='%2300b4d8'/%3E%3C/g%3E%3Ctext x='256' y='440' font-family='Arial, sans-serif' font-size='80' font-weight='bold' font-style='italic' fill='%23ffffff' text-anchor='middle'%3EDev%3Ctspan fill='%2300b4d8'%3EARO%3C/tspan%3E%3C/text%3E%3C/svg%3E">
+    <link rel="manifest" id="app-manifest" href="manifest.json">
 
     <script>
-      // Restaura rota específica pelo parâmetro type (ex: atalhos criados na área de trabalho ou celular)
       (function() {
-        try {
-          const urlParams = new URLSearchParams(window.location.search);
-          const type = (urlParams.get('type') || '').toLowerCase();
-          const hash = window.location.hash || '';
-          if (type && (!hash || hash === '#' || hash === '#/')) {
-            if (type === 'pdv') window.location.hash = '#/pdv';
-            else if (type === 'atendente' || type === 'atendimento') window.location.hash = '#/atendimento';
-            else if (type === 'entregador' || type === 'entregas') window.location.hash = '#/entregas';
-            else if (type === 'cardapio') window.location.hash = '#/cardapio';
-          }
-        } catch (e) {}
-      })();
-
-      // Sincroniza o link do manifest com o tipo e a unidade correspondente
-      function syncManifestLink() {
-        try {
-          const urlParams = new URLSearchParams(window.location.search);
-          const hash = window.location.hash || '';
-          let type = urlParams.get('type') || '';
-          let loja = urlParams.get('loja') || '';
-
-          if (!type) {
-            if (hash.includes('/pdv')) type = 'pdv';
-            else if (hash.includes('/atendimento')) type = 'atendente';
-            else if (hash.includes('/entregas')) type = 'entregador';
-            else if (hash.includes('/cardapio')) type = 'cardapio';
-          }
-
-          if (!loja && hash.includes('loja=')) {
-            const hashParts = hash.split('?');
-            if (hashParts[1]) {
-              const hashParams = new URLSearchParams(hashParts[1]);
-              loja = hashParams.get('loja') || '';
-            }
-          }
-
-          if (!loja) {
-            try {
-              loja = localStorage.getItem('last_store_slug') || localStorage.getItem('storeSlug') || '';
-            } catch (e) {}
-          }
-
-          const manifestEl = document.getElementById('app-manifest');
-          if (manifestEl) {
-            const params = new URLSearchParams();
-            if (type) params.set('type', type);
-            if (loja) params.set('loja', loja);
-            const targetHref = '/manifest.json' + (params.toString() ? '?' + params.toString() : '');
-            if (manifestEl.getAttribute('href') !== targetHref) {
-              manifestEl.setAttribute('href', targetHref);
-            }
-          }
-        } catch (e) {}
-      }
-      syncManifestLink();
-      window.addEventListener('hashchange', syncManifestLink);
-
-      // Captura global do evento de instalação PWA antes de qualquer componente carregar
-      window.deferredPWAInstallPrompt = null;
-
-      function triggerAutoInstallIfRequested(e) {
-        try {
-          const urlParams = new URLSearchParams(window.location.search);
-          const hash = window.location.hash || '';
-          if (urlParams.get('auto_install') === 'true' || urlParams.get('auto_install') === '1' || hash.includes('auto_install=true') || hash.includes('auto_install=1')) {
-            console.log('[PWA] Auto-instalação requisitada via parâmetro. Disparando prompt...');
-            setTimeout(function() {
-              if (window.deferredPWAInstallPrompt && typeof window.deferredPWAInstallPrompt.prompt === 'function') {
-                window.deferredPWAInstallPrompt.prompt().then(function(choice) {
-                  if (choice && choice.outcome === 'accepted') {
-                    window.dispatchEvent(new CustomEvent('pwa-installed'));
-                  }
-                }).catch(function(err) {
-                  console.warn('[PWA] Prompt automático completado:', err);
-                });
-              }
-            }, 300);
-          }
-        } catch (err) {
-          console.warn('[PWA] Erro na detecção de auto-instalação:', err);
+        const urlParams = new URLSearchParams(window.location.search);
+        const hash = window.location.hash;
+        
+        let loja = urlParams.get('loja');
+        if (!loja && hash.includes('loja=')) {
+          const hashParams = new URLSearchParams(hash.split('?')[1]);
+          loja = hashParams.get('loja');
         }
-      }
 
-      window.addEventListener('beforeinstallprompt', function(e) {
-        e.preventDefault();
-        window.deferredPWAInstallPrompt = e;
-        window.dispatchEvent(new CustomEvent('pwa-prompt-available', { detail: e }));
-        console.log('[PWA] Evento beforeinstallprompt capturado com sucesso.');
-        triggerAutoInstallIfRequested(e);
-      });
+        const isDelivery = urlParams.get('role') === 'entregador' || hash.includes('role=entregador') || hash.includes('/entregas');
+        const isAttendant = urlParams.get('role') === 'atendente' || hash.includes('role=atendente') || hash.includes('/atendimento');
+        const isMenu = hash.includes('/cardapio');
+        const isPDV = hash.includes('/pdv');
+        
+        let shouldGenerateManifest = false;
+        let appName = "G&C Staff";
+        let shortName = "G&C";
+        let startUrl = "/";
 
-      window.addEventListener('appinstalled', function() {
-        window.deferredPWAInstallPrompt = null;
-        window.dispatchEvent(new CustomEvent('pwa-installed'));
-        console.log('[PWA] Aplicativo instalado no sistema com sucesso.');
-      });
+        if (isDelivery) {
+          appName = loja ? `Entregas - ${loja}` : "Entregas DevARO";
+          shortName = "Entregas";
+          startUrl = `/#/entregas${loja ? '?loja=' + loja : ''}`;
+          shouldGenerateManifest = true;
+        } else if (isAttendant) {
+          appName = loja ? `Colaborador - ${loja}` : "Portal Colaborador";
+          shortName = "Colaborador";
+          startUrl = `/#/atendimento${loja ? '?loja=' + loja : ''}`;
+          shouldGenerateManifest = true;
+        } else if (isMenu) {
+          appName = loja ? `Cardápio - ${loja}` : "Cardápio Digital";
+          shortName = "Cardápio";
+          startUrl = `/#/cardapio${loja ? '?loja=' + loja : ''}`;
+          shouldGenerateManifest = true;
+        } else if (isPDV) {
+          appName = loja ? `PDV - ${loja}` : "PDV DevARO";
+          shortName = "PDV";
+          startUrl = `/#/pdv${loja ? '?loja=' + loja : ''}`;
+          shouldGenerateManifest = true;
+        }
+        
+        if (shouldGenerateManifest) {
+          const manifest = {
+            "name": appName,
+            "short_name": shortName,
+            "description": appName,
+            "start_url": startUrl,
+            "display": "standalone",
+            "background_color": "#ffffff",
+            "theme_color": "#001F3F",
+            "orientation": "portrait-primary",
+            "icons": [
+              {
+                "src": "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='120' fill='%23041434'/%3E%3Cg transform='translate(80, 80) scale(0.7)'%3E%3Cpath d='M150 256 L400 100 L250 256 L400 412 Z' fill='%2300b4d8'/%3E%3Ccircle cx='80' cy='180' r='25' fill='%2300b4d8'/%3E%3Ccircle cx='50' cy='256' r='25' fill='%2300b4d8'/%3E%3Ccircle cx='80' cy='332' r='25' fill='%2300b4d8'/%3E%3Crect x='80' y='165' width='100' height='30' rx='15' fill='%2300b4d8'/%3E%3Crect x='50' y='241' width='150' height='30' rx='15' fill='%2300b4d8'/%3E%3Crect x='80' y='317' width='100' height='30' rx='15' fill='%2300b4d8'/%3E%3C/g%3E%3Ctext x='256' y='440' font-family='Arial, sans-serif' font-size='80' font-weight='bold' font-style='italic' fill='%23ffffff' text-anchor='middle'%3EDev%3Ctspan fill='%2300b4d8'%3EARO%3C/tspan%3E%3C/text%3E%3C/svg%3E",
+                "sizes": "192x192",
+                "type": "image/svg+xml",
+                "purpose": "any maskable"
+              },
+              {
+                "src": "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='120' fill='%23041434'/%3E%3Cg transform='translate(80, 80) scale(0.7)'%3E%3Cpath d='M150 256 L400 100 L250 256 L400 412 Z' fill='%2300b4d8'/%3E%3Ccircle cx='80' cy='180' r='25' fill='%2300b4d8'/%3E%3Ccircle cx='50' cy='256' r='25' fill='%2300b4d8'/%3E%3Ccircle cx='80' cy='332' r='25' fill='%2300b4d8'/%3E%3Crect x='80' y='165' width='100' height='30' rx='15' fill='%2300b4d8'/%3E%3Crect x='50' y='241' width='150' height='30' rx='15' fill='%2300b4d8'/%3E%3Crect x='80' y='317' width='100' height='30' rx='15' fill='%2300b4d8'/%3E%3C/g%3E%3Ctext x='256' y='440' font-family='Arial, sans-serif' font-size='80' font-weight='bold' font-style='italic' fill='%23ffffff' text-anchor='middle'%3EDev%3Ctspan fill='%2300b4d8'%3EARO%3C/tspan%3E%3C/text%3E%3C/svg%3E",
+                "sizes": "512x512",
+                "type": "image/svg+xml",
+                "purpose": "any maskable"
+              }
+            ]
+          };
+          const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+          document.getElementById('app-manifest').href = URL.createObjectURL(blob);
+          
+          window.__SHOULD_REGISTER_SW__ = true;
+        } else {
+          document.getElementById('app-manifest')?.remove();
+          window.__SHOULD_REGISTER_SW__ = false;
+        }
+      })();
     </script>
 
     <script src="https://cdn.tailwindcss.com"></script>
@@ -167,21 +144,18 @@
         } catch (e) {}
       })();
 
-      // Registro permanente do Service Worker para PWA (executa imediatamente ou no load)
+      // Registro do Service Worker para PWA
       if ('serviceWorker' in navigator) {
-        function registerSW() {
-          navigator.serviceWorker.register('/sw.js', { scope: '/' })
-            .then(function(reg) {
-              console.log('[PWA] Service Worker registrado no escopo:', reg.scope);
-            })
-            .catch(function(err) {
-              console.log('[PWA] Falha ao registrar Service Worker:', err);
-            });
-        }
-        if (document.readyState === 'complete' || document.readyState === 'interactive') {
-          registerSW();
+        if (window.__SHOULD_REGISTER_SW__) {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration failed:', err));
+          });
         } else {
-          window.addEventListener('load', registerSW);
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            for(let registration of registrations) {
+              registration.unregister();
+            }
+          });
         }
       }
     </script>

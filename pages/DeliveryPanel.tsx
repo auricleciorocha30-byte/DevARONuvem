@@ -303,7 +303,7 @@ export default function DeliveryPanel({ storeId, user, settings, orders, storeSl
                 <span className="text-xl font-black">{weeklyCount}</span>
             </div>
             <div className="flex gap-2">
-              <InstallPrompt appType="entregador" />
+              <InstallPrompt />
               <button onClick={() => window.location.reload()} className="p-2 hover:bg-white/10 rounded-full transition-colors">
                 <RefreshCw size={20} />
               </button>

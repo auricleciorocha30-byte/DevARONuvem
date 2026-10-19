@@ -71,40 +71,15 @@ function StoreContext() {
   
   const storeSlug = useMemo(() => {
     const slug = searchParams.get('loja');
-    if (slug) {
-      try {
-        localStorage.setItem('last_store_slug', slug);
-        localStorage.setItem('storeSlug', slug);
-      } catch (e) {}
-      return slug;
-    }
+    if (slug) return slug;
     const urlParams = new URLSearchParams(window.location.search);
     const mainSlug = urlParams.get('loja');
-    if (mainSlug) {
-      try {
-        localStorage.setItem('last_store_slug', mainSlug);
-        localStorage.setItem('storeSlug', mainSlug);
-      } catch (e) {}
-      return mainSlug;
-    }
+    if (mainSlug) return mainSlug;
     const hashPart = window.location.hash.split('?')[1];
     if (hashPart) {
         const hashParams = new URLSearchParams(hashPart);
-        const hashSlug = hashParams.get('loja');
-        if (hashSlug) {
-          try {
-            localStorage.setItem('last_store_slug', hashSlug);
-            localStorage.setItem('storeSlug', hashSlug);
-          } catch (e) {}
-          return hashSlug;
-        }
+        return hashParams.get('loja');
     }
-    // Fallback para manter a unidade ativa ao abrir atalhos instalados
-    try {
-      const cached = localStorage.getItem('last_store_slug') || localStorage.getItem('storeSlug');
-      if (cached) return cached;
-    } catch (e) {}
-
     return null;
   }, [searchParams, location]);
   
@@ -361,8 +336,6 @@ function StoreContext() {
         // Cache store profile
         localStorage.setItem(`store_profile_${normalizedSlug}`, JSON.stringify(fullStoreData));
         localStorage.setItem('storeId', fullStoreData.id);
-        localStorage.setItem('last_store_slug', normalizedSlug);
-        localStorage.setItem('storeSlug', normalizedSlug);
       }
     } catch (err: any) {
       console.error("Critical error loading store:", err);
@@ -1145,7 +1118,7 @@ function StoreContext() {
         adminUser && (adminUser.role === 'ATENDENTE' || adminUser.role === 'GERENTE') && adminUser.store_id === currentStore?.id ? (
           <AttendantPanel adminUser={adminUser} orders={orders} settings={settings} onSelectTable={setActiveTable} updateStatus={updateOrderStatus} onLogout={() => handleSetUser(null)} isOffline={isOffline} />
         ) : (
-          <Navigate to={`/login${lojaParam}${lojaParam ? '&' : '?'}role=atendente&target=/atendimento`} replace />
+          <Navigate to={`/login${lojaParam}${lojaParam ? '&' : '?'}role=atendente`} replace />
         )
       } />
       <Route path="/cozinha" element={
@@ -1198,7 +1171,7 @@ function StoreContext() {
             refreshEcosystemUsage={loadEcosystemUsage}
           />
         ) : (
-          <Navigate to={`/login${lojaParam}${lojaParam ? '&' : '?'}role=atendente&target=/pdv`} replace />
+          <Navigate to={loginRedirect} replace />
         )
       } />
 
@@ -1213,7 +1186,7 @@ function StoreContext() {
             onLogout={() => handleSetUser(null)}
           />
         ) : (
-          <Navigate to={`/login${lojaParam}${lojaParam ? '&' : '?'}role=entregador&target=/entregas`} replace />
+          <Navigate to={`/login${lojaParam}${lojaParam ? '&' : '?'}role=entregador`} replace />
         )
       } />
 

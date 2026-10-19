@@ -1710,7 +1710,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <InstallPrompt appType="cardapio" />
+            <InstallPrompt />
             {(orderType === 'BALCAO' || orderType === 'ENTREGA') && (
               <button 
                 onClick={handleShare} 
