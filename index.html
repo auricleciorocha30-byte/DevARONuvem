@@ -18,6 +18,65 @@
     <link rel="manifest" id="app-manifest" href="/manifest.json">
 
     <script>
+      // Restaura rota específica pelo parâmetro type (ex: atalhos criados na área de trabalho ou celular)
+      (function() {
+        try {
+          const urlParams = new URLSearchParams(window.location.search);
+          const type = (urlParams.get('type') || '').toLowerCase();
+          const hash = window.location.hash || '';
+          if (type && (!hash || hash === '#' || hash === '#/')) {
+            if (type === 'pdv') window.location.hash = '#/pdv';
+            else if (type === 'atendente' || type === 'atendimento') window.location.hash = '#/atendimento';
+            else if (type === 'entregador' || type === 'entregas') window.location.hash = '#/entregas';
+            else if (type === 'cardapio') window.location.hash = '#/cardapio';
+          }
+        } catch (e) {}
+      })();
+
+      // Sincroniza o link do manifest com o tipo e a unidade correspondente
+      function syncManifestLink() {
+        try {
+          const urlParams = new URLSearchParams(window.location.search);
+          const hash = window.location.hash || '';
+          let type = urlParams.get('type') || '';
+          let loja = urlParams.get('loja') || '';
+
+          if (!type) {
+            if (hash.includes('/pdv')) type = 'pdv';
+            else if (hash.includes('/atendimento')) type = 'atendente';
+            else if (hash.includes('/entregas')) type = 'entregador';
+            else if (hash.includes('/cardapio')) type = 'cardapio';
+          }
+
+          if (!loja && hash.includes('loja=')) {
+            const hashParts = hash.split('?');
+            if (hashParts[1]) {
+              const hashParams = new URLSearchParams(hashParts[1]);
+              loja = hashParams.get('loja') || '';
+            }
+          }
+
+          if (!loja) {
+            try {
+              loja = localStorage.getItem('last_store_slug') || localStorage.getItem('storeSlug') || '';
+            } catch (e) {}
+          }
+
+          const manifestEl = document.getElementById('app-manifest');
+          if (manifestEl) {
+            const params = new URLSearchParams();
+            if (type) params.set('type', type);
+            if (loja) params.set('loja', loja);
+            const targetHref = '/manifest.json' + (params.toString() ? '?' + params.toString() : '');
+            if (manifestEl.getAttribute('href') !== targetHref) {
+              manifestEl.setAttribute('href', targetHref);
+            }
+          }
+        } catch (e) {}
+      }
+      syncManifestLink();
+      window.addEventListener('hashchange', syncManifestLink);
+
       // Captura global do evento de instalação PWA antes de qualquer componente carregar
       window.deferredPWAInstallPrompt = null;
 

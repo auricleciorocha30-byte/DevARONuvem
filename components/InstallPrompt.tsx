@@ -83,6 +83,46 @@ export default function InstallPrompt({ label, appType = 'general', className }:
     };
   }, []);
 
+  const getStoreSlug = () => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      let loja = urlParams.get('loja') || '';
+      if (!loja && window.location.hash.includes('loja=')) {
+        const hashParts = window.location.hash.split('?');
+        if (hashParts[1]) {
+          const hashParams = new URLSearchParams(hashParts[1]);
+          loja = hashParams.get('loja') || '';
+        }
+      }
+      if (!loja) {
+        loja = localStorage.getItem('last_store_slug') || localStorage.getItem('storeSlug') || '';
+      }
+      return loja;
+    } catch (e) {
+      return '';
+    }
+  };
+
+  const syncCurrentManifest = () => {
+    try {
+      const loja = getStoreSlug();
+      const manifestEl = document.getElementById('app-manifest');
+      if (manifestEl) {
+        const params = new URLSearchParams();
+        if (appType && appType !== 'general') params.set('type', appType);
+        if (loja) params.set('loja', loja);
+        const targetHref = '/manifest.json' + (params.toString() ? '?' + params.toString() : '');
+        if (manifestEl.getAttribute('href') !== targetHref) {
+          manifestEl.setAttribute('href', targetHref);
+        }
+      }
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    syncCurrentManifest();
+  }, [appType]);
+
   const getTargetStandaloneUrl = () => {
     let route = window.location.hash || '';
     if (!route || route === '#/') {
@@ -93,11 +133,19 @@ export default function InstallPrompt({ label, appType = 'general', className }:
     }
     const origin = window.location.origin;
     const urlParams = new URLSearchParams(window.location.search);
+    const loja = getStoreSlug();
+    if (loja) {
+      urlParams.set('loja', loja);
+    }
+    if (appType && appType !== 'general') {
+      urlParams.set('type', appType);
+    }
     urlParams.set('auto_install', '1');
     return `${origin}/?${urlParams.toString()}${route}`;
   };
 
   const handleInstallClick = async () => {
+    syncCurrentManifest();
     const promptEvent: BeforeInstallPromptEvent | null = 
       deferredPrompt || 
       (window as any).deferredPWAInstallPrompt ||

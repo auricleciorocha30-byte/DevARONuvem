@@ -73,28 +73,33 @@ async function startServer() {
 
     let name = loja ? `DevARONuvem - ${loja}` : "DevARONuvem - Gestão & PDV";
     let short_name = "DevARO";
-    let start_url = loja ? `/#/?loja=${encodeURIComponent(loja)}` : "/";
+    let start_url = loja ? `/?loja=${encodeURIComponent(loja)}` : "/";
+    let appId = loja ? `/app-${encodeURIComponent(loja)}` : "/";
 
     if (type === 'pdv') {
       name = loja ? `PDV - ${loja}` : "PDV Frente de Caixa";
       short_name = "PDV";
-      start_url = `/#/pdv${loja ? '?loja=' + encodeURIComponent(loja) : ''}`;
+      start_url = loja ? `/?type=pdv&loja=${encodeURIComponent(loja)}#/pdv` : "/?type=pdv#/pdv";
+      appId = loja ? `/pdv-${encodeURIComponent(loja)}` : "/pdv";
     } else if (type === 'atendente' || type === 'atendimento') {
       name = loja ? `Atendimento - ${loja}` : "Painel Atendente";
       short_name = "Atendente";
-      start_url = `/#/atendimento${loja ? '?loja=' + encodeURIComponent(loja) : ''}`;
+      start_url = loja ? `/?type=atendente&loja=${encodeURIComponent(loja)}#/atendimento` : "/?type=atendente#/atendimento";
+      appId = loja ? `/atendente-${encodeURIComponent(loja)}` : "/atendente";
     } else if (type === 'entregador' || type === 'entregas') {
       name = loja ? `Entregas - ${loja}` : "Painel Entregas";
       short_name = "Entregas";
-      start_url = `/#/entregas${loja ? '?loja=' + encodeURIComponent(loja) : ''}`;
+      start_url = loja ? `/?type=entregador&loja=${encodeURIComponent(loja)}#/entregas` : "/?type=entregador#/entregas";
+      appId = loja ? `/entregas-${encodeURIComponent(loja)}` : "/entregas";
     } else if (type === 'cardapio') {
       name = loja ? `Cardápio - ${loja}` : "Cardápio Digital";
       short_name = "Cardápio";
-      start_url = `/#/cardapio${loja ? '?loja=' + encodeURIComponent(loja) : ''}`;
+      start_url = loja ? `/?type=cardapio&loja=${encodeURIComponent(loja)}#/cardapio` : "/?type=cardapio#/cardapio";
+      appId = loja ? `/cardapio-${encodeURIComponent(loja)}` : "/cardapio";
     }
 
     const manifest = {
-      id: "/",
+      id: appId,
       name,
       short_name,
       description: `Aplicativo oficial ${name}.`,
@@ -125,10 +130,10 @@ async function startServer() {
         }
       ],
       shortcuts: [
-        { name: "PDV Frente de Caixa", short_name: "PDV", url: "/#/pdv", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
-        { name: "Atendimento", short_name: "Atendimento", url: "/#/atendimento", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
-        { name: "Entregas", short_name: "Entregas", url: "/#/entregas", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
-        { name: "Cardápio Digital", short_name: "Cardápio", url: "/#/cardapio", icons: [{ src: "/icon-192.png", sizes: "192x192" }] }
+        { name: "PDV Frente de Caixa", short_name: "PDV", url: loja ? `/?type=pdv&loja=${encodeURIComponent(loja)}#/pdv` : "/?type=pdv#/pdv", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
+        { name: "Atendimento", short_name: "Atendimento", url: loja ? `/?type=atendente&loja=${encodeURIComponent(loja)}#/atendimento` : "/?type=atendente#/atendimento", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
+        { name: "Entregas", short_name: "Entregas", url: loja ? `/?type=entregador&loja=${encodeURIComponent(loja)}#/entregas` : "/?type=entregador#/entregas", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
+        { name: "Cardápio Digital", short_name: "Cardápio", url: loja ? `/?type=cardapio&loja=${encodeURIComponent(loja)}#/cardapio` : "/?type=cardapio#/cardapio", icons: [{ src: "/icon-192.png", sizes: "192x192" }] }
       ]
     };
 

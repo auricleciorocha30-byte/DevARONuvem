@@ -40,13 +40,22 @@ export default function LoginPage({ onLoginSuccess }: Props) {
     if (searchParams.get('view') === 'login') {
       setView('login');
     }
+    const target = searchParams.get('target');
+    if (target) {
+      setView('login');
+      setIntendedDestination(target);
+    }
     if (searchParams.get('role') === 'entregador') {
       setView('login');
-      setIntendedDestination('/entregas');
+      if (!target) setIntendedDestination('/entregas');
     }
     if (searchParams.get('role') === 'atendente') {
       setView('login');
-      setIntendedDestination('/atendimento');
+      if (!target) setIntendedDestination('/atendimento');
+    }
+    if (searchParams.get('role') === 'pdv') {
+      setView('login');
+      if (!target) setIntendedDestination('/pdv');
     }
   }, [searchParams]);
 

@@ -1,8 +1,6 @@
 // Service Worker para PWA DevARONuvem
-const CACHE_NAME = 'devaro-pwa-v2';
+const CACHE_NAME = 'devaro-pwa-v4';
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png',
@@ -32,11 +30,22 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Only handle GET requests and skip API / WebSocket requests
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
-  if (url.pathname.startsWith('/api') || url.pathname.startsWith('/socket.io')) return;
 
+  // Skip APIs, WebSockets, and all Vite dev resources
+  if (
+    url.pathname.startsWith('/api') || 
+    url.pathname.startsWith('/socket.io') ||
+    url.pathname.startsWith('/@') ||
+    url.pathname.includes('node_modules') ||
+    url.pathname.endsWith('.tsx') ||
+    url.pathname.endsWith('.ts')
+  ) {
+    return;
+  }
+
+  // Network First, with cache fallback for static icons/manifest
   event.respondWith(
     fetch(event.request)
       .then((networkResponse) => {
@@ -45,9 +54,6 @@ self.addEventListener('fetch', (event) => {
       .catch(() => {
         return caches.match(event.request).then((cached) => {
           if (cached) return cached;
-          if (event.request.mode === 'navigate') {
-            return caches.match('/index.html');
-          }
           return new Response('Offline', { status: 503, statusText: 'Offline' });
         });
       })
