@@ -1,25 +1,62 @@
-
 {
-  "name": "Produto DevARO",
+  "id": "/",
+  "name": "DevARONuvem - Gestão & PDV",
   "short_name": "DevARO",
-  "description": "Sistema de Gestão DevARO",
-  "start_url": "/#/login",
+  "description": "Sistema completo para estabelecimentos com PDV Frente de Caixa, Atendimento, Entregas e Cardápio Digital.",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#001F3F",
-  "orientation": "portrait-primary",
+  "orientation": "any",
   "icons": [
     {
-      "src": "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='120' fill='%23041434'/%3E%3Cg transform='translate(80, 80) scale(0.7)'%3E%3Cpath d='M150 256 L400 100 L250 256 L400 412 Z' fill='%2300b4d8'/%3E%3Ccircle cx='80' cy='180' r='25' fill='%2300b4d8'/%3E%3Ccircle cx='50' cy='256' r='25' fill='%2300b4d8'/%3E%3Ccircle cx='80' cy='332' r='25' fill='%2300b4d8'/%3E%3Crect x='80' y='165' width='100' height='30' rx='15' fill='%2300b4d8'/%3E%3Crect x='50' y='241' width='150' height='30' rx='15' fill='%2300b4d8'/%3E%3Crect x='80' y='317' width='100' height='30' rx='15' fill='%2300b4d8'/%3E%3C/g%3E%3Ctext x='256' y='440' font-family='Arial, sans-serif' font-size='80' font-weight='bold' font-style='italic' fill='%23ffffff' text-anchor='middle'%3EDev%3Ctspan fill='%2300b4d8'%3EARO%3C/tspan%3E%3C/text%3E%3C/svg%3E",
+      "src": "/icon-192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='120' fill='%23041434'/%3E%3Cg transform='translate(80, 80) scale(0.7)'%3E%3Cpath d='M150 256 L400 100 L250 256 L400 412 Z' fill='%2300b4d8'/%3E%3Ccircle cx='80' cy='180' r='25' fill='%2300b4d8'/%3E%3Ccircle cx='50' cy='256' r='25' fill='%2300b4d8'/%3E%3Ccircle cx='80' cy='332' r='25' fill='%2300b4d8'/%3E%3Crect x='80' y='165' width='100' height='30' rx='15' fill='%2300b4d8'/%3E%3Crect x='50' y='241' width='150' height='30' rx='15' fill='%2300b4d8'/%3E%3Crect x='80' y='317' width='100' height='30' rx='15' fill='%2300b4d8'/%3E%3C/g%3E%3Ctext x='256' y='440' font-family='Arial, sans-serif' font-size='80' font-weight='bold' font-style='italic' fill='%23ffffff' text-anchor='middle'%3EDev%3Ctspan fill='%2300b4d8'%3EARO%3C/tspan%3E%3C/text%3E%3C/svg%3E",
+      "src": "/icon-512.png",
       "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "PDV Frente de Caixa",
+      "short_name": "PDV",
+      "description": "Abrir Frente de Caixa e Balcão",
+      "url": "/#/pdv",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Painel do Atendente",
+      "short_name": "Atendimento",
+      "description": "Mesas, Comandas e Atendimento",
+      "url": "/#/atendimento",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Painel de Entregas",
+      "short_name": "Entregas",
+      "description": "Rastreio e Despacho de Pedidos",
+      "url": "/#/entregas",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Cardápio Digital",
+      "short_name": "Cardápio",
+      "description": "Visualizar Cardápio e Pedidos",
+      "url": "/#/cardapio",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ]
 }

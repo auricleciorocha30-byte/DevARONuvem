@@ -4156,15 +4156,15 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                    const qty = newComplements[existingIndex].quantity;
                    if (currentQty > qty) { 
                       if (currentCatCount >= maxCategoryQty) return; 
-                      newComplements[existingIndex].quantity += 1;
+                      newComplements[existingIndex] = { ...newComplements[existingIndex], quantity: qty + 1 };
                    } else { 
-                      if (newComplements[existingIndex].quantity > 1) {
-                         newComplements[existingIndex].quantity -= 1;
+                      if (qty > 1) {
+                         newComplements[existingIndex] = { ...newComplements[existingIndex], quantity: qty - 1 };
                       } else {
                          newComplements.splice(existingIndex, 1);
                       }
                    }
-                } else { 
+                } else if (currentQty > 0) { 
                    if (currentCatCount >= maxCategoryQty) return; 
                    newComplements.push({
                       categoryId: category.id,

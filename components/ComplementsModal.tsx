@@ -32,7 +32,7 @@ export const ComplementsModal: React.FC<Props> = ({
       
       let min = cat.minQuantity || 0;
       if (cat.isRequired && min === 0) {
-          min = cat.maxQuantity || 1;
+          min = 1;
       }
 
       if (cat.isRequired && catCount < min) return false;
@@ -74,7 +74,13 @@ export const ComplementsModal: React.FC<Props> = ({
                      <h3 className="font-bold text-gray-800">{cat.name}</h3>
                      <p className="text-xs text-gray-500">
                        {cat.isRequired ? 'Obrigatório' : 'Opcional'} • 
-                       {cat.maxQuantity > 1 ? ` Escolha até ${cat.maxQuantity} opções` : ' Escolha 1 opção'}
+                       {cat.maxQuantity > 1
+                         ? (cat.minQuantity > 1 && cat.minQuantity === cat.maxQuantity
+                             ? ` Escolha ${cat.maxQuantity} opções`
+                             : cat.minQuantity > 1
+                               ? ` Escolha de ${cat.minQuantity} até ${cat.maxQuantity} opções`
+                               : ` Escolha até ${cat.maxQuantity} opções`)
+                         : ' Escolha 1 opção'}
                      </p>
                    </div>
                    <div className="text-xs font-bold px-2 py-1 bg-white rounded shadow-sm">
@@ -93,7 +99,7 @@ export const ComplementsModal: React.FC<Props> = ({
                      return (
                         <div key={item.id} className={`flex items-center justify-between p-3 rounded-xl border transition-colors cursor-pointer ${itemQty > 0 ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'}`}
                           onClick={() => {
-                            if (isRadio && itemQty === 0) onToggleComplement(cat, item, itemQty, cat.maxQuantity);
+                            if (isRadio && itemQty === 0) onToggleComplement(cat, item, 1, cat.maxQuantity);
                           }}
                         >
                           <div className="flex-1 flex gap-3 items-center">
@@ -130,7 +136,8 @@ export const ComplementsModal: React.FC<Props> = ({
                           {!isRadio && (
                             <div className="flex items-center gap-3 bg-white border rounded-xl p-1 shadow-sm" onClick={e => e.stopPropagation()}>
                               <button 
-                                onClick={() => onToggleComplement(cat, item, itemQty, cat.maxQuantity)} 
+                                type="button"
+                                onClick={() => onToggleComplement(cat, item, itemQty - 1, cat.maxQuantity)} 
                                 disabled={itemQty === 0}
                                 className={`p-1.5 rounded-lg ${itemQty > 0 ? 'bg-red-50 text-red-500 hover:bg-red-100' : 'bg-gray-50 text-gray-300'}`}
                               >
@@ -138,7 +145,8 @@ export const ComplementsModal: React.FC<Props> = ({
                               </button>
                               <span className="font-bold text-sm w-4 text-center">{itemQty}</span>
                               <button 
-                                onClick={() => onToggleComplement(cat, item, itemQty, cat.maxQuantity)} 
+                                type="button"
+                                onClick={() => onToggleComplement(cat, item, itemQty + 1, cat.maxQuantity)} 
                                 className={`p-1.5 rounded-lg ${(catCount >= cat.maxQuantity) ? 'bg-gray-50 text-gray-300' : 'bg-green-50 text-green-500 hover:bg-green-100'}`}
                                 disabled={catCount >= cat.maxQuantity}
                               >

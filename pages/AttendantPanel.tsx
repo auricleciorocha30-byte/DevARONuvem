@@ -463,7 +463,7 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
             </div>
           </div>
           <div className="flex gap-2">
-            <InstallPrompt />
+            <InstallPrompt appType="atendente" />
             <button onClick={() => handleQuickOrder('COMANDA')} className="flex items-center gap-2 px-4 py-3 bg-white/10 rounded-2xl hover:bg-white/20 font-bold text-xs">
               <Tag size={18} /> Comanda
             </button>

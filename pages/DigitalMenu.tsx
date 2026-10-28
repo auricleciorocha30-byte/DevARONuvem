@@ -2873,15 +2873,15 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                    const qty = newComplements[existingIndex].quantity;
                    if (currentQty > qty) { // Adding
                       if (currentCatCount >= maxCategoryQty) return; // Block
-                      newComplements[existingIndex].quantity += 1;
+                      newComplements[existingIndex] = { ...newComplements[existingIndex], quantity: qty + 1 };
                    } else { // Subtracting
-                      if (newComplements[existingIndex].quantity > 1) {
-                         newComplements[existingIndex].quantity -= 1;
+                      if (qty > 1) {
+                         newComplements[existingIndex] = { ...newComplements[existingIndex], quantity: qty - 1 };
                       } else {
                          newComplements.splice(existingIndex, 1);
                       }
                    }
-                } else { // Adding new item
+                } else if (currentQty > 0) { // Adding new item
                    if (currentCatCount >= maxCategoryQty) return; // Block
                    newComplements.push({
                       categoryId: category.id,
