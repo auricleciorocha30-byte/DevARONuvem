@@ -1,5 +1,5 @@
 // Service Worker para PWA DevARONuvem
-const CACHE_NAME = 'devaro-pwa-v4';
+const CACHE_NAME = 'devaro-pwa-v5';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/icon-192.png',
@@ -42,6 +42,14 @@ self.addEventListener('fetch', (event) => {
     url.pathname.endsWith('.tsx') ||
     url.pathname.endsWith('.ts')
   ) {
+    return;
+  }
+
+  // Always fetch fresh HTML for navigation requests to avoid stale cached index.html
+  if (event.request.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html') {
+    event.respondWith(
+      fetch(event.request, { cache: 'no-store' }).catch(() => caches.match(event.request))
+    );
     return;
   }
 

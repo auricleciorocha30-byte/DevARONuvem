@@ -150,8 +150,8 @@ async function startServer() {
     res.sendFile(path.join(process.cwd(), 'sw.js'));
   });
 
-  // Serve static PWA icons from root directory
-  app.use(express.static(process.cwd(), { maxAge: '1d' }));
+  // Serve static PWA icons from public directory without intercepting index.html
+  app.use(express.static(path.join(process.cwd(), 'public'), { index: false }));
 
   // Mount the router on /api IMMEDIATELY to ensure priority
   app.use('/api', apiRouter);
@@ -560,22 +560,23 @@ async function startServer() {
     }
   });
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server listening on http://localhost:${PORT}`);
-  });
-
-  // Vite middleware for development (Loaded asynchronously to not block listener)
+  // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
-    console.log('Initializing Vite in background...');
-    createViteServer({
+    console.log('Initializing Vite...');
+    const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
-    }).then(vite => {
-      app.use(vite.middlewares);
-      console.log('Vite integrated.');
-    }).catch(e => {
-      console.error('Vite failed to start:', e);
     });
+    app.use((req, res, next) => {
+      if (req.method === 'GET' && (req.path === '/' || req.path === '/index.html' || req.headers.accept?.includes('text/html'))) {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+      }
+      next();
+    });
+    app.use(vite.middlewares);
+    console.log('Vite integrated.');
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
@@ -584,6 +585,10 @@ async function startServer() {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
+
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server listening on http://localhost:${PORT}`);
+  });
 }
 
 startServer().catch(err => {
