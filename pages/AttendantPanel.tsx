@@ -365,13 +365,7 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
 
   const handleGroupStatusUpdate = async (ids: string[], status: OrderStatus) => {
     if (status === 'ENTREGUE') {
-         const ordersToUpdate = ids.filter(id => {
-             const order = displayOrders.find(o => o.originalIds?.includes(id) || o.id === id);
-             if (order && order.type === 'ENTREGA' && settings.requirePosFinalization) {
-                 return false; // Cannot set to ENTREGUE directly
-             }
-             return true;
-         });
+         const ordersToUpdate = ids;
 
          if (ordersToUpdate.length > 0) {
               const targetOrders = activeOrders.filter(o => ordersToUpdate.includes(o.id));
@@ -397,22 +391,7 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
 
     setIsUpdating(ids[0]);
     try {
-        if (status === 'ENVIADO_PARA_ENTREGA') {
-             // Check if any of these orders are ENTREGA and require POS finalization
-             const ordersToUpdate = ids.filter(id => {
-                 const order = displayOrders.find(o => o.originalIds?.includes(id) || o.id === id);
-                 if (order && order.type === 'ENTREGA' && settings.requirePosFinalization) {
-                     return false; // Cannot set to ENTREGUE directly
-                 }
-                 return true;
-             });
-
-             if (ordersToUpdate.length > 0) {
-                 await Promise.all(ordersToUpdate.map(id => updateStatus(id, status)));
-             }
-        } else {
-             await Promise.all(ids.map(id => updateStatus(id, status)));
-        }
+        await Promise.all(ids.map(id => updateStatus(id, status)));
     } finally {
         setIsUpdating(null);
     }
@@ -620,6 +599,18 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
                            </span>
                         </div>
                      )}
+                     {order.deliveryAddress && (
+                        <div className="flex justify-between items-start gap-2">
+                           <span className="font-bold uppercase tracking-wider shrink-0">Endereço:</span>
+                           <span className="text-right font-medium text-gray-700">{order.deliveryAddress}</span>
+                        </div>
+                     )}
+                     {order.type === 'ENTREGA' && order.deliveryDriverId === 'OUTROS_MEIOS' && (
+                        <div className="flex justify-between items-center bg-purple-50 px-2 py-1 rounded-lg border border-purple-100 text-purple-700 mt-0.5">
+                           <span className="font-bold uppercase tracking-wider">Envio:</span>
+                           <span className="font-black">Outros Meios (Fora do App)</span>
+                        </div>
+                     )}
                      {order.notes && (
                         <div className="mt-1 bg-yellow-50 p-2 rounded-lg border border-yellow-100 text-yellow-800 italic">
                            <span className="font-bold not-italic mr-1">Obs:</span> {order.notes}
@@ -667,7 +658,7 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
                       (order.status === 'AGUARDANDO' || order.status === 'AGUARDANDO_PAGAMENTO' || order.status === 'PENDENTE') ? 'bg-yellow-100 text-yellow-600' : 
                       'bg-orange-100 text-orange-600'
                     }`}>
-                        {order.status.replace('_', ' ')}
+                        {order.status.replace(/_/g, ' ')}
                     </span>
                   </div>
                   <div className="flex gap-2">
@@ -734,45 +725,238 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
                     )}
 
                     {order.status === 'PREPARANDO' && (
-                      <button 
-                        disabled={isUpdating === order.id}
-                        onClick={() => handleGroupStatusUpdate(order.originalIds, 'PRONTO')} 
-                        className="flex-1 py-3.5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
-                      >
-                        {isUpdating === order.id ? <Loader2 className="animate-spin" size={14} /> : 'MARCAR PRONTO'}
-                      </button>
+                      <div className="flex gap-2 w-full">
+                        <button 
+                          disabled={isUpdating === order.id}
+                          onClick={() => handleGroupStatusUpdate(order.originalIds, 'PRONTO')} 
+                          className="flex-1 py-3.5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
+                        >
+                          {isUpdating === order.id ? <Loader2 className="animate-spin" size={14} /> : 'MARCAR PRONTO'}
+                        </button>
+                        <div className="relative">
+                          <button 
+                            onClick={() => setOpenMenuId(openMenuId === order.id ? null : order.id)}
+                            className="h-full px-3 bg-gray-100 text-gray-500 rounded-2xl hover:bg-gray-200 transition-colors flex items-center justify-center"
+                          >
+                            <MoreVertical size={18} />
+                          </button>
+                          {openMenuId === order.id && (
+                            <div className="absolute bottom-full right-0 mb-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-20 flex flex-col">
+                              <button 
+                                onClick={() => {
+                                  const proceedCancel = () => {
+                                    if(window.confirm('Tem certeza que deseja cancelar este pedido?')) {
+                                      handleGroupStatusUpdate(order.originalIds, 'CANCELADO');
+                                    }
+                                    setOpenMenuId(null);
+                                  };
+                                  if (isGerente || settings.canWaitstaffCancelItems) {
+                                    proceedCancel();
+                                  } else {
+                                    setOpenMenuId(null);
+                                    setManagerModal({
+                                      isOpen: true,
+                                      title: 'Cancelar Pedido',
+                                      actionDescription: `Esta conta de atendente não possui permissão para cancelar o pedido #${order.displayId || order.id}.`,
+                                      onSuccess: () => proceedCancel()
+                                    });
+                                  }
+                                }}
+                                className="px-4 py-3 text-left text-xs font-bold text-red-500 hover:bg-red-50 flex items-center gap-2 w-full"
+                              >
+                                <XCircle size={14} /> Cancelar Pedido
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     )}
                     
                     {order.status === 'PRONTO' && (
-                      (checkCanFinish(order.type) || (!settings.requirePosFinalization)) ? (
+                      <div className="flex gap-2 w-full">
+                        {(checkCanFinish(order.type) || (!settings.requirePosFinalization)) ? (
+                          <button 
+                            disabled={isUpdating === order.id}
+                            onClick={() => {
+                              const targetNextStatus = (order.type === 'ENTREGA' && order.deliveryDriverId !== 'OUTROS_MEIOS') ? 'ENVIADO_PARA_ENTREGA' : 'ENTREGUE';
+                              const proceedFinish = () => {
+                                handleGroupStatusUpdate(order.originalIds, targetNextStatus);
+                              };
+                              if (checkCanFinish(order.type)) {
+                                proceedFinish();
+                              } else {
+                                setManagerModal({
+                                  isOpen: true,
+                                  title: 'Finalizar Pedido',
+                                  actionDescription: `Esta conta de atendente não possui permissão para finalizar o pedido #${order.displayId || order.id}.`,
+                                  onSuccess: () => {
+                                    proceedFinish();
+                                  }
+                                });
+                              }
+                            }} 
+                            className="flex-1 py-3.5 bg-green-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
+                          >
+                            {isUpdating === order.id ? <Loader2 className="animate-spin" size={14} /> : (order.type === 'ENTREGA' ? (order.deliveryDriverId === 'OUTROS_MEIOS' ? 'CONCLUIR (OUTROS MEIOS)' : 'ENVIAR P/ ENTREGA') : 'FINALIZAR')}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={isUpdating === order.id}
+                            onClick={() => {
+                              const targetNextStatus = (order.type === 'ENTREGA' && order.deliveryDriverId !== 'OUTROS_MEIOS') ? 'ENVIADO_PARA_ENTREGA' : 'ENTREGUE';
+                              setManagerModal({
+                                isOpen: true,
+                                title: 'Liberar Finalização',
+                                actionDescription: `Informe a senha do gerente para liberar o pedido #${order.displayId || order.id} ou finalize no PDV.`,
+                                onSuccess: () => {
+                                  handleGroupStatusUpdate(order.originalIds, targetNextStatus);
+                                }
+                              });
+                            }}
+                            className="flex-1 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-2xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 transition-colors"
+                          >
+                            <Lock size={12} /> Finalizar no PDV (ou Senha)
+                          </button>
+                        )}
+                        <div className="relative">
+                          <button 
+                            onClick={() => setOpenMenuId(openMenuId === order.id ? null : order.id)}
+                            className="h-full px-3 bg-gray-100 text-gray-500 rounded-2xl hover:bg-gray-200 transition-colors flex items-center justify-center"
+                          >
+                            <MoreVertical size={18} />
+                          </button>
+                          {openMenuId === order.id && (
+                            <div className="absolute bottom-full right-0 mb-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-20 flex flex-col">
+                              {order.type === 'ENTREGA' && order.deliveryDriverId !== 'OUTROS_MEIOS' && (
+                                <button 
+                                  onClick={() => {
+                                    setOpenMenuId(null);
+                                    const proceedDirectFinish = () => {
+                                      handleGroupStatusUpdate(order.originalIds, 'ENTREGUE');
+                                    };
+                                    if (checkCanFinish(order.type)) {
+                                      proceedDirectFinish();
+                                    } else {
+                                      setManagerModal({
+                                        isOpen: true,
+                                        title: 'Concluir Entrega Fora do App',
+                                        actionDescription: `Informe a senha do gerente para concluir diretamente a entrega do pedido #${order.displayId || order.id}.`,
+                                        onSuccess: () => proceedDirectFinish()
+                                      });
+                                    }
+                                  }}
+                                  className="px-4 py-3 text-left text-xs font-bold text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 w-full"
+                                >
+                                  <CheckCircle2 size={14} className="text-emerald-600"/> Concluir Direto (Outros Meios)
+                                </button>
+                              )}
+                              <button 
+                                onClick={() => {
+                                  const proceedCancel = () => {
+                                    if(window.confirm('Tem certeza que deseja cancelar este pedido?')) {
+                                      handleGroupStatusUpdate(order.originalIds, 'CANCELADO');
+                                    }
+                                    setOpenMenuId(null);
+                                  };
+                                  if (isGerente || settings.canWaitstaffCancelItems) {
+                                    proceedCancel();
+                                  } else {
+                                    setOpenMenuId(null);
+                                    setManagerModal({
+                                      isOpen: true,
+                                      title: 'Cancelar Pedido',
+                                      actionDescription: `Esta conta de atendente não possui permissão para cancelar o pedido #${order.displayId || order.id}.`,
+                                      onSuccess: () => proceedCancel()
+                                    });
+                                  }
+                                }}
+                                className="px-4 py-3 text-left text-xs font-bold text-red-500 hover:bg-red-50 flex items-center gap-2 border-t border-gray-50 w-full"
+                              >
+                                <XCircle size={14} /> Cancelar Pedido
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {(order.status === 'ENVIADO_PARA_ENTREGA' || order.status === 'CHEGUEI_NA_ORIGEM' || order.status === 'SAIU_PARA_ENTREGA') && (
+                      <div className="flex gap-2 w-full">
                         <button 
                           disabled={isUpdating === order.id}
                           onClick={() => {
                             const proceedFinish = () => {
-                              handleGroupStatusUpdate(order.originalIds, order.type === 'ENTREGA' ? 'ENVIADO_PARA_ENTREGA' : 'ENTREGUE');
+                              handleGroupStatusUpdate(order.originalIds, 'ENTREGUE');
                             };
                             if (checkCanFinish(order.type)) {
                               proceedFinish();
                             } else {
                               setManagerModal({
                                 isOpen: true,
-                                title: 'Finalizar Pedido',
-                                actionDescription: `Esta conta de atendente não possui permissão para finalizar o pedido #${order.displayId || order.id}.`,
+                                title: 'Concluir Entrega',
+                                actionDescription: `Esta conta de atendente não possui permissão para concluir diretamente o pedido #${order.displayId || order.id}.`,
                                 onSuccess: () => {
                                   proceedFinish();
                                 }
                               });
                             }
                           }} 
-                          className="flex-1 py-3.5 bg-green-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
+                          className="flex-1 py-3.5 bg-green-600 hover:bg-green-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
                         >
-                          {isUpdating === order.id ? <Loader2 className="animate-spin" size={14} /> : (order.type === 'ENTREGA' ? 'ENVIAR P/ ENTREGA' : 'FINALIZAR')}
+                          {isUpdating === order.id ? <Loader2 className="animate-spin" size={14} /> : 'CONCLUIR ENTREGA'}
                         </button>
-                      ) : (
-                        <div className="flex-1 py-3.5 bg-gray-100 text-gray-400 rounded-2xl text-[8px] font-black uppercase tracking-widest flex items-center justify-center gap-1 cursor-not-allowed">
-                          <Lock size={12} /> Finalizar no PDV
+
+                        <div className="relative">
+                          <button 
+                            onClick={() => setOpenMenuId(openMenuId === order.id ? null : order.id)}
+                            className="h-full px-3 bg-gray-100 text-gray-500 rounded-2xl hover:bg-gray-200 transition-colors flex items-center justify-center"
+                          >
+                            <MoreVertical size={18} />
+                          </button>
+                          
+                          {openMenuId === order.id && (
+                            <div className="absolute bottom-full right-0 mb-2 w-52 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-20 flex flex-col">
+                              <button 
+                                onClick={() => {
+                                  handleGroupStatusUpdate(order.originalIds, 'PRONTO');
+                                  setOpenMenuId(null);
+                                }}
+                                className="px-4 py-3 text-left text-xs font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-2 w-full"
+                              >
+                                <RefreshCw size={14} className="text-blue-500"/> Voltar para Pronto
+                              </button>
+                              
+                              <button 
+                                onClick={() => {
+                                  const proceedCancel = () => {
+                                    if(window.confirm('Tem certeza que deseja cancelar este pedido?')) {
+                                      handleGroupStatusUpdate(order.originalIds, 'CANCELADO');
+                                    }
+                                    setOpenMenuId(null);
+                                  };
+                                  if (isGerente || settings.canWaitstaffCancelItems) {
+                                    proceedCancel();
+                                  } else {
+                                    setOpenMenuId(null);
+                                    setManagerModal({
+                                      isOpen: true,
+                                      title: 'Cancelar Pedido',
+                                      actionDescription: `Esta conta de atendente não possui permissão para cancelar o pedido #${order.displayId || order.id}.`,
+                                      onSuccess: () => {
+                                        proceedCancel();
+                                      }
+                                    });
+                                  }
+                                }}
+                                className="px-4 py-3 text-left text-xs font-bold text-red-500 hover:bg-red-50 flex items-center gap-2 border-t border-gray-50 w-full"
+                              >
+                                <XCircle size={14} /> Cancelar Pedido
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      )
+                      </div>
                     )}
                   </div>
                 </div>
@@ -950,15 +1134,18 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
 
             {(() => {
               const targetOrders = orders.filter(o => paymentModalData?.orderIds.includes(o.id));
-              const allPaid = targetOrders.length > 0 && targetOrders.every(o => o.status === 'PAGO');
-              const somePaid = targetOrders.some(o => o.status === 'PAGO');
-              const paidOrders = targetOrders.filter(o => o.status === 'PAGO');
-              const unpaidOrders = targetOrders.filter(o => o.status !== 'PAGO');
+              const isOrderAlreadyPaid = (o: Order) => o.status === 'PAGO' || (!!o.paymentMethod && o.paymentMethod !== 'A_PAGAR');
+              const allPaid = targetOrders.length > 0 && targetOrders.every(isOrderAlreadyPaid);
+              const somePaid = targetOrders.some(isOrderAlreadyPaid);
+              const paidOrders = targetOrders.filter(isOrderAlreadyPaid);
+              const unpaidOrders = targetOrders.filter(o => !isOrderAlreadyPaid(o));
 
               if (allPaid) {
+                const existingMethod = targetOrders[0]?.paymentMethod || 'PIX';
+                const existingDetails = targetOrders[0]?.paymentDetails || JSON.stringify([{ method: existingMethod, amount: paymentModalData.totalAmount }]);
                 return (
-                  <div className="bg-green-50 text-green-800 p-4 rounded-2xl mb-6 border border-green-200 flex flex-col items-center justify-center text-center">
-                    <span className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-green-600 mb-1">
+                  <div className="bg-green-50 text-green-800 p-4 rounded-2xl mb-6 border border-green-200 flex flex-col items-center justify-center text-center gap-2">
+                    <span className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-green-600">
                       <CheckCircle size={16} className="text-green-500 animate-pulse" /> PAGAMENTO JÁ REALIZADO
                     </span>
                     <span className="text-xs font-bold leading-relaxed">
@@ -967,6 +1154,13 @@ const AttendantPanel: React.FC<Props> = ({ adminUser, onSelectTable, orders, set
                         {targetOrders.map(o => o.paymentMethod === 'ONLINE' ? 'Pagar externo' : (o.paymentMethod || 'Pagar externo')).filter((v, i, a) => a.indexOf(v) === i).join(', ')}
                       </strong>
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => paymentModalData.onSuccess(existingMethod, existingDetails)}
+                      className="mt-1 w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-md active:scale-95 transition-all flex items-center justify-center gap-2"
+                    >
+                      <CheckCircle2 size={16} /> Confirmar Entrega (Manter Pagamento)
+                    </button>
                   </div>
                 );
               }

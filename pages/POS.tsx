@@ -2390,10 +2390,10 @@ export default function POS({ storeId, user, settings, orders, products: propPro
         tableNumber: (orderType === 'COMANDA' || orderType === 'MESA') ? commandNumber : undefined,
         items: cart,
         status: isAutoFinalize 
-          ? (orderType === 'ENTREGA' ? 'ENVIADO_PARA_ENTREGA' : 'ENTREGUE') 
+          ? (orderType === 'ENTREGA' ? (deliveryDetails.driverId === 'OUTROS_MEIOS' ? 'ENTREGUE' : 'ENVIADO_PARA_ENTREGA') : 'ENTREGUE') 
           : (hasRealPayment 
               ? 'PAGO' 
-              : ((orderType === 'ENTREGA' && settings.autoApproveDeliveries) ? 'ENVIADO_PARA_ENTREGA' : 'PREPARANDO')),
+              : ((orderType === 'ENTREGA' && settings.autoApproveDeliveries) ? (deliveryDetails.driverId === 'OUTROS_MEIOS' ? 'PREPARANDO' : 'ENVIADO_PARA_ENTREGA') : 'PREPARANDO')),
         total: total,
         serviceFee: serviceFee,
         paymentMethod: finalPayments.length === 1 ? finalPayments[0].method : 'MISTO' as any,
@@ -2470,8 +2470,10 @@ export default function POS({ storeId, user, settings, orders, products: propPro
           if (origOrder) {
               const advancedStatuses = ['PRONTO', 'ENVIADO_PARA_ENTREGA', 'SAIU_PARA_ENTREGA', 'CHEGUEI_NA_ORIGEM', 'ENTREGUE', 'CLOSED'];
               if (advancedStatuses.includes(origOrder.status)) {
-                  if (origOrder.status === 'PRONTO') {
-                      order.status = orderType === 'ENTREGA' ? 'ENVIADO_PARA_ENTREGA' : 'ENTREGUE';
+                  if (isAutoFinalize && (deliveryDetails.driverId === 'OUTROS_MEIOS' || ['ENVIADO_PARA_ENTREGA', 'SAIU_PARA_ENTREGA', 'CHEGUEI_NA_ORIGEM'].includes(origOrder.status))) {
+                      order.status = 'ENTREGUE';
+                  } else if (origOrder.status === 'PRONTO') {
+                      order.status = (orderType === 'ENTREGA' && deliveryDetails.driverId !== 'OUTROS_MEIOS') ? 'ENVIADO_PARA_ENTREGA' : 'ENTREGUE';
                   } else {
                       order.status = origOrder.status; // Keep the advanced status
                   }
@@ -4467,7 +4469,7 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                           </div>
                       </div>
                       <div className="space-y-1 md:col-span-2">
-                          <label className="text-xs font-bold text-blue-700 uppercase">Entregador (Opcional)</label>
+                          <label className="text-xs font-bold text-blue-700 uppercase">Entregador / Modalidade de Envio</label>
                           <div className="relative">
                               <Truck className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-300" size={16} />
                               <select 
@@ -4475,12 +4477,18 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                                   onChange={e => setDeliveryDetails({...deliveryDetails, driverId: e.target.value})}
                                   className="w-full pl-10 p-3 rounded-xl border border-blue-100 focus:ring-2 focus:ring-blue-400 outline-none bg-white"
                               >
-                                  <option value="">Em Aberto (Qualquer Entregador)</option>
+                                  <option value="">Em Aberto (Qualquer Entregador do App)</option>
+                                  <option value="OUTROS_MEIOS">Outros Meios / Entrega Externa (Fora do App)</option>
                                   {couriers.map(c => (
                                       <option key={c.id} value={c.id}>{c.name}</option>
                                   ))}
                               </select>
                           </div>
+                          {deliveryDetails.driverId === 'OUTROS_MEIOS' && (
+                              <p className="text-[11px] font-medium text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-lg mt-1">
+                                  Esta entrega será registrada como enviada por outros meios (ex: Motoboy externo, Uber Flash, 99, Retirada por terceiro) e não ficará presa aguardando entregador no painel do app.
+                              </p>
+                          )}
                       </div>
 
                       <div className="space-y-1 md:col-span-2">
@@ -5288,9 +5296,9 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                                         {order.status.replace(/_/g, ' ')}
                                     </span>
                                     {order.deliveryDriverId && (
-                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider bg-yellow-100 text-yellow-700 flex items-center gap-1">
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 ${order.deliveryDriverId === 'OUTROS_MEIOS' ? 'bg-indigo-100 text-indigo-700' : 'bg-yellow-100 text-yellow-700'}`}>
                                             <Truck size={10} />
-                                            {couriers.find(c => c.id === order.deliveryDriverId)?.name || 'Entregador'}
+                                            {order.deliveryDriverId === 'OUTROS_MEIOS' ? 'Outros Meios (Fora do App)' : (couriers.find(c => c.id === order.deliveryDriverId)?.name || 'Entregador')}
                                         </span>
                                     )}
                                 </div>

@@ -28,6 +28,7 @@ interface DeliveryPanelProps {
 
 export default function DeliveryPanel({ storeId, user, settings, orders, storeSlug, onLogout }: DeliveryPanelProps) {
   const [deliveries, setDeliveries] = useState<Order[]>([]);
+  const [dbDeliveries, setDbDeliveries] = useState<Order[]>([]);
   const [historyDeliveries, setHistoryDeliveries] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'available' | 'mine' | 'history' | 'all'>('mine');
@@ -35,10 +36,46 @@ export default function DeliveryPanel({ storeId, user, settings, orders, storeSl
   const [showBulkFinalizeModal, setShowBulkFinalizeModal] = useState(false);
   const [bulkDeliveries, setBulkDeliveries] = useState<Order[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const hasAutoSelectedTabRef = useRef(false);
+
+  const fetchActiveDeliveries = async () => {
+    if (!storeId) return;
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('store_id', storeId)
+        .eq('type', 'ENTREGA')
+        .in('status', ['ENVIADO_PARA_ENTREGA', 'SAIU_PARA_ENTREGA', 'CHEGUEI_NA_ORIGEM'])
+        .order('createdAt', { ascending: false });
+
+      if (!error && data) {
+        const mapped = data.map((d: any) => ({
+          ...d,
+          id: String(d.id),
+          items: typeof d.items === 'string' ? (() => { try { return JSON.parse(d.items); } catch { return []; } })() : (d.items || []),
+          total: Number(d.total || 0),
+          deliveryFee: Number(d.deliveryFee || 0),
+          createdAt: Number(d.createdAt || Date.now()),
+          deliveryDriverId: d.deliveryDriverId || d.deliverydriverid || d.delivery_driver_id
+        })) as Order[];
+        setDbDeliveries(mapped);
+      }
+    } catch (err) {
+      console.error("Erro ao buscar entregas ativas:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchActiveDeliveries();
+    const interval = setInterval(fetchActiveDeliveries, 15000);
+    return () => clearInterval(interval);
+  }, [storeId]);
 
   useEffect(() => {
     if (user.role === 'GERENTE') {
-        // setActiveTab('all'); // Removed 'all' option
         fetchCouriers();
     }
   }, [user.role]);
@@ -62,23 +99,41 @@ export default function DeliveryPanel({ storeId, user, settings, orders, storeSl
   }, [activeTab]);
 
   useEffect(() => {
-      const computedDeliveries = orders.filter(o => 
+      const mergedMap = new Map<string, Order>();
+      orders.forEach(o => mergedMap.set(String(o.id), o));
+      dbDeliveries.forEach(o => mergedMap.set(String(o.id), o));
+
+      const computedDeliveries = Array.from(mergedMap.values()).filter(o => 
           o.type === 'ENTREGA' && 
+          o.deliveryDriverId !== 'OUTROS_MEIOS' &&
           ['ENVIADO_PARA_ENTREGA', 'SAIU_PARA_ENTREGA', 'CHEGUEI_NA_ORIGEM'].includes(o.status)
-      );
+      ).sort((a, b) => b.createdAt - a.createdAt);
       
       setDeliveries(computedDeliveries);
 
-      const newAvailableCount = computedDeliveries.filter((o: Order) => 
-          o.status === 'ENVIADO_PARA_ENTREGA' && (!o.deliveryDriverId || o.deliveryDriverId === '' || o.deliveryDriverId === 'null' || o.deliveryDriverId === 'undefined')
-      ).length;
-      
+      const avail = computedDeliveries.filter((o: Order) => 
+          ['ENVIADO_PARA_ENTREGA', 'SAIU_PARA_ENTREGA'].includes(o.status) && (!o.deliveryDriverId || o.deliveryDriverId === '' || o.deliveryDriverId === 'null' || o.deliveryDriverId === 'undefined')
+      );
+      const mine = computedDeliveries.filter((o: Order) => 
+          String(o.deliveryDriverId) === String(user.id) && o.status !== 'ENTREGUE' && o.status !== 'CANCELADO'
+      );
+
+      if (!hasAutoSelectedTabRef.current && computedDeliveries.length > 0) {
+          hasAutoSelectedTabRef.current = true;
+          if (mine.length === 0 && avail.length > 0) {
+              setActiveTab('available');
+          } else if (user.role === 'GERENTE' && mine.length === 0) {
+              setActiveTab('all');
+          }
+      }
+
+      const newAvailableCount = avail.length;
       if (newAvailableCount > previousCountRef.current) {
         playSound();
       }
       previousCountRef.current = newAvailableCount;
       setLoading(false);
-  }, [orders]);
+  }, [orders, dbDeliveries, user.id, user.role]);
 
   const fetchWeeklyCount = async () => {
       if (!storeId || !user.id) return;
@@ -161,6 +216,10 @@ export default function DeliveryPanel({ storeId, user, settings, orders, storeSl
       .from('orders')
       .eq('id', orderId)
       .update(updatePayload);
+
+    setDbDeliveries(prev => newStatus === 'ENTREGUE' ? prev.filter(o => String(o.id) !== String(orderId)) : prev.map(o => String(o.id) === String(orderId) ? { ...o, ...updatePayload } : o));
+    fetchActiveDeliveries();
+    if (newStatus === 'ENTREGUE') fetchWeeklyCount();
   };
 
   const updateReturnStatus = async (orderId: string, returnStatus: string, newStatus?: string) => {
@@ -187,6 +246,10 @@ export default function DeliveryPanel({ storeId, user, settings, orders, storeSl
       .from('orders')
       .eq('id', orderId)
       .update(updatePayload);
+
+    setDbDeliveries(prev => newStatus === 'ENTREGUE' ? prev.filter(o => String(o.id) !== String(orderId)) : prev.map(o => String(o.id) === String(orderId) ? { ...o, ...updatePayload } : o));
+    fetchActiveDeliveries();
+    if (newStatus === 'ENTREGUE') fetchWeeklyCount();
   };
 
   const acceptDelivery = async (orderId: string) => {
@@ -201,6 +264,7 @@ export default function DeliveryPanel({ storeId, user, settings, orders, storeSl
       
     if (currentOrder && currentOrder.deliveryDriverId && currentOrder.deliveryDriverId !== '' && currentOrder.deliveryDriverId !== 'null' && currentOrder.deliveryDriverId !== 'undefined') {
       setErrorMsg("Ops! Esta entrega já foi aceita por outro entregador.");
+      fetchActiveDeliveries();
       return;
     }
 
@@ -208,6 +272,9 @@ export default function DeliveryPanel({ storeId, user, settings, orders, storeSl
       .from('orders')
       .eq('id', orderId)
       .update({ deliveryDriverId: user.id });
+
+    setDbDeliveries(prev => prev.map(o => String(o.id) === String(orderId) ? { ...o, deliveryDriverId: user.id } : o));
+    fetchActiveDeliveries();
     setActiveTab('mine');
   };
 
@@ -259,6 +326,7 @@ export default function DeliveryPanel({ storeId, user, settings, orders, storeSl
                 .update(updates);
         }
         setShowBulkFinalizeModal(false);
+        fetchActiveDeliveries();
         fetchWeeklyCount();
     };
 
@@ -272,7 +340,7 @@ export default function DeliveryPanel({ storeId, user, settings, orders, storeSl
   );
 
   const myDeliveries = deliveries.filter(o => 
-    o.deliveryDriverId === user.id && o.status !== 'ENTREGUE' && o.status !== 'CANCELADO'
+    String(o.deliveryDriverId) === String(user.id) && o.status !== 'ENTREGUE' && o.status !== 'CANCELADO'
   );
 
   const displayedDeliveries = activeTab === 'available' 
@@ -280,7 +348,7 @@ export default function DeliveryPanel({ storeId, user, settings, orders, storeSl
     : activeTab === 'history' 
         ? historyDeliveries 
         : activeTab === 'all'
-            ? deliveries.filter(o => ['ENVIADO_PARA_ENTREGA', 'SAIU_PARA_ENTREGA', 'CHEGUEI_NA_ORIGEM'].includes(o.status) || o.deliveryDriverId === user.id)
+            ? deliveries.filter(o => ['ENVIADO_PARA_ENTREGA', 'SAIU_PARA_ENTREGA', 'CHEGUEI_NA_ORIGEM'].includes(o.status) || String(o.deliveryDriverId) === String(user.id))
             : myDeliveries;
 
   return (
@@ -304,7 +372,7 @@ export default function DeliveryPanel({ storeId, user, settings, orders, storeSl
             </div>
             <div className="flex gap-2">
               <InstallPrompt appType="entregador" />
-              <button onClick={() => window.location.reload()} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+              <button onClick={() => { setLoading(true); fetchActiveDeliveries(); fetchWeeklyCount(); }} className="p-2 hover:bg-white/10 rounded-full transition-colors">
                 <RefreshCw size={20} />
               </button>
               <button onClick={onLogout} className="p-2 hover:bg-red-500/20 rounded-full transition-colors text-red-200 hover:text-red-100">
@@ -343,6 +411,19 @@ export default function DeliveryPanel({ storeId, user, settings, orders, storeSl
                 <Package size={16} />
                 Disponíveis ({availableDeliveries.length})
             </button>
+            {user.role === 'GERENTE' && (
+                <button 
+                    onClick={() => setActiveTab('all')}
+                    className={`flex-1 py-3 px-4 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 whitespace-nowrap ${
+                        activeTab === 'all' 
+                        ? 'bg-amber-100 text-amber-800 shadow-sm' 
+                        : 'text-gray-500 hover:bg-gray-50'
+                    }`}
+                >
+                    <Truck size={16} />
+                    Todas ({deliveries.length})
+                </button>
+            )}
             <button 
                 onClick={() => setActiveTab('history')}
                 className={`flex-1 py-3 px-4 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 whitespace-nowrap ${
@@ -361,15 +442,24 @@ export default function DeliveryPanel({ storeId, user, settings, orders, storeSl
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-900"></div>
           </div>
         ) : displayedDeliveries.length === 0 ? (
-          <div className="text-center py-20 opacity-50">
-            <Package size={64} className="mx-auto mb-4 text-gray-400" />
-            <p className="text-xl font-bold text-gray-500">
+          <div className="text-center py-20">
+            <Package size={64} className="mx-auto mb-4 text-gray-300" />
+            <p className="text-xl font-bold text-gray-400">
                 {activeTab === 'available' 
                     ? 'Nenhuma entrega disponível' 
                     : activeTab === 'history'
                         ? 'Nenhuma entrega no histórico recente'
                         : 'Você não tem entregas ativas'}
             </p>
+            {activeTab === 'mine' && availableDeliveries.length > 0 && (
+              <button
+                onClick={() => setActiveTab('available')}
+                className="mt-4 px-6 py-3 bg-green-600 text-white rounded-xl font-bold text-sm shadow-lg hover:bg-green-700 transition-all inline-flex items-center gap-2"
+              >
+                <Package size={18} />
+                Ver {availableDeliveries.length} entrega(s) disponível(is)
+              </button>
+            )}
           </div>
         ) : (
           <>

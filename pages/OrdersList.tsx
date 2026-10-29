@@ -55,6 +55,7 @@ interface GroupedOrder {
   nfceReference?: string;
   nfceStatus?: string;
   scheduledTime?: string;
+  deliveryDriverId?: string;
 }
 
 const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder, settings, updateOrder }) => {
@@ -141,7 +142,8 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                 installments: order.installments,
                 nfceReference: order.nfce_reference,
                 nfceStatus: order.nfce_status,
-                scheduledTime: order.scheduledTime
+                scheduledTime: order.scheduledTime,
+                deliveryDriverId: order.deliveryDriverId
             });
         }
     });
@@ -523,6 +525,11 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                       <UserRound size={10} /> {group.waitstaffName}
                     </span>
                   )}
+                  {group.deliveryDriverId === 'OUTROS_MEIOS' && (
+                    <span className="bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-widest flex items-center gap-1">
+                      Outros Meios (Fora do App)
+                    </span>
+                  )}
                   <span className="bg-zinc-100 text-zinc-600 px-2 py-1 rounded-full text-[8px] font-black uppercase flex items-center gap-1">
                     <Clock size={10} /> {new Date(group.createdAt).toLocaleDateString('pt-BR')} {new Date(group.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
@@ -669,10 +676,10 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
                  {group.status !== 'ENTREGUE' && (
                    <button 
                     disabled={isProcessing}
-                    onClick={() => handleStatusUpdate(group, (group.type === 'ENTREGA' && group.status !== 'ENVIADO_PARA_ENTREGA') ? 'ENVIADO_PARA_ENTREGA' : 'ENTREGUE')} 
+                    onClick={() => handleStatusUpdate(group, (group.type === 'ENTREGA' && group.status !== 'ENVIADO_PARA_ENTREGA' && group.deliveryDriverId !== 'OUTROS_MEIOS' && !['SAIU_PARA_ENTREGA', 'CHEGUEI_NA_ORIGEM'].includes(group.status)) ? 'ENVIADO_PARA_ENTREGA' : 'ENTREGUE')} 
                     className={`flex-1 py-3.5 bg-green-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
                    >
-                    {group.type === 'ENTREGA' && group.status !== 'ENVIADO_PARA_ENTREGA' ? 'Enviar p/ Entrega' : 'Finalizar'}
+                    {group.type === 'ENTREGA' && group.status !== 'ENVIADO_PARA_ENTREGA' && group.deliveryDriverId !== 'OUTROS_MEIOS' && !['SAIU_PARA_ENTREGA', 'CHEGUEI_NA_ORIGEM'].includes(group.status) ? 'Enviar p/ Entrega' : 'Finalizar'}
                    </button>
                  )}
                  
