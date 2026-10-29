@@ -517,7 +517,12 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
             isByWeight: !!editingProduct.isByWeight,
             barcode: editingProduct.barcode || undefined,
             stock: (editingProduct.stock != null && !isNaN(Number(editingProduct.stock))) ? Number(editingProduct.stock) : null,
-            units: (editingProduct.units != null && !isNaN(Number(editingProduct.units))) ? Number(editingProduct.units) : null,
+            units: ((editingProduct.minOrderQuantity ?? editingProduct.units) != null && !isNaN(Number(editingProduct.minOrderQuantity ?? editingProduct.units)) && Number(editingProduct.minOrderQuantity ?? editingProduct.units) > 1)
+                ? Math.floor(Number(editingProduct.minOrderQuantity ?? editingProduct.units))
+                : null,
+            minOrderQuantity: ((editingProduct.minOrderQuantity ?? editingProduct.units) != null && !isNaN(Number(editingProduct.minOrderQuantity ?? editingProduct.units)) && Number(editingProduct.minOrderQuantity ?? editingProduct.units) > 1)
+                ? Math.floor(Number(editingProduct.minOrderQuantity ?? editingProduct.units))
+                : undefined,
             ncm: editingProduct.ncm || undefined,
             cfop: editingProduct.cfop || undefined,
             icms_situacao_tributaria: editingProduct.icms_situacao_tributaria || undefined,
@@ -796,6 +801,11 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                 {product.isCombo && (
                     <span className="bg-amber-500 text-white text-[8px] font-black px-2 py-1 rounded shadow-lg flex items-center gap-1 uppercase">
                         <Layers size={10} /> Combo ({product.comboItems?.length || 0} itens)
+                    </span>
+                )}
+                {((product.minOrderQuantity || product.units || 0) > 1) && (
+                    <span className="bg-indigo-600 text-white text-[8px] font-black px-2 py-1 rounded shadow-lg flex items-center gap-1 uppercase">
+                        Mín. {product.minOrderQuantity || product.units} un.
                     </span>
                 )}
             </div>
@@ -1200,6 +1210,40 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                   )}
                 </div>
               </div>
+
+              {!editingProduct?.isByWeight && (
+                <div className="bg-indigo-50/60 p-3.5 rounded-2xl border border-indigo-100 space-y-1.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex-1">
+                      <label className="block text-xs font-bold text-indigo-900 uppercase">
+                        Quantidade Mínima para Venda (Atacado / Lote)
+                      </label>
+                      <p className="text-[10px] text-indigo-600 leading-tight mt-0.5">
+                        O botão Finalizar Venda só será liberado quando o cliente atingir esta quantidade (ou mais) deste produto.
+                      </p>
+                    </div>
+                    <div className="w-28 shrink-0">
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={(editingProduct?.minOrderQuantity ?? editingProduct?.units) || ''}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => {
+                          const val = e.target.value === '' ? undefined : Math.max(1, parseInt(e.target.value) || 1);
+                          setEditingProduct({
+                            ...editingProduct,
+                            minOrderQuantity: val && val > 1 ? val : undefined,
+                            units: val && val > 1 ? val : undefined
+                          });
+                        }}
+                        className="w-full p-2 bg-white border border-indigo-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-black text-center text-indigo-900"
+                        placeholder="Ex: 6"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {editingProduct?.isCombo && (
                 <div className="bg-amber-50/50 px-3 py-4 border border-amber-200 rounded-2xl space-y-3">

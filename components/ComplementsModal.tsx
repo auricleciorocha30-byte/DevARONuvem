@@ -58,6 +58,11 @@ export const ComplementsModal: React.FC<Props> = ({
           <div>
             <h2 className="text-xl font-bold">{product.name}</h2>
             <p className="text-gray-500 text-sm">{product.description}</p>
+            {((product.minOrderQuantity || product.units || 0) > 1) && (
+              <span className="inline-block mt-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full">
+                Quantidade mínima p/ finalizar venda: {product.minOrderQuantity || product.units} un.
+              </span>
+            )}
           </div>
           <button onClick={onClose} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200">
             <X size={20} />
@@ -165,16 +170,29 @@ export const ComplementsModal: React.FC<Props> = ({
 
          <div className="p-6 border-t bg-gray-50 sm:rounded-b-[3rem]">
           <div className="flex items-center gap-4 mb-4 justify-between">
-            <div className="flex items-center gap-4 bg-white border rounded-2xl p-2 shadow-sm">
+            <div className="flex items-center gap-2 bg-white border rounded-2xl p-2 shadow-sm">
               <button 
-                onClick={() => onQuantityChange(quantity - 1)} 
+                type="button"
+                onClick={() => onQuantityChange(Math.max(1, quantity - 1))} 
                 disabled={quantity <= 1}
                 className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 disabled:opacity-50"
               >
                 <Minus size={20} />
               </button>
-              <span className="font-black text-xl w-6 text-center">{quantity}</span>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={quantity}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value);
+                  if (!isNaN(val) && val >= 1) onQuantityChange(val);
+                }}
+                className="font-black text-xl w-12 text-center outline-none bg-transparent"
+              />
               <button 
+                type="button"
                 onClick={() => onQuantityChange(quantity + 1)} 
                 className="p-3 bg-green-50 text-green-500 rounded-xl hover:bg-green-100"
               >

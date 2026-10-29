@@ -1046,7 +1046,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                 const newQty = item.quantity + (delta * step);
                 
                 if (delta > 0) {
-                    const product = products.find(p => p.id === productId);
+                    const product = products.find(p => p.id === (item.originalProductId || item.productId));
                     if (product && product.stock != null && newQty > product.stock) {
                         showAlert(`Estoque insuficiente! Disponível: ${product.stock} ${product.isByWeight ? 'KG' : 'un'}`);
                         return item;
@@ -1059,6 +1059,80 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
         }).filter(Boolean) as OrderItem[];
     });
   };
+
+  const setCartItemExactQuantity = (productId: string, targetQty: number) => {
+    if (isNaN(targetQty) || targetQty < 1) return;
+    setCart(prev => {
+      return prev.map(item => {
+        if (item.productId === productId) {
+          const product = products.find(p => p.id === (item.originalProductId || item.productId));
+          if (product && product.stock != null && targetQty > product.stock) {
+            showAlert(`Estoque insuficiente! Disponível: ${product.stock} ${product.isByWeight ? 'KG' : 'un'}`);
+            return { ...item, quantity: Math.max(1, Math.floor(product.stock)) };
+          }
+          return { ...item, quantity: Math.floor(targetQty) };
+        }
+        return item;
+      });
+    });
+  };
+
+  const minQuantityValidation = useMemo(() => {
+    const productTotals = new Map<string, { product: Product; currentQty: number; minQty: number; sampleCartItemId: string }>();
+    let totalCartUnits = 0;
+
+    cart.forEach(item => {
+      if (item.isRoulettePrize) return;
+      const baseProdId = item.originalProductId || item.productId;
+      const prod = products.find(p => p.id === baseProdId);
+      const complementsQtySum = (item.complements && item.complements.length > 0)
+        ? item.complements.reduce((sum, c) => sum + (c.quantity || 0), 0)
+        : 0;
+      const effectiveItemUnits = (prod && prod.price === 0 && complementsQtySum > 0)
+        ? Math.max(item.quantity, item.quantity * complementsQtySum)
+        : item.quantity;
+
+      if (!item.isByWeight) {
+        totalCartUnits += effectiveItemUnits;
+      }
+
+      if (prod && !prod.isByWeight) {
+        const minQty = Number(prod.minOrderQuantity || prod.units || 0);
+        if (minQty > 1) {
+          const existing = productTotals.get(prod.id);
+          if (existing) {
+            existing.currentQty += effectiveItemUnits;
+          } else {
+            productTotals.set(prod.id, {
+              product: prod,
+              currentQty: effectiveItemUnits,
+              minQty,
+              sampleCartItemId: item.productId
+            });
+          }
+        }
+      }
+    });
+
+    const unmetProducts = Array.from(productTotals.values())
+      .filter(entry => entry.currentQty < entry.minQty)
+      .map(entry => ({
+        ...entry,
+        missingQty: entry.minQty - entry.currentQty
+      }));
+
+    const storeMinQty = Number(settings.minOrderQuantity || 0);
+    const unmetStoreMinQty = storeMinQty > 1 && totalCartUnits < storeMinQty
+      ? { minQty: storeMinQty, currentQty: totalCartUnits, missingQty: storeMinQty - totalCartUnits }
+      : null;
+
+    return {
+      isValid: unmetProducts.length === 0 && !unmetStoreMinQty,
+      unmetProducts,
+      unmetStoreMinQty,
+      productTotals
+    };
+  }, [cart, products, settings.minOrderQuantity]);
 
   const { subtotal, cartTotal } = useMemo(() => {
     const sub = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
@@ -1152,6 +1226,18 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
     if (orderType === 'ENTREGA' && settings.minDeliveryOrderValue && cartTotal < settings.minDeliveryOrderValue) {
         showAlert(`O valor mínimo para entrega é R$ ${settings.minDeliveryOrderValue.toFixed(2)}`);
         return;
+    }
+
+    if (!minQuantityValidation.isValid) {
+        if (minQuantityValidation.unmetProducts.length > 0) {
+            const first = minQuantityValidation.unmetProducts[0];
+            showAlert(`O produto "${first.product.name}" exige quantidade mínima de ${first.minQty} un. (faltam ${first.missingQty} un.) para liberar a finalização.`);
+            return;
+        }
+        if (minQuantityValidation.unmetStoreMinQty) {
+            showAlert(`A quantidade mínima de itens para finalizar o pedido é de ${minQuantityValidation.unmetStoreMinQty.minQty} un. (faltam ${minQuantityValidation.unmetStoreMinQty.missingQty} un.).`);
+            return;
+        }
     }
 
     setIsSending(true);
@@ -1879,7 +1965,10 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
               </div>
               <div className="flex-1 min-w-0 flex flex-col justify-between h-full py-1">
                 <div className="min-w-0">
-                  {settings?.isCashbackActive && (!settings.cashbackScope || settings.cashbackScope === 'all' || (settings.cashbackScope === 'selected' && settings.cashbackProductIds?.includes(product.id))) && <div className="mb-1.5"><span className="bg-green-100 text-green-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center w-fit gap-1"><DollarSign size={10}/> Cashback Ativo</span></div>}
+                  <div className="flex flex-wrap gap-1 mb-1.5">
+                    {settings?.isCashbackActive && (!settings.cashbackScope || settings.cashbackScope === 'all' || (settings.cashbackScope === 'selected' && settings.cashbackProductIds?.includes(product.id))) && <span className="bg-green-100 text-green-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center w-fit gap-1"><DollarSign size={10}/> Cashback Ativo</span>}
+                    {((product.minOrderQuantity || product.units || 0) > 1) && <span className="bg-indigo-100 text-indigo-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center w-fit gap-1">Mín. {product.minOrderQuantity || product.units} un.</span>}
+                  </div>
                   <h3 className="font-bold text-sm md:text-base leading-tight text-slate-800 mb-1">{product.name}</h3>
                   <p className="text-[11px] text-slate-500 whitespace-normal line-clamp-2 leading-relaxed">{product.description}</p>
                   {product.isCombo && getComboItems(product.comboItems).length > 0 && (
@@ -1980,41 +2069,80 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                      ) : (
                        <>
                          <div className="space-y-4">
-                            {cart.map(item => (
-                              <div key={item.productId} className="flex items-center gap-4 bg-gray-50/50 p-4 rounded-3xl border border-gray-100 group">
-                                 <div className="flex-1 min-w-0">
-                                    <h4 className="font-bold text-gray-800 break-words">{item.name}</h4>
-                                    {item.complements && item.complements.length > 0 && (
-                                       <ul className="mt-1 space-y-1 mb-2">
-                                          {item.complements.map((comp, idx) => (
-                                             <li key={idx} className="text-[10px] text-gray-500 font-medium">
-                                                <span className="text-gray-400 font-bold">{comp.quantity}x</span> {comp.name}
-                                                {comp.price > 0 && <span className="text-gray-400"> (+ R$ {(comp.price * comp.quantity).toFixed(2)})</span>}
-                                                {comp.description && <div className="italic text-gray-400 mt-0.5 ml-2">- {comp.description}</div>}
-                                             </li>
-                                          ))}
-                                       </ul>
-                                    )}
-                                    {item.isCombo && getComboItems(item.comboItems).length > 0 && (
-                                       <div className="mt-1 flex flex-wrap gap-1 mb-2">
-                                          {getComboItems(item.comboItems).map((comp, idx) => (
-                                             <span key={idx} className="bg-amber-50 text-amber-800 text-[9px] font-medium px-1.5 py-0.5 rounded border border-amber-200">
-                                                {comp.quantity * item.quantity}x {comp.name}
-                                             </span>
-                                          ))}
-                                       </div>
-                                    )}
-                                    {item.price > 0 && <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">R$ {item.price.toFixed(2)} {item.isByWeight ? '/kg' : 'un'}</p>}
+                            {cart.map(item => {
+                              const baseProdId = item.originalProductId || item.productId;
+                              const prodMinInfo = minQuantityValidation.productTotals.get(baseProdId);
+                              return (
+                              <div key={item.productId} className="flex flex-col gap-2 bg-gray-50/50 p-4 rounded-3xl border border-gray-100 group">
+                                 <div className="flex items-center gap-4">
+                                   <div className="flex-1 min-w-0">
+                                      <h4 className="font-bold text-gray-800 break-words">{item.name}</h4>
+                                      {item.complements && item.complements.length > 0 && (
+                                         <ul className="mt-1 space-y-1 mb-2">
+                                            {item.complements.map((comp, idx) => (
+                                               <li key={idx} className="text-[10px] text-gray-500 font-medium">
+                                                  <span className="text-gray-400 font-bold">{comp.quantity}x</span> {comp.name}
+                                                  {comp.price > 0 && <span className="text-gray-400"> (+ R$ {(comp.price * comp.quantity).toFixed(2)})</span>}
+                                                  {comp.description && <div className="italic text-gray-400 mt-0.5 ml-2">- {comp.description}</div>}
+                                               </li>
+                                            ))}
+                                         </ul>
+                                      )}
+                                      {item.isCombo && getComboItems(item.comboItems).length > 0 && (
+                                         <div className="mt-1 flex flex-wrap gap-1 mb-2">
+                                            {getComboItems(item.comboItems).map((comp, idx) => (
+                                               <span key={idx} className="bg-amber-50 text-amber-800 text-[9px] font-medium px-1.5 py-0.5 rounded border border-amber-200">
+                                                  {comp.quantity * item.quantity}x {comp.name}
+                                               </span>
+                                            ))}
+                                         </div>
+                                      )}
+                                      {item.price > 0 && <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">R$ {item.price.toFixed(2)} {item.isByWeight ? '/kg' : 'un'}</p>}
+                                   </div>
+                                   <div className="flex items-center bg-white rounded-2xl border border-gray-100 p-1 shadow-sm">
+                                      <button onClick={() => updateCartItemQuantity(item.productId, -1)} className="p-2 text-gray-400 hover:text-red-500 transition-colors"><MinusIcon size={14} /></button>
+                                      {item.isByWeight ? (
+                                        <span className="px-3 font-black text-sm text-primary min-w-[3rem] text-center">
+                                           {`${item.quantity.toFixed(3)}kg`}
+                                        </span>
+                                      ) : (
+                                        <input
+                                          type="number"
+                                          min="1"
+                                          step="1"
+                                          value={item.quantity}
+                                          onFocus={(e) => e.target.select()}
+                                          onChange={(e) => {
+                                            const val = parseInt(e.target.value);
+                                            if (!isNaN(val) && val >= 1) setCartItemExactQuantity(item.productId, val);
+                                          }}
+                                          className="w-12 font-black text-sm text-primary text-center outline-none bg-transparent"
+                                        />
+                                      )}
+                                      <button onClick={() => updateCartItemQuantity(item.productId, 1)} className="p-2 text-gray-400 hover:text-green-500 transition-colors"><PlusIcon size={14} /></button>
+                                   </div>
                                  </div>
-                                 <div className="flex items-center bg-white rounded-2xl border border-gray-100 p-1 shadow-sm">
-                                    <button onClick={() => updateCartItemQuantity(item.productId, -1)} className="p-2 text-gray-400 hover:text-red-500 transition-colors"><MinusIcon size={14} /></button>
-                                    <span className="px-3 font-black text-sm text-primary min-w-[3rem] text-center">
-                                       {item.isByWeight ? `${item.quantity.toFixed(3)}kg` : item.quantity}
-                                    </span>
-                                    <button onClick={() => updateCartItemQuantity(item.productId, 1)} className="p-2 text-gray-400 hover:text-green-500 transition-colors"><PlusIcon size={14} /></button>
-                                 </div>
+                                 {prodMinInfo && (
+                                   <div className={`flex items-center justify-between px-3 py-1.5 rounded-xl text-[10px] font-bold border ${prodMinInfo.currentQty < prodMinInfo.minQty ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
+                                     <span>
+                                       {prodMinInfo.currentQty < prodMinInfo.minQty
+                                         ? `Mínimo p/ venda: ${prodMinInfo.minQty} un. (Faltam ${prodMinInfo.minQty - prodMinInfo.currentQty} un.)`
+                                         : `✓ Quantidade mínima atingida (${prodMinInfo.currentQty}/${prodMinInfo.minQty} un.)`}
+                                     </span>
+                                     {prodMinInfo.currentQty < prodMinInfo.minQty && (
+                                       <button
+                                         type="button"
+                                         onClick={() => updateCartItemQuantity(item.productId, prodMinInfo.minQty - prodMinInfo.currentQty)}
+                                         className="px-2 py-0.5 bg-amber-600 text-white rounded-lg font-black uppercase tracking-wider hover:bg-amber-700 transition-colors"
+                                       >
+                                         + Completar ({prodMinInfo.minQty})
+                                       </button>
+                                     )}
+                                   </div>
+                                 )}
                               </div>
-                            ))}
+                              );
+                            })}
                          </div>
                        </>
                      )}
@@ -2636,7 +2764,38 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                  </div>
 
                  <div className="flex flex-col gap-3">
-                   <button onClick={() => setCheckoutStep('details')} className="w-full py-5 bg-secondary text-primary rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all">Prosseguir para Identificação</button>
+                   {!minQuantityValidation.isValid && (
+                     <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl space-y-1.5 text-left">
+                       <p className="text-[10px] font-black text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
+                         <AlertTriangle size={14} className="text-amber-600 shrink-0" />
+                         Atingir quantidade mínima para liberar a finalização:
+                       </p>
+                       {minQuantityValidation.unmetProducts.map(up => (
+                         <div key={up.product.id} className="flex items-center justify-between gap-2 text-[11px] text-amber-800">
+                           <span>• <strong>{up.product.name}</strong>: mín. {up.minQty} un. (faltam {up.missingQty})</span>
+                           <button
+                             type="button"
+                             onClick={() => updateCartItemQuantity(up.sampleCartItemId, up.missingQty)}
+                             className="px-2 py-0.5 bg-amber-600 text-white rounded-lg text-[10px] font-black uppercase shrink-0"
+                           >
+                             + Completar
+                           </button>
+                         </div>
+                       ))}
+                       {minQuantityValidation.unmetStoreMinQty && (
+                         <p className="text-[11px] text-amber-800">
+                           • Mínimo geral do pedido: <strong>{minQuantityValidation.unmetStoreMinQty.minQty} itens</strong> (faltam {minQuantityValidation.unmetStoreMinQty.missingQty})
+                         </p>
+                       )}
+                     </div>
+                   )}
+                   <button
+                     disabled={!minQuantityValidation.isValid}
+                     onClick={() => setCheckoutStep('details')}
+                     className="w-full py-5 bg-secondary text-primary rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                   >
+                     {minQuantityValidation.isValid ? 'Prosseguir para Identificação' : 'Atingir Quantidade Mínima p/ Liberar'}
+                   </button>
                    <button onClick={handleCloseCart} className="w-full py-4 bg-gray-100 text-gray-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-gray-200 transition-all">
                      <div className="flex items-center justify-center gap-2">
                        <PlusIcon size={16} /> Adicionar mais itens

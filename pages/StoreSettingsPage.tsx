@@ -712,7 +712,7 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                 </div>
                 {localSettings.isDeliveryActive && (
                   <div className="p-3 bg-gray-50 rounded-xl space-y-1 mt-3">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Pedido Mínimo (R$)</label>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Pedido Mínimo Entrega (R$)</label>
                     <input 
                       type="text" 
                       inputMode="decimal"
@@ -727,6 +727,25 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
                     />
                   </div>
                 )}
+                <div className="p-3 bg-indigo-50/60 border border-indigo-100 rounded-xl space-y-1.5 mt-3">
+                  <label className="text-[10px] font-bold text-indigo-900 uppercase ml-1">Quantidade Mínima Geral p/ Liberar Venda (Unid.)</label>
+                  <input 
+                    type="number" 
+                    min="0"
+                    step="1"
+                    placeholder="Ex: 6 (0 ou vazio = sem mínimo geral)" 
+                    value={!localSettings.minOrderQuantity ? '' : localSettings.minOrderQuantity} 
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => {
+                      const val = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value) || 0);
+                      setLocalSettings({...localSettings, minOrderQuantity: val});
+                    }} 
+                    className="w-full px-3 py-2 bg-white rounded-lg border border-indigo-200 outline-none text-sm font-bold text-indigo-900" 
+                  />
+                  <p className="text-[10px] text-indigo-600 leading-tight ml-1">
+                    Libera o botão Finalizar Venda somente quando a soma de itens atingir esta quantidade (ou configure por produto na aba Cardápio).
+                  </p>
+                </div>
             </div>
           </section>
         </div>
@@ -1012,6 +1031,40 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
               <Settings size={16} /> Regras de Negócio
             </h2>
             <div className="space-y-4">
+              <div className="p-4 bg-indigo-50/60 border border-indigo-100 rounded-2xl space-y-3">
+                <div>
+                  <span className="text-sm font-bold text-indigo-900 block">Venda em Quantidades (Atacado / Lote Mínimo)</span>
+                  <span className="text-[10px] text-indigo-600 block mt-0.5">
+                    Defina uma quantidade mínima geral de produtos para liberar o botão Finalizar Venda, ou configure individualmente no cadastro de cada produto (menu Cardápio).
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-indigo-800 uppercase ml-1">Quantidade Mínima Geral no Pedido (Unid.)</label>
+                  <input 
+                    type="number" 
+                    min="0"
+                    step="1"
+                    placeholder="Ex: 6 (Deixe vazio se usar apenas mínimo por produto)" 
+                    value={!localSettings.minOrderQuantity ? '' : localSettings.minOrderQuantity} 
+                    onChange={(e) => {
+                      const val = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value) || 0);
+                      setLocalSettings({...localSettings, minOrderQuantity: val});
+                    }} 
+                    className="w-full px-3 py-2 bg-white rounded-lg border border-indigo-200 outline-none text-sm font-bold text-indigo-900" 
+                  />
+                </div>
+                <div className="flex items-center justify-between pt-2 border-t border-indigo-100">
+                  <div className="flex flex-col pr-2">
+                    <span className="text-xs font-bold text-indigo-900">Bloquear "Finalizar Venda" também no PDV</span>
+                    <span className="text-[10px] text-indigo-600">Exige atingir a quantidade mínima definida (do produto ou da loja) para liberar o botão Finalizar Venda no caixa.</span>
+                  </div>
+                  <Switch 
+                    checked={localSettings.enforceMinQuantityInPos !== false} 
+                    onChange={(checked) => setLocalSettings({...localSettings, enforceMinQuantityInPos: checked})} 
+                  />
+                </div>
+              </div>
+
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
                 <div className="flex flex-col">
                   <span className="text-sm font-bold text-gray-700">Programa de Cashback</span>

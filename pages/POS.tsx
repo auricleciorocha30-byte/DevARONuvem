@@ -1693,6 +1693,79 @@ export default function POS({ storeId, user, settings, orders, products: propPro
     applyUpdateQuantity(productId, delta, false);
   };
 
+  const setExactQuantity = (productId: string, targetQty: number) => {
+    const itemToUpdate = cart.find(i => i.productId === productId);
+    if (!itemToUpdate) return;
+    const safeTarget = Math.max(1, Math.floor(Number(targetQty) || 1));
+    const delta = safeTarget - itemToUpdate.quantity;
+    if (delta === 0) return;
+    updateQuantity(productId, delta);
+  };
+
+  // Validação de Quantidade Mínima (por produto e geral da loja)
+  const minQuantityValidation = useMemo(() => {
+    const productTotals = new Map<string, { name: string; currentQty: number; minQty: number; sampleCartProductId: string }>();
+    let totalOrderQty = 0;
+
+    cart.forEach((item) => {
+      if (item.isRoulettePrize) return;
+      const baseProdId = item.originalProductId || item.productId;
+      const prod = products.find((p) => p.id === baseProdId);
+
+      const complementsQtySum = item.complements
+        ? item.complements.reduce((sum, c) => sum + (c.quantity || 1), 0)
+        : 0;
+      const effectiveItemQty = (prod && prod.price === 0 && complementsQtySum > 0)
+        ? Math.max(item.quantity, item.quantity * complementsQtySum)
+        : item.quantity;
+
+      totalOrderQty += effectiveItemQty;
+
+      const minQty = Number(prod?.minOrderQuantity || prod?.units || 0);
+      if (minQty > 1) {
+        const existing = productTotals.get(baseProdId);
+        if (existing) {
+          existing.currentQty += effectiveItemQty;
+        } else {
+          productTotals.set(baseProdId, {
+            name: prod?.name || item.name,
+            currentQty: effectiveItemQty,
+            minQty,
+            sampleCartProductId: item.productId
+          });
+        }
+      }
+    });
+
+    const invalidProducts = Array.from(productTotals.entries())
+      .filter(([_, data]) => data.currentQty < data.minQty)
+      .map(([productId, data]) => ({
+        productId,
+        name: data.name,
+        currentQty: data.currentQty,
+        minQty: data.minQty,
+        remaining: Math.max(0, data.minQty - data.currentQty),
+        sampleCartProductId: data.sampleCartProductId
+      }));
+
+    const storeMinQty = Number(settings?.minOrderQuantity || 0);
+    const storeMinMet = storeMinQty <= 1 || totalOrderQty >= storeMinQty;
+    const storeRemainingQty = storeMinMet ? 0 : Math.max(0, storeMinQty - totalOrderQty);
+
+    return {
+      isValid: invalidProducts.length === 0 && storeMinMet,
+      invalidProducts,
+      storeMinQty,
+      storeMinMet,
+      storeRemainingQty,
+      totalOrderQty,
+      productTotals
+    };
+  }, [cart, products, settings?.minOrderQuantity]);
+
+  const enforceMinQtyInPos = settings.enforceMinQuantityInPos !== false;
+  const canFinalizeByMinQuantity = !enforceMinQtyInPos || minQuantityValidation.isValid;
+
   const subtotal = cart.reduce((acc, item) => acc + ((item.price || 0) * (item.quantity || 0)), 0);
   const rouletteDiscountAmount = rouletteDiscountPercentagePos > 0 ? subtotal * (rouletteDiscountPercentagePos / 100) : 0;
   const commissionRate = (user && (user.role === 'ATENDENTE' || user.role === 'GERENTE') && settings.waitstaffCommissions?.[user.id]) || 0;
@@ -2326,6 +2399,16 @@ export default function POS({ storeId, user, settings, orders, products: propPro
 
   const handleCheckout = async () => {
     if (cart.length === 0) return;
+
+    if (!canFinalizeByMinQuantity) {
+      if (minQuantityValidation.invalidProducts.length > 0) {
+        const firstInvalid = minQuantityValidation.invalidProducts[0];
+        alert(`Quantidade mínima não atingida para "${firstInvalid.name}". Mínimo exigido: ${firstInvalid.minQty} un. (faltam ${firstInvalid.remaining} un.).`);
+      } else if (!minQuantityValidation.storeMinMet) {
+        alert(`Quantidade mínima do pedido não atingida. Mínimo de ${minQuantityValidation.storeMinQty} itens para finalizar a venda (faltam ${minQuantityValidation.storeRemainingQty}).`);
+      }
+      return;
+    }
 
     const isGerente = user.role === 'GERENTE';
     const canFinish = isGerente || settings.canWaitstaffFinishOrder;
@@ -3827,6 +3910,11 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                         Peso
                       </div>
                     )}
+                    {((product.minOrderQuantity && product.minOrderQuantity > 1) || (product.units && product.units > 1)) && (
+                      <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md text-[9px] font-black shadow-sm bg-amber-500 text-white z-10 uppercase">
+                        Mín. {product.minOrderQuantity || product.units} un
+                      </div>
+                    )}
                   </div>
                   <h3 className="font-bold text-gray-800 text-[11px] md:text-xs line-clamp-2 leading-tight mb-1 group-hover:text-blue-600 transition-colors">
                     {product.name}
@@ -3973,48 +4061,88 @@ export default function POS({ storeId, user, settings, orders, products: propPro
               <p>Carrinho vazio</p>
             </div>
           ) : (
-            cart.map(item => (
-              <div key={item.productId} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
-                <div className="flex-1">
-                  <p className="font-bold text-sm text-gray-800 line-clamp-1 break-words">{item.name}</p>
-                  {item.complements && item.complements.length > 0 && (
-                     <ul className="mt-1 space-y-0.5 mb-1">
-                        {item.complements.map((comp, idx) => (
-                           <li key={idx} className="text-[9px] text-gray-500 font-medium">
-                              <span className="text-gray-400 font-bold">{comp.quantity}x</span> {comp.name}
-                              {comp.price > 0 && <span className="text-gray-400"> (+ R$ {(comp.price * comp.quantity).toFixed(2)})</span>}
-                              {comp.description && <div className="italic text-gray-400 mt-0.5 ml-2">- {comp.description}</div>}
-                           </li>
-                        ))}
-                     </ul>
-                  )}
-                  {item.isCombo && getComboItems(item.comboItems).length > 0 && (
-                     <div className="mt-1 flex flex-wrap gap-1 mb-1">
-                        {getComboItems(item.comboItems).map((comp, idx) => (
-                           <span key={idx} className="bg-amber-50 text-amber-800 text-[8px] font-medium px-1 py-0.5 rounded border border-amber-200">
-                              {comp.quantity * item.quantity}x {comp.name}
-                           </span>
-                        ))}
-                     </div>
-                  )}
-                  <p className="text-xs text-gray-500">{formatCurrency(item.price)} {item.isByWeight ? '/ kg' : 'un'}</p>
-                </div>
-                <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-1">
-                  <button onClick={() => updateQuantity(item.productId, item.isByWeight ? -0.1 : -1)} className="p-1 hover:bg-white rounded-md shadow-sm transition-all text-gray-600">
-                    <Minus size={14} />
+            cart.map(item => {
+              const baseProdId = item.originalProductId || item.productId;
+              const prodStatus = minQuantityValidation.productTotals.get(baseProdId);
+              return (
+              <div key={item.productId} className={`flex flex-col gap-2 p-3 bg-white rounded-xl border shadow-sm ${enforceMinQtyInPos && prodStatus && prodStatus.currentQty < prodStatus.minQty ? 'border-amber-300 bg-amber-50/20' : 'border-gray-100'}`}>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-sm text-gray-800 line-clamp-1 break-words">{item.name}</p>
+                    {item.complements && item.complements.length > 0 && (
+                       <ul className="mt-1 space-y-0.5 mb-1">
+                          {item.complements.map((comp, idx) => (
+                             <li key={idx} className="text-[9px] text-gray-500 font-medium">
+                                <span className="text-gray-400 font-bold">{comp.quantity}x</span> {comp.name}
+                                {comp.price > 0 && <span className="text-gray-400"> (+ R$ {(comp.price * comp.quantity).toFixed(2)})</span>}
+                                {comp.description && <div className="italic text-gray-400 mt-0.5 ml-2">- {comp.description}</div>}
+                             </li>
+                          ))}
+                       </ul>
+                    )}
+                    {item.isCombo && getComboItems(item.comboItems).length > 0 && (
+                       <div className="mt-1 flex flex-wrap gap-1 mb-1">
+                          {getComboItems(item.comboItems).map((comp, idx) => (
+                             <span key={idx} className="bg-amber-50 text-amber-800 text-[8px] font-medium px-1 py-0.5 rounded border border-amber-200">
+                                {comp.quantity * item.quantity}x {comp.name}
+                             </span>
+                          ))}
+                       </div>
+                    )}
+                    <p className="text-xs text-gray-500">{formatCurrency(item.price)} {item.isByWeight ? '/ kg' : 'un'}</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 bg-gray-50 rounded-lg p-1">
+                    <button onClick={() => updateQuantity(item.productId, item.isByWeight ? -0.1 : -1)} className="p-1 hover:bg-white rounded-md shadow-sm transition-all text-gray-600">
+                      <Minus size={14} />
+                    </button>
+                    {item.isByWeight ? (
+                      <span className="text-sm font-bold w-12 text-center">
+                        {item.quantity.toFixed(3)}
+                      </span>
+                    ) : (
+                      <input
+                        type="number"
+                        min={1}
+                        value={item.quantity}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10);
+                          if (!isNaN(val) && val >= 1) {
+                            setExactQuantity(item.productId, val);
+                          }
+                        }}
+                        className="text-sm font-bold w-12 text-center bg-transparent outline-none focus:bg-white focus:ring-1 focus:ring-blue-400 rounded"
+                        title="Digite a quantidade desejada"
+                      />
+                    )}
+                    <button onClick={() => updateQuantity(item.productId, item.isByWeight ? 0.1 : 1)} className="p-1 hover:bg-white rounded-md shadow-sm transition-all text-blue-600">
+                      <Plus size={14} />
+                    </button>
+                  </div>
+                  <button onClick={() => updateQuantity(item.productId, -item.quantity)} className="p-2 text-red-300 hover:text-red-500 transition-colors">
+                    <Trash2 size={16} />
                   </button>
-                  <span className="text-sm font-bold w-12 text-center">
-                    {item.isByWeight ? item.quantity.toFixed(3) : item.quantity}
-                  </span>
-                  <button onClick={() => updateQuantity(item.productId, item.isByWeight ? 0.1 : 1)} className="p-1 hover:bg-white rounded-md shadow-sm transition-all text-blue-600">
-                    <Plus size={14} />
-                  </button>
                 </div>
-                <button onClick={() => updateQuantity(item.productId, -item.quantity)} className="p-2 text-red-300 hover:text-red-500 transition-colors">
-                  <Trash2 size={16} />
-                </button>
+                {prodStatus && (
+                  <div className="flex items-center justify-between pt-1 border-t border-gray-100">
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${prodStatus.currentQty >= prodStatus.minQty ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>
+                      {prodStatus.currentQty >= prodStatus.minQty
+                        ? `✓ Mínimo atingido (${prodStatus.currentQty}/${prodStatus.minQty} un)`
+                        : `Mínimo p/ venda: ${prodStatus.currentQty}/${prodStatus.minQty} un (faltam ${prodStatus.minQty - prodStatus.currentQty})`}
+                    </span>
+                    {prodStatus.currentQty < prodStatus.minQty && !item.isByWeight && (
+                      <button
+                        type="button"
+                        onClick={() => updateQuantity(item.productId, prodStatus.minQty - prodStatus.currentQty)}
+                        className="text-[10px] font-black text-amber-700 hover:text-amber-900 bg-amber-100 hover:bg-amber-200 px-2 py-0.5 rounded-md transition-colors"
+                      >
+                        + Completar ({prodStatus.minQty - prodStatus.currentQty})
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
-            ))
+              );
+            })
           )}
         </div>
 
@@ -4037,6 +4165,32 @@ export default function POS({ storeId, user, settings, orders, products: propPro
             <span className="text-2xl md:text-3xl font-black text-gray-900">{formatCurrency(total)}</span>
           </div>
           
+          {cart.length > 0 && !canFinalizeByMinQuantity && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1.5">
+              <div className="flex items-center gap-1.5 text-amber-800 font-black text-[11px] uppercase tracking-wider">
+                <AlertCircle size={14} className="shrink-0 text-amber-600" />
+                Quantidade Mínima p/ Liberar Venda
+              </div>
+              {minQuantityValidation.invalidProducts.map((inv) => (
+                <div key={inv.productId} className="flex items-center justify-between text-xs font-bold text-amber-900">
+                  <span className="truncate pr-2">• {inv.name}: {inv.currentQty}/{inv.minQty} un (faltam {inv.remaining})</span>
+                  <button
+                    type="button"
+                    onClick={() => updateQuantity(inv.sampleCartProductId, inv.remaining)}
+                    className="shrink-0 text-[10px] font-black bg-amber-200 hover:bg-amber-300 text-amber-900 px-2 py-0.5 rounded-md transition-colors"
+                  >
+                    + Completar
+                  </button>
+                </div>
+              ))}
+              {!minQuantityValidation.storeMinMet && (
+                <p className="text-xs font-bold text-amber-900">
+                  • Total do pedido: {minQuantityValidation.totalOrderQty} de {minQuantityValidation.storeMinQty} itens (faltam {minQuantityValidation.storeRemainingQty})
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="flex flex-wrap gap-2">
             {loadedCommandIds.length > 0 && (
                 <button 
@@ -4071,15 +4225,19 @@ export default function POS({ storeId, user, settings, orders, products: propPro
             )}
             <button 
                 onClick={() => {
+                    if (!canFinalizeByMinQuantity) return;
                     setIsCheckoutOpen(true);
                     setPayments(loadedCommandIds.length > 0 ? loadedPayments : []);
                     setCurrentPaymentAmount(total.toFixed(2));
                 }}
-                disabled={cart.length === 0}
+                disabled={cart.length === 0 || !canFinalizeByMinQuantity}
+                title={!canFinalizeByMinQuantity ? 'Atingir a quantidade mínima definida pelo lojista para liberar a finalização da venda' : ''}
                 className="flex-[2] min-w-[200px] w-full py-3 md:py-4 bg-green-600 text-white rounded-xl font-bold text-sm md:text-lg shadow-lg hover:bg-green-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1 md:gap-2"
             >
                 <CheckCircle2 size={20} />
-                {loadedCommandIds.length > 0 ? `Finalizar Comanda ${commandNumber}` : 'Finalizar Venda'}
+                {!canFinalizeByMinQuantity
+                  ? 'Atingir Qtd. Mínima'
+                  : (loadedCommandIds.length > 0 ? `Finalizar Comanda ${commandNumber}` : 'Finalizar Venda')}
             </button>
           </div>
         </div>
@@ -5005,11 +5163,11 @@ export default function POS({ storeId, user, settings, orders, products: propPro
             <div className="p-6 border-t bg-gray-50 flex gap-2">
               <button 
                 onClick={handleCheckout}
-                disabled={isProcessing || (remaining > 0.01 && !(orderType === 'ENTREGA' && deliveryDetails.payOnDelivery))}
+                disabled={isProcessing || !canFinalizeByMinQuantity || (remaining > 0.01 && !(orderType === 'ENTREGA' && deliveryDetails.payOnDelivery))}
                 className="flex-1 py-4 bg-green-600 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-green-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isProcessing ? <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div> : <CheckCircle2 size={24} />}
-                Finalizar Venda
+                {!canFinalizeByMinQuantity ? 'Quantidade Mínima Não Atingida' : 'Finalizar Venda'}
               </button>
             </div>
           </div>

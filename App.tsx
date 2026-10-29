@@ -465,6 +465,7 @@ function StoreContext() {
     stock: p.stock != null ? Number(p.stock) : undefined,
     fractions: p.fractions != null ? Number(p.fractions) : undefined,
     units: p.units != null ? Number(p.units) : undefined,
+    minOrderQuantity: p.minOrderQuantity != null ? Number(p.minOrderQuantity) : (p.units != null && Number(p.units) > 0 ? Number(p.units) : undefined),
     fractionPrice: p.fractionPrice != null || p.fractionprice != null || p.fraction_price != null ? Number(p.fractionPrice || p.fractionprice || p.fraction_price) : undefined,
     ncm: p.ncm || undefined,
     cfop: p.cfop || undefined,
@@ -1242,6 +1243,10 @@ function StoreContext() {
           }
           if (payload.isCombo !== undefined) {
              payload.isCombo = payload.isCombo ? 1 : 0;
+          }
+          if (payload.minOrderQuantity !== undefined) {
+             payload.units = payload.minOrderQuantity && Number(payload.minOrderQuantity) > 1 ? Number(payload.minOrderQuantity) : null;
+             delete payload.minOrderQuantity;
           }
           if (!payload.id) delete payload.id;
 

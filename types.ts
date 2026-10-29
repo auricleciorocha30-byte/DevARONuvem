@@ -75,6 +75,7 @@ export interface Product {
   stock?: number;
   fractions?: number;
   units?: number;
+  minOrderQuantity?: number;
   fractionPrice?: number;
   ncm?: string;
   cfop?: string;
@@ -235,6 +236,8 @@ export interface StoreSettings {
   usbPrinterVendorId?: number;
   usbPrinterProductId?: number;
   minDeliveryOrderValue?: number;
+  minOrderQuantity?: number;
+  enforceMinQuantityInPos?: boolean;
   requirePosFinalization?: boolean;
   autoApproveDeliveries?: boolean;
   waitstaffCommissions?: Record<string, number>;
