@@ -35,7 +35,11 @@
               } catch (e) {}
               return loja;
             }
-            return localStorage.getItem('last_store_slug') || localStorage.getItem('storeSlug') || '';
+            // Somente usa cache se um módulo específico (?type=...) foi iniciado
+            if (urlParams.get('type')) {
+              return localStorage.getItem('last_store_slug') || localStorage.getItem('storeSlug') || '';
+            }
+            return '';
           } catch (e) {
             return '';
           }
@@ -64,18 +68,7 @@
 
         function detectCurrentAppType() {
           try {
-            var urlParams = new URLSearchParams(window.location.search);
-            var fromQuery = normalizeAppType(urlParams.get('type'));
             var hash = window.location.hash || '';
-            if (!fromQuery && hash.indexOf('?') !== -1) {
-              var hashParams = new URLSearchParams(hash.split('?')[1]);
-              fromQuery = normalizeAppType(hashParams.get('type'));
-            }
-            if (fromQuery) {
-              try { localStorage.setItem('pwa_installed_type', fromQuery); } catch (e) {}
-              return fromQuery;
-            }
-
             var hashPath = hash.split('?')[0];
             if (hashPath.indexOf('/pdv') !== -1) return 'pdv';
             if (hashPath.indexOf('/atendimento') !== -1) return 'atendente';
@@ -84,11 +77,14 @@
             if (hashPath.indexOf('/cozinha') !== -1) return 'cozinha';
             if (hashPath.indexOf('/tv') !== -1) return 'tv';
 
-            var isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
-            var isRootHash = !hashPath || hashPath === '#' || hashPath === '#/';
-            if (isStandalone && isRootHash) {
-              var savedType = normalizeAppType(localStorage.getItem('pwa_installed_type'));
-              if (savedType) return savedType;
+            var urlParams = new URLSearchParams(window.location.search);
+            var fromQuery = normalizeAppType(urlParams.get('type'));
+            if (!fromQuery && hash.indexOf('?') !== -1) {
+              var hashParams = new URLSearchParams(hash.split('?')[1]);
+              fromQuery = normalizeAppType(hashParams.get('type'));
+            }
+            if (fromQuery && (!hashPath || hashPath === '#' || hashPath === '#/')) {
+              return fromQuery;
             }
           } catch (e) {}
           return '';
@@ -97,7 +93,7 @@
         window.__detectPWAAppType = detectCurrentAppType;
         window.__getPWAStoreSlug = getStoreSlugFromLocation;
 
-        // 1. Redireciona imediatamente para o módulo correto (PDV, Atendimento, Entregas, Cardápio, Cozinha, TV)
+        // 1. Redireciona imediatamente para o módulo correto quando iniciado via atalho com ?type=...
         try {
           var activeType = detectCurrentAppType();
           var activeLoja = getStoreSlugFromLocation();
@@ -114,7 +110,7 @@
           }
         } catch (e) {}
 
-        // 2. Sincroniza o link do manifest com o módulo e a unidade correspondente
+        // 2. Sincroniza o link do manifest e os parâmetros de URL com o módulo e a unidade correspondente
         window.syncManifestLink = function(forcedType) {
           try {
             var type = normalizeAppType(forcedType) || detectCurrentAppType();
@@ -127,6 +123,29 @@
               var targetHref = '/api/manifest' + (params.toString() ? '?' + params.toString() : '');
               if (manifestEl.getAttribute('href') !== targetHref) {
                 manifestEl.setAttribute('href', targetHref);
+              }
+            }
+            // Mantém ?type= sincronizado na barra de endereços quando em um módulo (PDV, Atendimento, etc.)
+            if (window.history && window.history.replaceState) {
+              var currentSearch = new URLSearchParams(window.location.search);
+              var changed = false;
+              if (type) {
+                if (currentSearch.get('type') !== type) {
+                  currentSearch.set('type', type);
+                  changed = true;
+                }
+                if (loja && currentSearch.get('loja') !== loja) {
+                  currentSearch.set('loja', loja);
+                  changed = true;
+                }
+              } else if (currentSearch.has('type')) {
+                currentSearch.delete('type');
+                changed = true;
+              }
+              if (changed) {
+                var newQuery = currentSearch.toString();
+                var newUrl = window.location.pathname + (newQuery ? '?' + newQuery : '') + (window.location.hash || '');
+                window.history.replaceState(null, '', newUrl);
               }
             }
           } catch (e) {}

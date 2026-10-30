@@ -99,11 +99,14 @@ function StoreContext() {
           return hashSlug;
         }
     }
-    // Fallback para manter a unidade ativa ao abrir atalhos instalados
-    try {
-      const cached = localStorage.getItem('last_store_slug') || localStorage.getItem('storeSlug');
-      if (cached) return cached;
-    } catch (e) {}
+    // Somente usa o cache se um módulo específico (?type=...) foi aberto via atalho sem ?loja=
+    const explicitType = urlParams.get('type') || searchParams.get('type');
+    if (explicitType) {
+      try {
+        const cached = localStorage.getItem('last_store_slug') || localStorage.getItem('storeSlug');
+        if (cached) return cached;
+      } catch (e) {}
+    }
 
     return null;
   }, [searchParams, location]);
@@ -1143,16 +1146,13 @@ function StoreContext() {
     try {
       const urlParams = new URLSearchParams(window.location.search);
       const searchType = urlParams.get('type') || searchParams.get('type');
-      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
-      const savedType = isStandalone ? localStorage.getItem('pwa_installed_type') : null;
-      const activeType = searchType || savedType;
 
-      if (activeType === 'pdv') return '/pdv';
-      if (activeType === 'atendente' || activeType === 'atendimento') return '/atendimento';
-      if (activeType === 'entregador' || activeType === 'entregas') return '/entregas';
-      if (activeType === 'cardapio') return '/cardapio';
-      if (activeType === 'cozinha' || activeType === 'producao') return '/cozinha';
-      if (activeType === 'tv') return '/tv';
+      if (searchType === 'pdv') return '/pdv';
+      if (searchType === 'atendente' || searchType === 'atendimento') return '/atendimento';
+      if (searchType === 'entregador' || searchType === 'entregas') return '/entregas';
+      if (searchType === 'cardapio') return '/cardapio';
+      if (searchType === 'cozinha' || searchType === 'producao') return '/cozinha';
+      if (searchType === 'tv') return '/tv';
     } catch (e) {}
     return null;
   })();
