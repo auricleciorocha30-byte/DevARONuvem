@@ -3,7 +3,7 @@ import { Download, Smartphone, Monitor, X, Info, ExternalLink, CheckCircle2, Loa
 
 interface InstallPromptProps {
   label?: string;
-  appType?: 'pdv' | 'atendente' | 'entregador' | 'cardapio' | 'general';
+  appType?: 'pdv' | 'atendente' | 'entregador' | 'cardapio' | 'cozinha' | 'tv' | 'general';
   className?: string;
 }
 
@@ -12,7 +12,33 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
 }
 
+function inferAppType(explicitType?: string): 'pdv' | 'atendente' | 'entregador' | 'cardapio' | 'cozinha' | 'tv' | 'general' {
+  if (explicitType && explicitType !== 'general') {
+    return explicitType as any;
+  }
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const qType = (urlParams.get('type') || '').toLowerCase();
+    if (qType === 'pdv') return 'pdv';
+    if (qType === 'atendente' || qType === 'atendimento') return 'atendente';
+    if (qType === 'entregador' || qType === 'entregas') return 'entregador';
+    if (qType === 'cardapio') return 'cardapio';
+    if (qType === 'cozinha' || qType === 'producao') return 'cozinha';
+    if (qType === 'tv') return 'tv';
+
+    const hashPath = (window.location.hash || '').split('?')[0];
+    if (hashPath.includes('/pdv')) return 'pdv';
+    if (hashPath.includes('/atendimento')) return 'atendente';
+    if (hashPath.includes('/entregas')) return 'entregador';
+    if (hashPath.includes('/cardapio') && !hashPath.includes('/cardapio-admin')) return 'cardapio';
+    if (hashPath.includes('/cozinha')) return 'cozinha';
+    if (hashPath.includes('/tv')) return 'tv';
+  } catch (e) {}
+  return 'general';
+}
+
 export default function InstallPrompt({ label, appType = 'general', className }: InstallPromptProps) {
+  const effectiveAppType = inferAppType(appType);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstallable, setIsInstallable] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
@@ -56,6 +82,9 @@ export default function InstallPrompt({ label, appType = 'general', className }:
     };
 
     const onAppInstalled = () => {
+      if (effectiveAppType && effectiveAppType !== 'general') {
+        try { localStorage.setItem('pwa_installed_type', effectiveAppType); } catch (e) {}
+      }
       setIsStandalone(true);
       setIsInstallable(false);
       setDeferredPrompt(null);
@@ -81,7 +110,7 @@ export default function InstallPrompt({ label, appType = 'general', className }:
       window.removeEventListener('pwa-installed', onAppInstalled);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
-  }, []);
+  }, [effectiveAppType]);
 
   const getStoreSlug = () => {
     try {
@@ -106,12 +135,16 @@ export default function InstallPrompt({ label, appType = 'general', className }:
   const syncCurrentManifest = () => {
     try {
       const loja = getStoreSlug();
+      if (loja) {
+        localStorage.setItem('last_store_slug', loja);
+        localStorage.setItem('storeSlug', loja);
+      }
       const manifestEl = document.getElementById('app-manifest');
       if (manifestEl) {
         const params = new URLSearchParams();
-        if (appType && appType !== 'general') params.set('type', appType);
+        if (effectiveAppType && effectiveAppType !== 'general') params.set('type', effectiveAppType);
         if (loja) params.set('loja', loja);
-        const targetHref = '/manifest.json' + (params.toString() ? '?' + params.toString() : '');
+        const targetHref = '/api/manifest' + (params.toString() ? '?' + params.toString() : '');
         if (manifestEl.getAttribute('href') !== targetHref) {
           manifestEl.setAttribute('href', targetHref);
         }
@@ -121,43 +154,67 @@ export default function InstallPrompt({ label, appType = 'general', className }:
 
   useEffect(() => {
     syncCurrentManifest();
-  }, [appType]);
+  }, [effectiveAppType]);
 
   const getTargetStandaloneUrl = () => {
+    const loja = getStoreSlug();
+    const lojaHashQuery = loja ? `?loja=${encodeURIComponent(loja)}` : '';
     let route = window.location.hash || '';
-    if (!route || route === '#/') {
-      if (appType === 'pdv') route = '#/pdv';
-      else if (appType === 'atendente') route = '#/atendimento';
-      else if (appType === 'entregador') route = '#/entregas';
-      else if (appType === 'cardapio') route = '#/cardapio';
-    }
+    if (effectiveAppType === 'pdv') route = `#/pdv${lojaHashQuery}`;
+    else if (effectiveAppType === 'atendente') route = `#/atendimento${lojaHashQuery}`;
+    else if (effectiveAppType === 'entregador') route = `#/entregas${lojaHashQuery}`;
+    else if (effectiveAppType === 'cardapio') route = `#/cardapio${lojaHashQuery}`;
+    else if (effectiveAppType === 'cozinha') route = `#/cozinha${lojaHashQuery}`;
+    else if (effectiveAppType === 'tv') route = `#/tv${lojaHashQuery}`;
+
     const origin = window.location.origin;
     const urlParams = new URLSearchParams(window.location.search);
-    const loja = getStoreSlug();
     if (loja) {
       urlParams.set('loja', loja);
     }
-    if (appType && appType !== 'general') {
-      urlParams.set('type', appType);
+    if (effectiveAppType && effectiveAppType !== 'general') {
+      urlParams.set('type', effectiveAppType);
     }
     urlParams.set('auto_install', '1');
     return `${origin}/?${urlParams.toString()}${route}`;
   };
 
   const handleInstallClick = async () => {
+    // Save installed module preference immediately so launching the shortcut always opens this exact panel
+    try {
+      if (effectiveAppType && effectiveAppType !== 'general') {
+        localStorage.setItem('pwa_installed_type', effectiveAppType);
+      }
+      const loja = getStoreSlug();
+      if (loja) {
+        localStorage.setItem('last_store_slug', loja);
+        localStorage.setItem('storeSlug', loja);
+      }
+    } catch (e) {}
+
     syncCurrentManifest();
+
     const promptEvent: BeforeInstallPromptEvent | null = 
       deferredPrompt || 
       (window as any).deferredPWAInstallPrompt ||
       (window.top && (window.top as any).deferredPWAInstallPrompt);
 
-    // 1. If native deferred prompt is available in browser memory, trigger it DIRECTLY on click!
-    if (promptEvent && typeof promptEvent.prompt === 'function') {
+    const capturedPromptType = (window as any).deferredPWAInstallType || '';
+    const isPromptMatchingModule =
+      effectiveAppType === 'general' ||
+      !capturedPromptType ||
+      capturedPromptType === effectiveAppType;
+
+    // 1. If native deferred prompt is available in browser memory and matches the current module, trigger it DIRECTLY on click!
+    if (promptEvent && typeof promptEvent.prompt === 'function' && isPromptMatchingModule) {
       try {
         setIsInstalling(true);
         await promptEvent.prompt();
         const choice = await promptEvent.userChoice;
         if (choice && choice.outcome === 'accepted') {
+          if (effectiveAppType && effectiveAppType !== 'general') {
+            try { localStorage.setItem('pwa_installed_type', effectiveAppType); } catch (e) {}
+          }
           setIsInstallable(false);
           setDeferredPrompt(null);
           (window as any).deferredPWAInstallPrompt = null;
@@ -175,15 +232,17 @@ export default function InstallPrompt({ label, appType = 'general', className }:
       }
     }
 
-    // 2. If running inside an iframe (e.g. AI Studio preview environment),
-    // modern browsers prohibit the install prompt inside frames.
-    // We open directly in top window / new tab with auto_install=1 which immediately triggers native prompt on load!
-    if (isInIframe) {
+    // 2. If running inside an iframe OR if the prompt was captured on a different module (e.g. navigated from Admin without reload),
+    // open/reload with ?type=<module>&auto_install=1 so the browser binds the shortcut to this specific module!
+    if (isInIframe || (promptEvent && !isPromptMatchingModule)) {
       try {
         const fullUrl = getTargetStandaloneUrl();
+        if (!isInIframe) {
+          window.location.href = fullUrl;
+          return;
+        }
         const win = window.open(fullUrl, '_blank');
         if (win) {
-          // Opened successfully
           setInstallSuccess(true);
           setTimeout(() => setInstallSuccess(false), 4000);
           return;
@@ -202,7 +261,16 @@ export default function InstallPrompt({ label, appType = 'general', className }:
     }
 
     // 4. On Desktop or Android outside an iframe where prompt hasn't arrived yet:
-    // Try waiting up to 600ms for event or display direct action modal
+    // Ensure ?type=<module> is in the URL so any browser-menu install also uses the module's start_url
+    try {
+      const currentUrlParams = new URLSearchParams(window.location.search);
+      if (effectiveAppType !== 'general' && currentUrlParams.get('type') !== effectiveAppType) {
+        const newUrl = getTargetStandaloneUrl().replace('&auto_install=1', '').replace('auto_install=1&', '').replace('?auto_install=1', '');
+        window.history.replaceState(null, '', newUrl);
+        syncCurrentManifest();
+      }
+    } catch (e) {}
+
     setIsInstalling(true);
     let resolved = false;
 
@@ -223,6 +291,9 @@ export default function InstallPrompt({ label, appType = 'general', className }:
           await activePrompt.prompt();
           const choice = await activePrompt.userChoice;
           if (choice && choice.outcome === 'accepted') {
+            if (effectiveAppType && effectiveAppType !== 'general') {
+              try { localStorage.setItem('pwa_installed_type', effectiveAppType); } catch (e) {}
+            }
             setInstallSuccess(true);
             setTimeout(() => setInstallSuccess(false), 5000);
           }
@@ -243,11 +314,13 @@ export default function InstallPrompt({ label, appType = 'general', className }:
   // Display name by app type
   const defaultLabel = (() => {
     if (label) return label;
-    switch (appType) {
+    switch (effectiveAppType) {
       case 'pdv': return 'Instalar PDV';
       case 'atendente': return 'Instalar Atendente';
       case 'entregador': return 'Instalar Entregas';
       case 'cardapio': return 'Instalar Cardápio';
+      case 'cozinha': return 'Instalar Produção';
+      case 'tv': return 'Instalar Painel TV';
       default: return 'Instalar App';
     }
   })();

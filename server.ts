@@ -66,10 +66,12 @@ async function startServer() {
     next();
   });
 
-  // Dynamic Web App Manifest tailored to context (PDV, Atendimento, Entregas, Cardápio)
-  app.get('/manifest.json', (req, res) => {
+  // Dynamic Web App Manifest tailored to context (PDV, Atendimento, Entregas, Cardápio, Cozinha, TV)
+  const handleDynamicManifest = (req: express.Request, res: express.Response) => {
     const type = (req.query.type as string || '').toLowerCase();
     const loja = (req.query.loja as string || '').trim();
+    const lojaQuery = loja ? `&loja=${encodeURIComponent(loja)}` : '';
+    const lojaHashQuery = loja ? `?loja=${encodeURIComponent(loja)}` : '';
 
     let name = loja ? `DevARONuvem - ${loja}` : "DevARONuvem - Gestão & PDV";
     let short_name = "DevARO";
@@ -79,23 +81,33 @@ async function startServer() {
     if (type === 'pdv') {
       name = loja ? `PDV - ${loja}` : "PDV Frente de Caixa";
       short_name = "PDV";
-      start_url = loja ? `/?type=pdv&loja=${encodeURIComponent(loja)}#/pdv` : "/?type=pdv#/pdv";
+      start_url = `/?type=pdv${lojaQuery}#/pdv${lojaHashQuery}`;
       appId = loja ? `/pdv-${encodeURIComponent(loja)}` : "/pdv";
     } else if (type === 'atendente' || type === 'atendimento') {
       name = loja ? `Atendimento - ${loja}` : "Painel Atendente";
       short_name = "Atendente";
-      start_url = loja ? `/?type=atendente&loja=${encodeURIComponent(loja)}#/atendimento` : "/?type=atendente#/atendimento";
+      start_url = `/?type=atendente${lojaQuery}#/atendimento${lojaHashQuery}`;
       appId = loja ? `/atendente-${encodeURIComponent(loja)}` : "/atendente";
     } else if (type === 'entregador' || type === 'entregas') {
       name = loja ? `Entregas - ${loja}` : "Painel Entregas";
       short_name = "Entregas";
-      start_url = loja ? `/?type=entregador&loja=${encodeURIComponent(loja)}#/entregas` : "/?type=entregador#/entregas";
+      start_url = `/?type=entregador${lojaQuery}#/entregas${lojaHashQuery}`;
       appId = loja ? `/entregas-${encodeURIComponent(loja)}` : "/entregas";
     } else if (type === 'cardapio') {
       name = loja ? `Cardápio - ${loja}` : "Cardápio Digital";
       short_name = "Cardápio";
-      start_url = loja ? `/?type=cardapio&loja=${encodeURIComponent(loja)}#/cardapio` : "/?type=cardapio#/cardapio";
+      start_url = `/?type=cardapio${lojaQuery}#/cardapio${lojaHashQuery}`;
       appId = loja ? `/cardapio-${encodeURIComponent(loja)}` : "/cardapio";
+    } else if (type === 'cozinha' || type === 'producao') {
+      name = loja ? `Produção - ${loja}` : "Painel de Produção";
+      short_name = "Produção";
+      start_url = `/?type=cozinha${lojaQuery}#/cozinha${lojaHashQuery}`;
+      appId = loja ? `/cozinha-${encodeURIComponent(loja)}` : "/cozinha";
+    } else if (type === 'tv') {
+      name = loja ? `Painel TV - ${loja}` : "Painel TV";
+      short_name = "Painel TV";
+      start_url = `/?type=tv${lojaQuery}#/tv${lojaHashQuery}`;
+      appId = loja ? `/tv-${encodeURIComponent(loja)}` : "/tv";
     }
 
     const manifest = {
@@ -130,17 +142,21 @@ async function startServer() {
         }
       ],
       shortcuts: [
-        { name: "PDV Frente de Caixa", short_name: "PDV", url: loja ? `/?type=pdv&loja=${encodeURIComponent(loja)}#/pdv` : "/?type=pdv#/pdv", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
-        { name: "Atendimento", short_name: "Atendimento", url: loja ? `/?type=atendente&loja=${encodeURIComponent(loja)}#/atendimento` : "/?type=atendente#/atendimento", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
-        { name: "Entregas", short_name: "Entregas", url: loja ? `/?type=entregador&loja=${encodeURIComponent(loja)}#/entregas` : "/?type=entregador#/entregas", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
-        { name: "Cardápio Digital", short_name: "Cardápio", url: loja ? `/?type=cardapio&loja=${encodeURIComponent(loja)}#/cardapio` : "/?type=cardapio#/cardapio", icons: [{ src: "/icon-192.png", sizes: "192x192" }] }
+        { name: "PDV Frente de Caixa", short_name: "PDV", url: `/?type=pdv${lojaQuery}#/pdv${lojaHashQuery}`, icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
+        { name: "Atendimento", short_name: "Atendimento", url: `/?type=atendente${lojaQuery}#/atendimento${lojaHashQuery}`, icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
+        { name: "Entregas", short_name: "Entregas", url: `/?type=entregador${lojaQuery}#/entregas${lojaHashQuery}`, icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
+        { name: "Cardápio Digital", short_name: "Cardápio", url: `/?type=cardapio${lojaQuery}#/cardapio${lojaHashQuery}`, icons: [{ src: "/icon-192.png", sizes: "192x192" }] }
       ]
     };
 
     res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
-    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     res.json(manifest);
-  });
+  };
+
+  app.get('/manifest.json', handleDynamicManifest);
+  app.get('/api/manifest', handleDynamicManifest);
+  apiRouter.get('/manifest', handleDynamicManifest);
 
   // Service Worker route with root scope allowance
   app.get('/sw.js', (req, res) => {

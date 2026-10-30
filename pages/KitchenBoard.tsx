@@ -2,6 +2,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Order, OrderStatus } from '../types';
 import { ChefHat, Clock, Utensils, ShoppingBag, Truck, CheckCircle, Hash, DollarSign, MapPin, Scale } from 'lucide-react';
+import InstallPrompt from '../components/InstallPrompt';
 
 const getComboItems = (comboItems: any): any[] => {
   if (!comboItems) return [];
@@ -69,6 +70,7 @@ const KitchenBoard: React.FC<Props> = ({ orders, updateStatus }) => {
           </div>
         </div>
         <div className="flex items-center gap-6">
+            <InstallPrompt appType="cozinha" />
             <div className="text-right">
                 <p className="text-3xl font-mono font-bold leading-none">{currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
                 <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">{activeOrders.length} Pedidos Ativos</p>

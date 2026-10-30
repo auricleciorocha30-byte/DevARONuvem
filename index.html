@@ -15,107 +15,173 @@
     <meta name="theme-color" content="#001F3F">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
-    <link rel="manifest" id="app-manifest" href="/manifest.json">
+    <link rel="manifest" id="app-manifest" href="/api/manifest">
 
     <script>
-      // Restaura rota específica pelo parâmetro type (ex: atalhos criados na área de trabalho ou celular)
       (function() {
-        try {
-          const urlParams = new URLSearchParams(window.location.search);
-          const type = (urlParams.get('type') || '').toLowerCase();
-          const hash = window.location.hash || '';
-          if (type && (!hash || hash === '#' || hash === '#/')) {
-            if (type === 'pdv') window.location.hash = '#/pdv';
-            else if (type === 'atendente' || type === 'atendimento') window.location.hash = '#/atendimento';
-            else if (type === 'entregador' || type === 'entregas') window.location.hash = '#/entregas';
-            else if (type === 'cardapio') window.location.hash = '#/cardapio';
-          }
-        } catch (e) {}
-      })();
-
-      // Sincroniza o link do manifest com o tipo e a unidade correspondente
-      function syncManifestLink() {
-        try {
-          const urlParams = new URLSearchParams(window.location.search);
-          const hash = window.location.hash || '';
-          let type = urlParams.get('type') || '';
-          let loja = urlParams.get('loja') || '';
-
-          if (!type) {
-            if (hash.includes('/pdv')) type = 'pdv';
-            else if (hash.includes('/atendimento')) type = 'atendente';
-            else if (hash.includes('/entregas')) type = 'entregador';
-            else if (hash.includes('/cardapio')) type = 'cardapio';
-          }
-
-          if (!loja && hash.includes('loja=')) {
-            const hashParts = hash.split('?');
-            if (hashParts[1]) {
-              const hashParams = new URLSearchParams(hashParts[1]);
+        function getStoreSlugFromLocation() {
+          try {
+            var urlParams = new URLSearchParams(window.location.search);
+            var loja = urlParams.get('loja') || '';
+            var hash = window.location.hash || '';
+            if (!loja && hash.indexOf('?') !== -1) {
+              var hashParams = new URLSearchParams(hash.split('?')[1]);
               loja = hashParams.get('loja') || '';
             }
+            if (loja) {
+              try {
+                localStorage.setItem('last_store_slug', loja);
+                localStorage.setItem('storeSlug', loja);
+              } catch (e) {}
+              return loja;
+            }
+            return localStorage.getItem('last_store_slug') || localStorage.getItem('storeSlug') || '';
+          } catch (e) {
+            return '';
           }
+        }
 
-          if (!loja) {
-            try {
-              loja = localStorage.getItem('last_store_slug') || localStorage.getItem('storeSlug') || '';
-            } catch (e) {}
-          }
+        function normalizeAppType(raw) {
+          var t = (raw || '').toLowerCase().trim();
+          if (t === 'pdv' || t === 'caixa') return 'pdv';
+          if (t === 'atendente' || t === 'atendimento') return 'atendente';
+          if (t === 'entregador' || t === 'entregas') return 'entregador';
+          if (t === 'cardapio') return 'cardapio';
+          if (t === 'cozinha' || t === 'producao') return 'cozinha';
+          if (t === 'tv') return 'tv';
+          return '';
+        }
 
-          const manifestEl = document.getElementById('app-manifest');
-          if (manifestEl) {
-            const params = new URLSearchParams();
-            if (type) params.set('type', type);
-            if (loja) params.set('loja', loja);
-            const targetHref = '/manifest.json' + (params.toString() ? '?' + params.toString() : '');
-            if (manifestEl.getAttribute('href') !== targetHref) {
-              manifestEl.setAttribute('href', targetHref);
+        function getRouteForType(type) {
+          if (type === 'pdv') return '/pdv';
+          if (type === 'atendente') return '/atendimento';
+          if (type === 'entregador') return '/entregas';
+          if (type === 'cardapio') return '/cardapio';
+          if (type === 'cozinha') return '/cozinha';
+          if (type === 'tv') return '/tv';
+          return '';
+        }
+
+        function detectCurrentAppType() {
+          try {
+            var urlParams = new URLSearchParams(window.location.search);
+            var fromQuery = normalizeAppType(urlParams.get('type'));
+            var hash = window.location.hash || '';
+            if (!fromQuery && hash.indexOf('?') !== -1) {
+              var hashParams = new URLSearchParams(hash.split('?')[1]);
+              fromQuery = normalizeAppType(hashParams.get('type'));
+            }
+            if (fromQuery) {
+              try { localStorage.setItem('pwa_installed_type', fromQuery); } catch (e) {}
+              return fromQuery;
+            }
+
+            var hashPath = hash.split('?')[0];
+            if (hashPath.indexOf('/pdv') !== -1) return 'pdv';
+            if (hashPath.indexOf('/atendimento') !== -1) return 'atendente';
+            if (hashPath.indexOf('/entregas') !== -1) return 'entregador';
+            if (hashPath.indexOf('/cardapio') !== -1 && hashPath.indexOf('/cardapio-admin') === -1) return 'cardapio';
+            if (hashPath.indexOf('/cozinha') !== -1) return 'cozinha';
+            if (hashPath.indexOf('/tv') !== -1) return 'tv';
+
+            var isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+            var isRootHash = !hashPath || hashPath === '#' || hashPath === '#/';
+            if (isStandalone && isRootHash) {
+              var savedType = normalizeAppType(localStorage.getItem('pwa_installed_type'));
+              if (savedType) return savedType;
+            }
+          } catch (e) {}
+          return '';
+        }
+
+        window.__detectPWAAppType = detectCurrentAppType;
+        window.__getPWAStoreSlug = getStoreSlugFromLocation;
+
+        // 1. Redireciona imediatamente para o módulo correto (PDV, Atendimento, Entregas, Cardápio, Cozinha, TV)
+        try {
+          var activeType = detectCurrentAppType();
+          var activeLoja = getStoreSlugFromLocation();
+          var currentHash = window.location.hash || '';
+          var currentHashPath = currentHash.split('?')[0];
+          var isAtRoot = !currentHashPath || currentHashPath === '#' || currentHashPath === '#/';
+
+          if (activeType && isAtRoot) {
+            var targetRoute = getRouteForType(activeType);
+            if (targetRoute) {
+              var lojaSuffix = activeLoja ? ('?loja=' + encodeURIComponent(activeLoja)) : '';
+              window.location.replace(window.location.pathname + window.location.search + '#' + targetRoute + lojaSuffix);
             }
           }
         } catch (e) {}
-      }
-      syncManifestLink();
-      window.addEventListener('hashchange', syncManifestLink);
 
-      // Captura global do evento de instalação PWA antes de qualquer componente carregar
-      window.deferredPWAInstallPrompt = null;
-
-      function triggerAutoInstallIfRequested(e) {
-        try {
-          const urlParams = new URLSearchParams(window.location.search);
-          const hash = window.location.hash || '';
-          if (urlParams.get('auto_install') === 'true' || urlParams.get('auto_install') === '1' || hash.includes('auto_install=true') || hash.includes('auto_install=1')) {
-            console.log('[PWA] Auto-instalação requisitada via parâmetro. Disparando prompt...');
-            setTimeout(function() {
-              if (window.deferredPWAInstallPrompt && typeof window.deferredPWAInstallPrompt.prompt === 'function') {
-                window.deferredPWAInstallPrompt.prompt().then(function(choice) {
-                  if (choice && choice.outcome === 'accepted') {
-                    window.dispatchEvent(new CustomEvent('pwa-installed'));
-                  }
-                }).catch(function(err) {
-                  console.warn('[PWA] Prompt automático completado:', err);
-                });
+        // 2. Sincroniza o link do manifest com o módulo e a unidade correspondente
+        window.syncManifestLink = function(forcedType) {
+          try {
+            var type = normalizeAppType(forcedType) || detectCurrentAppType();
+            var loja = getStoreSlugFromLocation();
+            var manifestEl = document.getElementById('app-manifest');
+            if (manifestEl) {
+              var params = new URLSearchParams();
+              if (type) params.set('type', type);
+              if (loja) params.set('loja', loja);
+              var targetHref = '/api/manifest' + (params.toString() ? '?' + params.toString() : '');
+              if (manifestEl.getAttribute('href') !== targetHref) {
+                manifestEl.setAttribute('href', targetHref);
               }
-            }, 300);
-          }
-        } catch (err) {
-          console.warn('[PWA] Erro na detecção de auto-instalação:', err);
-        }
-      }
+            }
+          } catch (e) {}
+        };
 
-      window.addEventListener('beforeinstallprompt', function(e) {
-        e.preventDefault();
-        window.deferredPWAInstallPrompt = e;
-        window.dispatchEvent(new CustomEvent('pwa-prompt-available', { detail: e }));
-        console.log('[PWA] Evento beforeinstallprompt capturado com sucesso.');
-        triggerAutoInstallIfRequested(e);
-      });
+        window.syncManifestLink();
+        window.addEventListener('hashchange', function() { window.syncManifestLink(); });
+        window.addEventListener('popstate', function() { window.syncManifestLink(); });
 
-      window.addEventListener('appinstalled', function() {
+        // 3. Captura global do evento de instalação PWA
         window.deferredPWAInstallPrompt = null;
-        window.dispatchEvent(new CustomEvent('pwa-installed'));
-        console.log('[PWA] Aplicativo instalado no sistema com sucesso.');
-      });
+        window.deferredPWAInstallType = '';
+
+        function triggerAutoInstallIfRequested() {
+          try {
+            var urlParams = new URLSearchParams(window.location.search);
+            var hash = window.location.hash || '';
+            if (urlParams.get('auto_install') === 'true' || urlParams.get('auto_install') === '1' || hash.indexOf('auto_install=true') !== -1 || hash.indexOf('auto_install=1') !== -1) {
+              var detected = detectCurrentAppType();
+              if (detected) {
+                try { localStorage.setItem('pwa_installed_type', detected); } catch (e) {}
+              }
+              setTimeout(function() {
+                if (window.deferredPWAInstallPrompt && typeof window.deferredPWAInstallPrompt.prompt === 'function') {
+                  window.deferredPWAInstallPrompt.prompt().then(function(choice) {
+                    if (choice && choice.outcome === 'accepted') {
+                      window.dispatchEvent(new CustomEvent('pwa-installed'));
+                    }
+                  }).catch(function(err) {
+                    console.warn('[PWA] Prompt automático:', err);
+                  });
+                }
+              }, 300);
+            }
+          } catch (err) {}
+        }
+
+        window.addEventListener('beforeinstallprompt', function(e) {
+          e.preventDefault();
+          window.syncManifestLink();
+          window.deferredPWAInstallPrompt = e;
+          window.deferredPWAInstallType = detectCurrentAppType();
+          window.dispatchEvent(new CustomEvent('pwa-prompt-available', { detail: e }));
+          triggerAutoInstallIfRequested();
+        });
+
+        window.addEventListener('appinstalled', function() {
+          var installedType = detectCurrentAppType();
+          if (installedType) {
+            try { localStorage.setItem('pwa_installed_type', installedType); } catch (e) {}
+          }
+          window.deferredPWAInstallPrompt = null;
+          window.dispatchEvent(new CustomEvent('pwa-installed'));
+        });
+      })();
     </script>
 
     <script src="https://cdn.tailwindcss.com"></script>

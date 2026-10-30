@@ -1139,6 +1139,22 @@ function StoreContext() {
   const lojaParam = storeSlug ? `?loja=${storeSlug}` : '';
   const loginRedirect = `/login${lojaParam}${lojaParam ? '&' : '?'}view=login`;
 
+  const pwaTargetRoute = useMemo(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const searchType = urlParams.get('type') || searchParams.get('type');
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+    const savedType = isStandalone ? localStorage.getItem('pwa_installed_type') : null;
+    const activeType = searchType || savedType;
+
+    if (activeType === 'pdv') return '/pdv';
+    if (activeType === 'atendente' || activeType === 'atendimento') return '/atendimento';
+    if (activeType === 'entregador' || activeType === 'entregas') return '/entregas';
+    if (activeType === 'cardapio') return '/cardapio';
+    if (activeType === 'cozinha' || activeType === 'producao') return '/cozinha';
+    if (activeType === 'tv') return '/tv';
+    return null;
+  }, [searchParams]);
+
   return (
     <React.Suspense fallback={<div className="min-h-screen bg-slate-900 flex items-center justify-center"><Loader2 className="animate-spin text-secondary" size={48} /></div>}>
       <Routes>
@@ -1153,14 +1169,14 @@ function StoreContext() {
         adminUser && (adminUser.role === 'ATENDENTE' || adminUser.role === 'GERENTE') && adminUser.store_id === currentStore?.id ? (
           <KitchenBoard orders={orders} updateStatus={updateOrderStatus} />
         ) : (
-          <Navigate to={loginRedirect} replace />
+          <Navigate to={`${loginRedirect}&target=/cozinha`} replace />
         )
       } />
       <Route path="/tv" element={
         adminUser && (adminUser.role === 'ATENDENTE' || adminUser.role === 'GERENTE') && adminUser.store_id === currentStore?.id ? (
           <TVBoard orders={orders} settings={settings} products={products} />
         ) : (
-          <Navigate to={loginRedirect} replace />
+          <Navigate to={`${loginRedirect}&target=/tv`} replace />
         )
       } />
       <Route path="/cardapio/*" element={<DigitalMenu storeId={currentStore?.id} products={products} categories={categories} settings={settings} orders={orders} addOrder={addOrder} updateOrder={updateOrder} tableNumber={activeTable} onLogout={() => setActiveTable(null)} isWaitstaff={!!adminUser} user={adminUser || undefined} ecosystemUsage={ecosystemUsage} refreshEcosystemUsage={loadEcosystemUsage} />} />
@@ -1219,7 +1235,9 @@ function StoreContext() {
       } />
 
       <Route path="/" element={
-        !storeSlug ? <SuperAdminPanel /> : (
+        pwaTargetRoute ? (
+          <Navigate to={`${pwaTargetRoute}${lojaParam}`} replace />
+        ) : !storeSlug ? <SuperAdminPanel /> : (
           adminUser && adminUser.store_id === currentStore?.id ? (
             adminUser.role === 'GERENTE' ? 
               <AdminLayout settings={settings} onLogout={() => handleSetUser(null)} /> : 
@@ -1309,6 +1327,10 @@ function AdminLayout({ settings, onLogout }: { settings: StoreSettings, onLogout
   const [searchParams] = useSearchParams();
   const storeSlug = useMemo(() => searchParams.get('loja'), [searchParams]);
   const lojaParam = storeSlug ? `?loja=${storeSlug}` : '';
+  const getModuleUrl = (type: string, route: string) => {
+    const query = storeSlug ? `?type=${type}&loja=${encodeURIComponent(storeSlug)}` : `?type=${type}`;
+    return `/${query}#${route}${lojaParam}`;
+  };
 
   const menuItems = [
     { to: `/${lojaParam}`, label: 'Início', icon: <LayoutDashboard size={20} /> },
@@ -1346,12 +1368,12 @@ function AdminLayout({ settings, onLogout }: { settings: StoreSettings, onLogout
             </Link>
           ))}
           <div className="pt-6 pb-2 px-3 text-[10px] text-white/40 font-bold uppercase tracking-widest">Atalhos Externos</div>
-          <a href={`#/pdv${lojaParam}`} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-green-400 font-bold"><ShoppingCart size={20} /> PDV / Caixa</a>
-          <a href={`#/entregas${lojaParam}`} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-blue-400 font-bold"><Truck size={20} /> Entregas</a>
-          <a href={`#/atendimento${lojaParam}`} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-orange-400 font-bold"><UserRound size={20} /> Atendimento</a>
-          <a href={`#/cardapio${lojaParam}`} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-secondary"><Utensils size={20} /> Cardápio</a>
-          <a href={`#/cozinha${lojaParam}`} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-gray-300"><ChefHat size={20} /> Produção</a>
-          <a href={`#/tv${lojaParam}`} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-gray-300"><Tv size={20} /> Painel TV</a>
+          <a href={getModuleUrl('pdv', '/pdv')} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-green-400 font-bold"><ShoppingCart size={20} /> PDV / Caixa</a>
+          <a href={getModuleUrl('entregador', '/entregas')} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-blue-400 font-bold"><Truck size={20} /> Entregas</a>
+          <a href={getModuleUrl('atendente', '/atendimento')} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-orange-400 font-bold"><UserRound size={20} /> Atendimento</a>
+          <a href={getModuleUrl('cardapio', '/cardapio')} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-secondary"><Utensils size={20} /> Cardápio</a>
+          <a href={getModuleUrl('cozinha', '/cozinha')} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-gray-300"><ChefHat size={20} /> Produção</a>
+          <a href={getModuleUrl('tv', '/tv')} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-gray-300"><Tv size={20} /> Painel TV</a>
         </nav>
         <div className="p-4 border-t border-white/10"><button onClick={onLogout} className="w-full flex items-center gap-3 p-3 text-red-400 font-bold"><LogOut size={18} /> Sair</button></div>
       </aside>
@@ -1363,7 +1385,7 @@ function AdminLayout({ settings, onLogout }: { settings: StoreSettings, onLogout
             <span className="text-[9px] font-bold uppercase truncate w-full text-center px-1">{item.label}</span>
           </Link>
         ))}
-        <a href={`#/entregas${lojaParam}`} target="_blank" rel="noreferrer" className="flex flex-col items-center justify-center gap-1 flex-shrink-0 min-w-[72px] h-full text-blue-500">
+        <a href={getModuleUrl('entregador', '/entregas')} target="_blank" rel="noreferrer" className="flex flex-col items-center justify-center gap-1 flex-shrink-0 min-w-[72px] h-full text-blue-500">
           <Truck size={20} />
           <span className="text-[9px] font-bold uppercase truncate w-full text-center px-1">Entregas</span>
         </a>

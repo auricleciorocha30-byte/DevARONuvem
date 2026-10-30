@@ -1073,12 +1073,26 @@ const StatCard = ({ icon, label, value, color }: any) => (
     </div>
 );
 
-const OpPanelLink = ({ to, label, icon, color }: any) => (
-    <a href={`#${to}`} target="_blank" rel="noreferrer" className={`p-6 rounded-[2.5rem] flex flex-col items-center gap-3 border transition-all active:scale-95 ${color} shadow-sm hover:shadow-xl group`}>
-        <div className="p-3 bg-white rounded-2xl shadow-sm transition-transform group-hover:scale-110">{icon}</div>
-        <span className="text-xs font-black uppercase tracking-widest">{label}</span>
-    </a>
-);
+const OpPanelLink = ({ to, label, icon, color }: any) => {
+    let type = '';
+    if (to.startsWith('/pdv')) type = 'pdv';
+    else if (to.startsWith('/atendimento')) type = 'atendente';
+    else if (to.startsWith('/entregas')) type = 'entregador';
+    else if (to.startsWith('/cozinha')) type = 'cozinha';
+    else if (to.startsWith('/tv')) type = 'tv';
+    else if (to.startsWith('/cardapio')) type = 'cardapio';
+
+    const qIdx = to.indexOf('?');
+    const queryStr = qIdx !== -1 ? to.slice(qIdx + 1) : '';
+    const searchPrefix = type ? `/?type=${type}${queryStr ? `&${queryStr}` : ''}` : '';
+
+    return (
+        <a href={`${searchPrefix}#${to}`} target="_blank" rel="noreferrer" className={`p-6 rounded-[2.5rem] flex flex-col items-center gap-3 border transition-all active:scale-95 ${color} shadow-sm hover:shadow-xl group`}>
+            <div className="p-3 bg-white rounded-2xl shadow-sm transition-transform group-hover:scale-110">{icon}</div>
+            <span className="text-xs font-black uppercase tracking-widest">{label}</span>
+        </a>
+    );
+};
 
 const generateChartData = (orders: Order[]) => {
     const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];

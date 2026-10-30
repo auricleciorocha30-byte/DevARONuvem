@@ -2,6 +2,7 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { Order, StoreSettings, Product } from '../types';
 import { ChefHat, CheckCircle2, Tv, Flame, Star, Calendar, ShoppingBag, Truck, Utensils } from 'lucide-react';
+import InstallPrompt from '../components/InstallPrompt';
 
 interface Props {
   orders: Order[];
@@ -84,9 +85,12 @@ const TVBoard: React.FC<Props> = ({ orders, settings, products }) => {
             <p className="text-lg text-secondary uppercase tracking-widest font-medium">Painel de Atendimento</p>
           </div>
         </div>
-        <div className="bg-white/5 px-6 py-2 rounded-2xl border border-white/10">
-          <p className="text-4xl font-bold font-mono">{currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
-          <p className="text-[10px] text-gray-500 text-center uppercase tracking-widest">{currentTime.toLocaleDateString('pt-BR', { weekday: 'long' })}</p>
+        <div className="flex items-center gap-4">
+          <InstallPrompt appType="tv" />
+          <div className="bg-white/5 px-6 py-2 rounded-2xl border border-white/10">
+            <p className="text-4xl font-bold font-mono">{currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+            <p className="text-[10px] text-gray-500 text-center uppercase tracking-widest">{currentTime.toLocaleDateString('pt-BR', { weekday: 'long' })}</p>
+          </div>
         </div>
       </header>
 
