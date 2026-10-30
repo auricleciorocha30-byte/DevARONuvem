@@ -1,5 +1,5 @@
 // Service Worker para PWA DevARONuvem
-const CACHE_NAME = 'devaro-pwa-v6';
+const CACHE_NAME = 'devaro-pwa-v7';
 const STATIC_ASSETS = [
   '/icon-192.png',
   '/icon-512.png',

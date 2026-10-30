@@ -1139,21 +1139,23 @@ function StoreContext() {
   const lojaParam = storeSlug ? `?loja=${storeSlug}` : '';
   const loginRedirect = `/login${lojaParam}${lojaParam ? '&' : '?'}view=login`;
 
-  const pwaTargetRoute = useMemo(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const searchType = urlParams.get('type') || searchParams.get('type');
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
-    const savedType = isStandalone ? localStorage.getItem('pwa_installed_type') : null;
-    const activeType = searchType || savedType;
+  const pwaTargetRoute = (() => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const searchType = urlParams.get('type') || searchParams.get('type');
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+      const savedType = isStandalone ? localStorage.getItem('pwa_installed_type') : null;
+      const activeType = searchType || savedType;
 
-    if (activeType === 'pdv') return '/pdv';
-    if (activeType === 'atendente' || activeType === 'atendimento') return '/atendimento';
-    if (activeType === 'entregador' || activeType === 'entregas') return '/entregas';
-    if (activeType === 'cardapio') return '/cardapio';
-    if (activeType === 'cozinha' || activeType === 'producao') return '/cozinha';
-    if (activeType === 'tv') return '/tv';
+      if (activeType === 'pdv') return '/pdv';
+      if (activeType === 'atendente' || activeType === 'atendimento') return '/atendimento';
+      if (activeType === 'entregador' || activeType === 'entregas') return '/entregas';
+      if (activeType === 'cardapio') return '/cardapio';
+      if (activeType === 'cozinha' || activeType === 'producao') return '/cozinha';
+      if (activeType === 'tv') return '/tv';
+    } catch (e) {}
     return null;
-  }, [searchParams]);
+  })();
 
   return (
     <React.Suspense fallback={<div className="min-h-screen bg-slate-900 flex items-center justify-center"><Loader2 className="animate-spin text-secondary" size={48} /></div>}>
