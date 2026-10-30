@@ -52,6 +52,7 @@ import { supabase } from '../lib/supabase';
 import { Product, StoreSettings, Order, OrderItem, OrderType, PaymentMethod, Waitstaff, CartComplementItem, ComplementCategory } from '../types';
 import InstallPrompt from '../components/InstallPrompt';
 import { ComplementsModal } from '../components/ComplementsModal';
+import { RouletteWheel } from '../components/RouletteWheel';
 
 const getComboItems = (comboItems: any): any[] => {
   if (!comboItems) return [];
@@ -3133,97 +3134,45 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
 
       {/* MODAL DA ROLETA DE SORTEIOS */}
       {showRouletteModal && (
-        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-sm rounded-[3rem] shadow-2xl p-6 text-center border border-orange-100 animate-scale-up relative">
-            
+        <div className="fixed inset-0 z-[200] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-[400px] rounded-[2.5rem] shadow-[0_24px_60px_rgba(0,0,0,0.45)] p-6 text-center border border-amber-200/80 animate-scale-up relative overflow-hidden">
+            {/* Faixa decorativa superior */}
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400" />
+
             {/* Fechar botão apenas se não estiver girando */}
             {!isRouletteSpinning && (
               <button 
                 onClick={() => setShowRouletteModal(false)} 
-                className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 bg-gray-50 rounded-full"
+                className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200/70 rounded-full transition-colors"
               >
                 <X size={20} />
               </button>
             )}
 
-            <div className="p-2 bg-gradient-to-r from-amber-500 to-orange-600 rounded-2xl text-white inline-block mb-4 shadow-md">
-              <Gift size={28} />
+            <div className="w-12 h-12 bg-gradient-to-br from-amber-400 via-orange-500 to-orange-600 rounded-2xl text-white flex items-center justify-center mx-auto mb-3 shadow-lg shadow-orange-500/25">
+              <Gift size={24} />
             </div>
             
-            <h3 className="text-xl font-brand font-black text-gray-800 mb-1 uppercase tracking-wide">Roleta da Sorte! 🎰</h3>
-            <p className="text-xs text-gray-500 mb-6">Gire a roleta e ganhe descontos imperdíveis ou brindes especiais para acompanhar o seu pedido!</p>
+            <h3 className="text-xl font-brand font-black text-slate-900 mb-1 uppercase tracking-tight">Roleta da Sorte! 🎰</h3>
+            <p className="text-xs text-slate-500 mb-5 px-2 leading-relaxed">
+              Gire a roleta e ganhe descontos imperdíveis ou brindes especiais para acompanhar o seu pedido!
+            </p>
 
-            {/* Container da Roleta Física */}
-            <div className="relative w-64 h-64 mx-auto mb-8 flex items-center justify-center">
-              
-              {/* Ponteiro de Seleção */}
-              <div className="absolute top-[-10px] left-1/2 -translate-x-1/2 z-50 w-0 h-0 border-l-[12px] border-l-transparent border-r-[12px] border-r-transparent border-t-[20px] border-t-amber-500 drop-shadow-md"></div>
-              
-              {/* O Círculo da Roleta */}
-              <div 
-                style={{
-                  transform: `rotate(${rouletteRotation}deg)`,
-                  transition: isRouletteSpinning ? 'transform 5000ms cubic-bezier(0.1, 0.8, 0.1, 1)' : 'none',
-                  background: (() => {
-                    const prizes = settings.roulettePrizes || [
-                      { id: '1', label: '5% Desc', type: 'discount', value: 5, probability: 30 },
-                      { id: '2', label: '10% Desc', type: 'discount', value: 10, probability: 10 },
-                      { id: '3', label: 'Tente Novamente 🍀', type: 'try_again', value: 0, probability: 50 },
-                      { id: '4', label: 'Brinde Especial! 🎁', type: 'try_again', value: 0, probability: 10 },
-                    ];
-                    const colors = ['#f59e0b', '#3b82f6', '#10b981', '#ec4899', '#8b5cf6', '#ef4444', '#14b8a6'];
-                    const conicParts = prizes.map((p, idx) => {
-                      const from = idx * (360 / prizes.length);
-                      const to = (idx + 1) * (360 / prizes.length);
-                      return `${colors[idx % colors.length]} ${from}deg ${to}deg`;
-                    });
-                    return `conic-gradient(${conicParts.join(', ')})`;
-                  })()
-                }}
-                className="w-full h-full rounded-full border-[8px] border-amber-400 shadow-2xl relative overflow-hidden"
-              >
-                {/* Rótulos dos Prêmios */}
-                {(() => {
-                  const prizes = settings.roulettePrizes || [
-                    { id: '1', label: '5% Desc', type: 'discount', value: 5, probability: 30 },
-                    { id: '2', label: '10% Desc', type: 'discount', value: 10, probability: 10 },
+            {/* Roleta Moderna com Quebra de Linha Automática */}
+            <div className="mb-6">
+              <RouletteWheel
+                prizes={
+                  settings.roulettePrizes || [
+                    { id: '1', label: '5% de Desconto', type: 'discount', value: 5, probability: 30 },
+                    { id: '2', label: '10% de Desconto', type: 'discount', value: 10, probability: 10 },
                     { id: '3', label: 'Tente Novamente 🍀', type: 'try_again', value: 0, probability: 50 },
                     { id: '4', label: 'Brinde Especial! 🎁', type: 'try_again', value: 0, probability: 10 },
-                  ];
-                  return prizes.map((p, idx) => {
-                    const angle = idx * (360 / prizes.length) + (360 / prizes.length) / 2;
-                    return (
-                      <div
-                        key={p.id}
-                        style={{
-                          transform: `rotate(${angle}deg) translateY(-85px)`,
-                          position: 'absolute',
-                          top: '50%',
-                          left: '50%',
-                          marginTop: '-12px',
-                          marginLeft: '-45px',
-                          width: '90px',
-                          textAlign: 'center',
-                          fontSize: '9px',
-                          fontWeight: 900,
-                          color: 'white',
-                          textShadow: '0 1.5px 3px rgba(0,0,0,0.9)',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis'
-                        }}
-                      >
-                        {p.label}
-                      </div>
-                    );
-                  });
-                })()}
-
-                {/* Pino Central */}
-                <div className="absolute inset-0 m-auto w-10 h-10 bg-amber-400 border-4 border-white rounded-full shadow-md z-30 flex items-center justify-center">
-                  <div className="w-2 h-2 bg-gray-800 rounded-full"></div>
-                </div>
-              </div>
+                  ]
+                }
+                rotation={rouletteRotation}
+                isSpinning={isRouletteSpinning}
+                disabled={!!roulettePrizeWon}
+              />
             </div>
 
             {/* Ações e Mensagens */}
@@ -3256,10 +3205,11 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                     }
                   }
 
-                  // 2. Calcular rotação final
+                  // 2. Calcular rotação final acumulativa
                   const sliceAngle = 360 / prizes.length;
                   const prizeAngle = selectedIndex * sliceAngle + sliceAngle / 2;
-                  const finalRotation = 360 * 6 - prizeAngle; // 6 spins completos + posicionamento inverso
+                  const currentBase = Math.ceil(rouletteRotation / 360) * 360;
+                  const finalRotation = currentBase + 360 * 6 - prizeAngle;
                   setRouletteRotation(finalRotation);
 
                   // 3. Aguardar fim do giro
@@ -3290,17 +3240,17 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                     }
                   }, 5000);
                 }}
-                className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:brightness-105 active:scale-95 transition-all shadow-xl shadow-orange-500/10 disabled:opacity-50"
+                className="w-full py-4 bg-gradient-to-r from-amber-500 via-orange-500 to-orange-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:brightness-105 active:scale-95 transition-all shadow-xl shadow-orange-500/25 disabled:opacity-50"
               >
                 {isRouletteSpinning ? 'Girando a Roleta...' : 'Girar Agora! 🍀'}
               </button>
             ) : (
               <div className="space-y-4 animate-scale-up">
-                <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-zinc-900">
+                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-zinc-900">
                   <p className="text-sm font-black text-emerald-800">
                     {roulettePrizeWon.type === 'try_again' ? '🍀 Não foi dessa vez!' : '🎉 Parabéns! Você ganhou:'}
                   </p>
-                  <p className="text-lg font-black text-emerald-600 mt-1">{roulettePrizeWon.label}</p>
+                  <p className="text-lg font-black text-emerald-600 mt-1 break-words leading-snug">{roulettePrizeWon.label}</p>
                   <p className="text-[11px] text-gray-500 mt-2">
                     {roulettePrizeWon.type === 'discount' && 'O desconto foi aplicado diretamente ao subtotal da sua sacola!'}
                     {roulettePrizeWon.type === 'item' && 'O item grátis foi adicionado à sua sacola sem custos!'}
