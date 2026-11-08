@@ -561,12 +561,67 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
     setShowProfileModal(true);
   };
 
-  const handleConfirmPhoneStep = () => {
+  const handleConfirmPhoneStep = async () => {
     const digits = tempProfilePhone.replace(/\D/g, '');
     if (digits.length < 10) {
       showAlert('Informe um número de WhatsApp/Telefone válido com DDD.');
       return;
     }
+    const formattedPhone = formatPhoneMask(digits);
+
+    if (storeId) {
+      try {
+        const { data, error } = await supabase
+          .from('customers')
+          .select('*')
+          .eq('store_id', storeId)
+          .eq('phone', formattedPhone)
+          .maybeSingle();
+
+        if (data && data.name) {
+          setCustomerPhone(formattedPhone);
+          setCustomerName(data.name || '');
+          setCustomerBirthDate(data.birth_date || '');
+          setCustomerId(data.id);
+          setCustomerPoints(data.points || 0);
+          if (data.address) handleSetAddressParts(data.address);
+          if (data.referencePoint) setReferencePoint(data.referencePoint);
+
+          try {
+            localStorage.setItem('customer_phone', formattedPhone);
+            localStorage.setItem('customer_name', data.name);
+            if (data.birth_date) localStorage.setItem('customer_birthdate', data.birth_date);
+          } catch (e) {}
+
+          setShowProfileModal(false);
+          showSuccessAlert(`Bem-vindo de volta, ${data.name}!`);
+          return;
+        }
+
+        const matchingOrder = orders.find(o => {
+          const oPhone = (o.customerPhone || '').replace(/\D/g, '');
+          return oPhone && (oPhone === digits || oPhone.endsWith(digits) || digits.endsWith(oPhone));
+        });
+        if (matchingOrder && matchingOrder.customerName) {
+          setCustomerPhone(formattedPhone);
+          setCustomerName(matchingOrder.customerName);
+          if (matchingOrder.deliveryAddress) handleSetAddressParts(matchingOrder.deliveryAddress);
+
+          try {
+            localStorage.setItem('customer_phone', formattedPhone);
+            localStorage.setItem('customer_name', matchingOrder.customerName);
+          } catch (e) {}
+
+          setShowProfileModal(false);
+          showSuccessAlert(`Bem-vindo de volta, ${matchingOrder.customerName}!`);
+          return;
+        }
+      } catch (err) {
+        console.error('Error auto-lookup customer:', err);
+      }
+    }
+
+    setCustomerPhone(formattedPhone);
     setProfileStep('info');
   };
 
