@@ -61,8 +61,20 @@ const defaultOperatingHours = {
 
 const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 
+const BANNER_PRESETS = [
+  { label: '🍔 Hamburgueria', url: 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=1200&auto=format&fit=crop&q=80' },
+  { label: '🍕 Pizzaria', url: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=1200&auto=format&fit=crop&q=80' },
+  { label: '🍧 Açaí & Sobremesas', url: 'https://images.unsplash.com/photo-1590301157890-4810ed352733?w=1200&auto=format&fit=crop&q=80' },
+  { label: '🥩 Churrasco & Carnes', url: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=1200&auto=format&fit=crop&q=80' },
+  { label: '🍣 Sushi & Oriental', url: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=1200&auto=format&fit=crop&q=80' },
+  { label: '☕ Café & Padaria', url: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=1200&auto=format&fit=crop&q=80' },
+  { label: '🍹 Bar & Bebidas', url: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=1200&auto=format&fit=crop&q=80' },
+  { label: '🍽️ Restaurante Gourmet', url: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&auto=format&fit=crop&q=80' },
+];
+
 const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeId }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const bannerFileInputRef = useRef<HTMLInputElement>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
   const [localSettings, setLocalSettings] = useState<StoreSettings>(settings);
   const [activeTab, setActiveTab] = useState<'geral' | 'canais_pagamentos' | 'regras' | 'visual' | 'dados'>('geral');
@@ -231,6 +243,49 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
           
           const base64String = canvas.toDataURL('image/jpeg', 0.7);
           setLocalSettings(prev => ({ ...prev, logoUrl: base64String }));
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleBannerFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) { 
+        alert("A imagem da capa é muito grande. Escolha uma imagem de até 2MB.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1200;
+          const MAX_HEIGHT = 600;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          
+          const base64String = canvas.toDataURL('image/jpeg', 0.8);
+          setLocalSettings(prev => ({ ...prev, bannerUrl: base64String }));
         };
         img.src = reader.result as string;
       };
@@ -1552,6 +1607,110 @@ const StoreSettingsPage: React.FC<Props> = ({ settings, products, onSave, storeI
       {/* ABA 4: IDENTIDADE & IMPRESSÃO */}
       {activeTab === 'visual' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+          {/* BANNER / FOTO DE CAPA DO CARDÁPIO */}
+          <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 col-span-full">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+              <div>
+                <h2 className="text-base font-extrabold text-slate-800 flex items-center gap-2">
+                  <ImageIcon size={20} className="text-orange-500" /> Foto de Capa / Banner do Cardápio
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  Esta imagem é exibida no cabeçalho do seu Cardápio Web externo. Escolha uma foto do seu estabelecimento ou selecione um modelo pronto abaixo.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => bannerFileInputRef.current?.click()}
+                  className="px-4 py-2 bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold text-xs rounded-xl flex items-center gap-2 transition-all shadow-sm cursor-pointer"
+                >
+                  <Upload size={14} /> Fazer Upload de Imagem
+                </button>
+                {localSettings.bannerUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setLocalSettings(prev => ({ ...prev, bannerUrl: '' }))}
+                    className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-all border border-rose-100 cursor-pointer"
+                    title="Remover banner personalizado"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Banner Preview */}
+            <div 
+              onClick={() => bannerFileInputRef.current?.click()}
+              className="relative w-full h-44 sm:h-56 rounded-2xl overflow-hidden border-2 border-dashed border-orange-200 bg-slate-900 group cursor-pointer transition-all hover:border-orange-400 shadow-inner"
+            >
+              <img 
+                src={localSettings.bannerUrl || "https://images.unsplash.com/photo-1550547660-d9450f859349?w=1200&auto=format&fit=crop&q=80"} 
+                alt="Banner Preview" 
+                className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-500"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/30 flex flex-col items-center justify-center p-4 text-center">
+                <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white mb-2 group-hover:scale-110 transition-transform shadow-lg">
+                  <Camera size={22} />
+                </div>
+                <span className="text-white font-bold text-sm drop-shadow-md">
+                  Clique para trocar a imagem da capa
+                </span>
+                <span className="text-white/80 text-xs drop-shadow-sm mt-0.5">
+                  Formatos recomendados: JPG, PNG ou WEBP (formato horizontal)
+                </span>
+              </div>
+            </div>
+            <input 
+              type="file" 
+              ref={bannerFileInputRef} 
+              onChange={handleBannerFileChange} 
+              className="hidden" 
+              accept="image/*" 
+            />
+
+            {/* Custom URL Input */}
+            <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider shrink-0">
+                Ou cole o link da foto:
+              </span>
+              <input
+                type="url"
+                value={localSettings.bannerUrl || ''}
+                onChange={(e) => setLocalSettings(prev => ({ ...prev, bannerUrl: e.target.value }))}
+                placeholder="https://exemplo.com/minha-capa.jpg"
+                className="flex-1 px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-400"
+              />
+            </div>
+
+            {/* Quick Presets Gallery */}
+            <div className="mt-4 pt-4 border-t border-slate-100">
+              <span className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-2.5">
+                Modelos Prontos por Categoria (Clique para aplicar):
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {BANNER_PRESETS.map((preset) => {
+                  const isSelected = localSettings.bannerUrl === preset.url;
+                  return (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => setLocalSettings(prev => ({ ...prev, bannerUrl: preset.url }))}
+                      className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-between gap-1 transition-all text-left cursor-pointer ${
+                        isSelected 
+                          ? 'bg-orange-500 text-white border-orange-500 shadow-sm' 
+                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      <span className="truncate">{preset.label}</span>
+                      {isSelected && <Check size={14} className="shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+
           <div className="space-y-6">
             <section className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col items-center">
             <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-6 text-center">QR Code Pix</h2>

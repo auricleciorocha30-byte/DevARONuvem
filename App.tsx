@@ -1079,6 +1079,7 @@ function StoreContext() {
       await supabase.from('store_profiles').eq('id', currentStore.id).update({ 
         settings: JSON.stringify(newSettings),
         logoUrl: newSettings.logoUrl,
+        bannerUrl: newSettings.bannerUrl,
         name: newSettings.storeName,
         address: newSettings.address,
         whatsapp: newSettings.whatsapp
@@ -1086,6 +1087,7 @@ function StoreContext() {
       const updatedStore = { 
         ...currentStore, 
         settings: newSettings,
+        bannerUrl: newSettings.bannerUrl !== undefined ? newSettings.bannerUrl : currentStore.bannerUrl,
         logoUrl: newSettings.logoUrl || currentStore.logoUrl,
         name: newSettings.storeName || currentStore.name,
         address: newSettings.address || currentStore.address,

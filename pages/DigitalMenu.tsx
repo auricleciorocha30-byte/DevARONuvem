@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   ShoppingCart, 
@@ -52,7 +52,11 @@ import {
   ChevronDown,
   Bike,
   Footprints,
-  Sparkles
+  Sparkles,
+  Maximize2,
+  Camera,
+  Upload,
+  Trash2
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Product, StoreSettings, Order, OrderItem, OrderType, PaymentMethod, Waitstaff, CartComplementItem, ComplementCategory } from '../types';
@@ -730,6 +734,78 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const [isFeeConfirmed, setIsFeeConfirmed] = useState(false);
   
   const [activeWaitstaff, setActiveWaitstaff] = useState<Waitstaff | null>(null);
+
+  const [menuBannerUrl, setMenuBannerUrl] = useState<string>(settings.bannerUrl || '');
+  useEffect(() => {
+    if (settings.bannerUrl) setMenuBannerUrl(settings.bannerUrl);
+  }, [settings.bannerUrl]);
+
+  const menuBannerInputRef = useRef<HTMLInputElement>(null);
+
+  const handleMenuBannerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        showAlert("A imagem é muito grande. Escolha uma imagem de até 2MB.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const img = new Image();
+        img.onload = async () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1200;
+          const MAX_HEIGHT = 600;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+
+          const base64String = canvas.toDataURL('image/jpeg', 0.8);
+          setMenuBannerUrl(base64String);
+
+          if (storeId) {
+            const updatedSettings = { ...settings, bannerUrl: base64String };
+            await supabase.from('store_profiles').eq('id', storeId).update({
+              bannerUrl: base64String,
+              settings: JSON.stringify(updatedSettings)
+            });
+            if (storeSlug) {
+              const cached = localStorage.getItem(`store_profile_${storeSlug.toLowerCase()}`);
+              if (cached) {
+                try {
+                  const parsed = JSON.parse(cached);
+                  parsed.bannerUrl = base64String;
+                  parsed.settings = updatedSettings;
+                  localStorage.setItem(`store_profile_${storeSlug.toLowerCase()}`, JSON.stringify(parsed));
+                } catch (err) {
+                  console.error(err);
+                }
+              }
+            }
+          }
+          showSuccessAlert("Foto de capa do cardápio atualizada com sucesso!");
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   useEffect(() => {
     // Only update deliveryAddress if we actually have fields filled, to not overwrite customer.address on load if they don't edit
@@ -2237,11 +2313,11 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
         /* CARDÁPIO WEB - EXTERNAL DESIGN */
         <div className="flex-1 flex flex-col w-full bg-slate-50 min-h-screen">
           {/* Top Cover Banner */}
-          <div className="relative w-full h-40 sm:h-52 bg-slate-900 overflow-hidden">
+          <div className="relative w-full h-40 sm:h-52 bg-slate-900 overflow-hidden group/banner">
             <img 
-              src={settings.bannerUrl || "https://images.unsplash.com/photo-1550547660-d9450f859349?w=1200&auto=format&fit=crop&q=80"} 
+              src={menuBannerUrl || settings.bannerUrl || "https://images.unsplash.com/photo-1550547660-d9450f859349?w=1200&auto=format&fit=crop&q=80"} 
               alt="Capa da Loja" 
-              className="w-full h-full object-cover opacity-90"
+              className="w-full h-full object-cover opacity-90 transition-transform duration-500 group-hover/banner:scale-105"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
             
@@ -2255,6 +2331,17 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
               </button>
 
               <div className="flex items-center gap-2">
+                {rawIsWaitstaff && (
+                  <button 
+                    type="button"
+                    onClick={() => menuBannerInputRef.current?.click()} 
+                    className="px-2.5 py-1.5 rounded-full bg-black/50 hover:bg-black/75 text-white text-[11px] font-bold backdrop-blur-md flex items-center gap-1.5 border border-white/20 transition-all shadow-sm active:scale-95 cursor-pointer"
+                    title="Trocar Capa do Cardápio"
+                  >
+                    <Camera size={13} />
+                    <span>Trocar Capa</span>
+                  </button>
+                )}
                 <InstallPrompt appType="cardapio" />
                 <button 
                   onClick={handleShare} 
@@ -2265,6 +2352,15 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                 </button>
               </div>
             </div>
+            {rawIsWaitstaff && (
+              <input 
+                type="file" 
+                ref={menuBannerInputRef} 
+                onChange={handleMenuBannerChange} 
+                className="hidden" 
+                accept="image/*" 
+              />
+            )}
           </div>
 
           {/* Overlapping Centered Logo */}
@@ -2503,9 +2599,25 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                 )}
                               </div>
                             </div>
-                            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shrink-0 bg-slate-100 border border-slate-100 relative self-center">
+                            <div 
+                              onClick={(e) => {
+                                if (product.imageUrl) {
+                                  e.stopPropagation();
+                                  handleExpandProductImages(product, 0);
+                                }
+                              }}
+                              className={`w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shrink-0 bg-slate-100 border border-slate-100 relative self-center group/img ${
+                                product.imageUrl ? 'cursor-zoom-in' : ''
+                              }`}
+                              title={product.imageUrl ? "Clique para ampliar a foto" : undefined}
+                            >
                               {product.imageUrl ? (
-                                <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                                <>
+                                  <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                                  <div className="absolute inset-0 bg-black/25 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                    <Maximize2 size={20} className="text-white drop-shadow-md" />
+                                  </div>
+                                </>
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center text-slate-300"><Package size={28} /></div>
                               )}
@@ -2579,9 +2691,25 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                     )}
                                   </div>
                                 </div>
-                                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shrink-0 bg-slate-100 border border-slate-100 relative self-center">
+                                <div 
+                                  onClick={(e) => {
+                                    if (product.imageUrl) {
+                                      e.stopPropagation();
+                                      handleExpandProductImages(product, 0);
+                                    }
+                                  }}
+                                  className={`w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shrink-0 bg-slate-100 border border-slate-100 relative self-center group/img ${
+                                    product.imageUrl ? 'cursor-zoom-in' : ''
+                                  }`}
+                                  title={product.imageUrl ? "Clique para ampliar a foto" : undefined}
+                                >
                                   {product.imageUrl ? (
-                                    <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                                    <>
+                                      <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                                      <div className="absolute inset-0 bg-black/25 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                        <Maximize2 size={20} className="text-white drop-shadow-md" />
+                                      </div>
+                                    </>
                                   ) : (
                                     <div className="w-full h-full flex items-center justify-center text-slate-300"><Package size={28} /></div>
                                   )}
@@ -2669,9 +2797,25 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                       )}
                                     </div>
                                   </div>
-                                  <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shrink-0 bg-slate-100 border border-slate-100 relative self-center">
+                                  <div 
+                                    onClick={(e) => {
+                                      if (product.imageUrl) {
+                                        e.stopPropagation();
+                                        handleExpandProductImages(product, 0);
+                                      }
+                                    }}
+                                    className={`w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shrink-0 bg-slate-100 border border-slate-100 relative self-center group/img ${
+                                      product.imageUrl ? 'cursor-zoom-in' : ''
+                                    }`}
+                                    title={product.imageUrl ? "Clique para ampliar a foto" : undefined}
+                                  >
                                     {product.imageUrl ? (
-                                      <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                                      <>
+                                        <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                                        <div className="absolute inset-0 bg-black/25 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                          <Maximize2 size={20} className="text-white drop-shadow-md" />
+                                        </div>
+                                      </>
                                     ) : (
                                       <div className="w-full h-full flex items-center justify-center text-slate-300"><Package size={28} /></div>
                                     )}
@@ -2750,9 +2894,25 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                               </span>
                             </div>
                           </div>
-                          <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shrink-0 bg-slate-100 border border-slate-100 self-center">
+                          <div 
+                            onClick={(e) => {
+                              if (product.imageUrl) {
+                                e.stopPropagation();
+                                handleExpandProductImages(product, 0);
+                              }
+                            }}
+                            className={`w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shrink-0 bg-slate-100 border border-slate-100 self-center relative group/img ${
+                              product.imageUrl ? 'cursor-zoom-in' : ''
+                            }`}
+                            title={product.imageUrl ? "Clique para ampliar a foto" : undefined}
+                          >
                             {product.imageUrl ? (
-                              <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                              <>
+                                <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                <div className="absolute inset-0 bg-black/25 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                  <Maximize2 size={20} className="text-white drop-shadow-md" />
+                                </div>
+                              </>
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-slate-300"><Package size={28} /></div>
                             )}
@@ -4346,7 +4506,6 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                       type="tel"
                       value={tempProfilePhone}
                       onChange={e => setTempProfilePhone(formatPhoneMask(e.target.value))}
-                      placeholder="(85) 98758-2159"
                       className="w-full bg-transparent outline-none text-base font-bold text-slate-900 tracking-wider"
                       autoFocus
                       onKeyDown={e => { if (e.key === 'Enter') handleConfirmPhoneStep(); }}
