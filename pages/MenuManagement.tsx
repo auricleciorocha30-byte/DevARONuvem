@@ -1356,9 +1356,31 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                   )}
               </div>
 
-              <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Dias em Destaque (Exibir em Ofertas)</label>
-                  <div className="flex flex-wrap gap-2">
+              <div className="bg-amber-50/70 p-4 rounded-2xl border border-amber-200/90 space-y-2.5">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <label className="text-xs font-bold text-amber-950 uppercase flex items-center gap-1.5">
+                      <Star size={14} className="text-amber-500 fill-amber-500" /> Produto em Destaque no Cardápio
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const allDays = [0, 1, 2, 3, 4, 5, 6];
+                        const isAllSelected = allDays.every(d => editingProduct?.featuredDays?.includes(d));
+                        if (isAllSelected) {
+                          setEditingProduct({ ...editingProduct, featuredDays: [], featuredDay: -1, isFeatured: false, isHighlight: false });
+                        } else {
+                          setEditingProduct({ ...editingProduct, featuredDays: allDays, featuredDay: -1, isFeatured: true, isHighlight: true });
+                        }
+                      }}
+                      className="px-3 py-1 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-[10px] font-black uppercase rounded-lg shadow-xs transition-all cursor-pointer"
+                    >
+                      {[0, 1, 2, 3, 4, 5, 6].every(d => editingProduct?.featuredDays?.includes(d)) ? 'Remover Destaque' : 'Destacar Todos os Dias ⭐'}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-amber-800 leading-relaxed">
+                    Escolha os dias da semana para exibir este produto na seção de <strong>DESTAQUES</strong> do cardápio digital (ou clique acima para destacar todos os dias):
+                  </p>
+                  <div className="flex flex-wrap gap-2 pt-1">
                     {days.map((day) => {
                       const isActive = editingProduct?.featuredDays?.includes(day.id) || editingProduct?.featuredDay === day.id;
                       return (
@@ -1367,28 +1389,31 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                           type="button"
                           onClick={() => {
                             let newDays = editingProduct?.featuredDays ? [...editingProduct.featuredDays] : [];
-                            
-                            // If it was the old featuredDay, migrate it
                             if (editingProduct?.featuredDay === day.id && !newDays.includes(day.id)) {
                                 newDays.push(day.id);
                             }
-
                             if (newDays.includes(day.id)) {
                               newDays = newDays.filter(d => d !== day.id);
                             } else {
                               newDays.push(day.id);
                             }
-                            setEditingProduct({...editingProduct, featuredDays: newDays, featuredDay: -1});
+                            setEditingProduct({
+                              ...editingProduct, 
+                              featuredDays: newDays, 
+                              featuredDay: -1,
+                              isFeatured: newDays.length > 0,
+                              isHighlight: newDays.length > 0
+                            });
                           }}
-                          className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${
+                          className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border cursor-pointer ${
                             isActive 
-                            ? 'bg-orange-500 text-white border-orange-600 shadow-sm' 
-                            : 'bg-white text-gray-500 border-gray-100 hover:border-gray-200'
+                            ? 'bg-amber-500 text-white border-amber-600 shadow-xs' 
+                            : 'bg-white text-gray-500 border-gray-200 hover:border-amber-300'
                           }`}
                         >
                           {day.name}
                         </button>
-                      )
+                      );
                     })}
                   </div>
               </div>

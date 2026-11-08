@@ -473,6 +473,8 @@ function StoreContext() {
     ncm: p.ncm || undefined,
     cfop: p.cfop || undefined,
     icms_situacao_tributaria: p.icms_situacao_tributaria || p.icms_situacaotributaria || undefined,
+    isFeatured: p.isFeatured === 1 || p.isFeatured === true || p.isfeatured === 1 || p.isfeatured === true || p.is_featured === 1 || p.is_featured === true || (p.featuredDays && (Array.isArray(p.featuredDays) ? p.featuredDays.length > 0 : true)) || (p.featuredDay !== null && p.featuredDay !== undefined && p.featuredDay !== -1),
+    isHighlight: p.isHighlight === 1 || p.isHighlight === true || p.ishighlight === 1 || p.ishighlight === true || p.is_highlight === 1 || p.is_highlight === true,
     isCombo: p.isCombo === 1 || p.isCombo === true || p.iscombo === 1 || p.iscombo === true,
     comboItems: (() => {
       const field = p.comboItems || p.comboitems || p.combo_items;

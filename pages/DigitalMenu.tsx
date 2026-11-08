@@ -53,6 +53,7 @@ import {
   Bike,
   Footprints,
   Sparkles,
+  Star,
   Maximize2,
   Camera,
   Upload,
@@ -1108,16 +1109,40 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   
   const featuredProducts = useMemo(() => {
     const today = new Date().getDay();
-    const list = products.filter(p => {
-      const isFeatured = p.featuredDays?.includes(today) || p.featuredDay === today;
-      return isFeatured && p.isActive && p.showInMenu !== false;
+    // 1. Items specifically scheduled for today
+    const todayFeatured = products.filter(p => {
+      const isToday = p.featuredDays?.includes(today) || p.featuredDay === today;
+      return isToday && p.isActive && p.showInMenu !== false;
     });
-    // Sort out of stock to the top
-    return [...list].sort((a, b) => {
+
+    // 2. Items marked as featured, highlight, or with any featuredDays configured
+    const otherFeatured = products.filter(p => {
+      if (!p.isActive || p.showInMenu === false) return false;
+      if (todayFeatured.some(tf => tf.id === p.id)) return false;
+      const isConfigured = (p.featuredDays && Array.isArray(p.featuredDays) && p.featuredDays.length > 0) || 
+                           (p.featuredDay !== undefined && p.featuredDay !== null && p.featuredDay !== -1) ||
+                           p.isFeatured || p.isHighlight;
+      return isConfigured;
+    });
+
+    const combined = [...todayFeatured, ...otherFeatured];
+
+    // 3. Fallback: if no products have featuredDays or isHighlight, show promotional products or top items so Destaques is always present
+    if (combined.length === 0) {
+      const promoOrFirst = products.filter(p => {
+        if (!p.isActive || p.showInMenu === false) return false;
+        const promoPrice = getPromotionalPrice(p);
+        const discount = getPromotionalDiscountPercentage(p) || (p.discountPercentage || 0);
+        return promoPrice !== null || discount > 0;
+      });
+      combined.push(...promoOrFirst.slice(0, 6));
+    }
+
+    return combined.sort((a, b) => {
       const aNoStock = a.stock != null && a.stock <= 0;
       const bNoStock = b.stock != null && b.stock <= 0;
-      if (aNoStock && !bNoStock) return -1;
-      if (!aNoStock && bNoStock) return 1;
+      if (aNoStock && !bNoStock) return 1;
+      if (!aNoStock && bNoStock) return -1;
       return 0;
     });
   }, [products]);
@@ -2593,9 +2618,9 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                             <div className="flex-1 min-w-0 flex flex-col justify-between">
                               <div>
                                 <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                                  {product.isFeatured && (
-                                    <span className="bg-amber-100 text-amber-900 text-[9px] font-black uppercase px-2 py-0.5 rounded-md">
-                                      MAIS PEDIDO
+                                  {(product.isFeatured || (product.featuredDays && product.featuredDays.length > 0) || (product.featuredDay !== undefined && product.featuredDay !== null && product.featuredDay !== -1)) && (
+                                    <span className="bg-amber-100 text-amber-900 text-[9px] font-black uppercase px-2 py-0.5 rounded-md inline-flex items-center gap-1">
+                                      <Sparkles size={9} className="text-amber-600 fill-amber-500" /> DESTAQUE
                                     </span>
                                   )}
                                   {product.isHighlight && (
@@ -2684,12 +2709,17 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                   </div>
                 ) : (
                   <div className="space-y-8">
-                    {/* MAIS VENDIDOS */}
+                    {/* DESTAQUES & MAIS PEDIDOS */}
                     {featuredProducts.length > 0 && (
                       <div className="space-y-3">
-                        <h2 className="text-xs font-black text-slate-800 uppercase tracking-widest px-1 flex items-center gap-1.5">
-                          <Flame size={14} className="text-orange-500" /> MAIS VENDIDOS
-                        </h2>
+                        <div className="flex items-center justify-between px-1">
+                          <h2 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-1.5">
+                            <Sparkles size={14} className="text-amber-500 fill-amber-400" /> DESTAQUES
+                          </h2>
+                          <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200/80">
+                            Mais pedidos & Recomendações
+                          </span>
+                        </div>
                         <div className="space-y-3">
                           {featuredProducts.map(product => {
                             const promoPrice = getPromotionalPrice(product);
@@ -2705,8 +2735,8 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                               >
                                 <div className="flex-1 min-w-0 flex flex-col justify-between">
                                   <div>
-                                    <span className="bg-amber-100 text-amber-900 text-[9px] font-black uppercase px-2 py-0.5 rounded-md inline-block mb-1.5">
-                                      MAIS PEDIDO
+                                    <span className="bg-amber-100 text-amber-900 text-[9px] font-black uppercase px-2 py-0.5 rounded-md inline-flex items-center gap-1 mb-1.5">
+                                      <Sparkles size={10} className="text-amber-600 fill-amber-500" /> DESTAQUE
                                     </span>
                                     <h3 className="font-bold text-sm sm:text-base text-slate-800 leading-snug group-hover:text-primary transition-colors line-clamp-2">
                                       {product.name}
@@ -2801,6 +2831,11 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                                   <div className="flex-1 min-w-0 flex flex-col justify-between">
                                     <div>
                                       <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                                        {(product.isFeatured || (product.featuredDays && product.featuredDays.length > 0) || (product.featuredDay !== undefined && product.featuredDay !== null && product.featuredDay !== -1)) && (
+                                          <span className="bg-amber-100 text-amber-900 text-[9px] font-black uppercase px-2 py-0.5 rounded-md inline-flex items-center gap-1">
+                                            <Sparkles size={9} className="text-amber-600 fill-amber-500" /> DESTAQUE
+                                          </span>
+                                        )}
                                         {product.isHighlight && (
                                           <span className="bg-pink-100 text-pink-700 text-[9px] font-black uppercase px-2 py-0.5 rounded-md">
                                             EDIÇÃO LIMITADA
