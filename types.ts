@@ -8,6 +8,7 @@ export interface StoreProfile {
   slug: string;
   name: string;
   logoUrl: string;
+  bannerUrl?: string;
   address: string;
   whatsapp: string;
   isActive: boolean;
@@ -84,6 +85,9 @@ export interface Product {
   isCombo?: boolean;
   comboItems?: ComboItem[];
   costPrice?: number;
+  isFeatured?: boolean;
+  isHighlight?: boolean;
+  discountPercentage?: number;
 }
 
 export interface OrderItem {
@@ -211,6 +215,7 @@ export interface StoreSettings {
   storeName: string;
   cnpj?: string;
   logoUrl: string;
+  bannerUrl?: string;
   primaryColor: string;
   secondaryColor: string;
   tableCount?: number;
@@ -223,6 +228,11 @@ export interface StoreSettings {
   address?: string;
   cep?: string;
   whatsapp?: string;
+  deliveryFee?: number;
+  deliveryFeeType?: 'FREE' | 'FIXED' | 'DISTANCE' | 'NEIGHBORHOOD';
+  neighborhoodFees?: { name: string; fee: number }[];
+  freeDeliveryMinimumAmount?: number;
+  estimatedDeliveryTime?: string;
   couponName?: string;
   couponDiscount?: number;
   isCouponActive?: boolean;

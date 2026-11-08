@@ -46,7 +46,13 @@ import {
   Package,
   Calendar,
   Gift,
-  Share2
+  Share2,
+  Home,
+  User,
+  ChevronDown,
+  Bike,
+  Footprints,
+  Sparkles
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Product, StoreSettings, Order, OrderItem, OrderType, PaymentMethod, Waitstaff, CartComplementItem, ComplementCategory } from '../types';
@@ -404,14 +410,11 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
     if (urlType && ['BALCAO', 'ENTREGA', 'MESA', 'COMANDA'].includes(urlType)) return true;
     if (isWaitstaff) return true;
     if (effectiveTable && settings.isTableOrderActive) return true;
+    if (!urlModo || urlModo === 'externo') return true;
     
     if (urlModo === 'local') {
         if (settings.isTableOrderActive && settings.isCommandOrderActive === false) return true;
         if (!settings.isTableOrderActive && settings.isCommandOrderActive !== false) return true;
-    }
-    if (urlModo === 'externo') {
-        if (settings.isCounterPickupActive && !settings.isDeliveryActive) return true;
-        if (!settings.isCounterPickupActive && settings.isDeliveryActive) return true;
     }
     
     return false;
@@ -426,13 +429,14 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
     if (urlModo === 'local') {
         if (settings.isTableOrderActive && settings.isCommandOrderActive === false) return 'MESA';
         if (!settings.isTableOrderActive && settings.isCommandOrderActive !== false) return 'COMANDA';
+        return 'MESA';
     }
-    if (urlModo === 'externo') {
-        if (settings.isCounterPickupActive && !settings.isDeliveryActive) return 'BALCAO';
-        if (!settings.isCounterPickupActive && settings.isDeliveryActive) return 'ENTREGA';
+    if (urlModo === 'externo' || !urlModo) {
+        if (settings.isDeliveryActive) return 'ENTREGA';
+        if (settings.isCounterPickupActive) return 'BALCAO';
     }
     
-    return isWaitstaff ? 'MESA' : 'BALCAO';
+    return isWaitstaff ? 'MESA' : 'ENTREGA';
   });
 
   useEffect(() => {
@@ -482,8 +486,208 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const [notes, setNotes] = useState('');
   const [isSending, setIsSending] = useState(false);
 
-  const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerName, setCustomerName] = useState(() => {
+    try { return localStorage.getItem('customer_name') || ''; } catch { return ''; }
+  });
+  const [customerPhone, setCustomerPhone] = useState(() => {
+    try { return localStorage.getItem('customer_phone') || ''; } catch { return ''; }
+  });
+  const [customerBirthDate, setCustomerBirthDate] = useState(() => {
+    try { return localStorage.getItem('customer_birthdate') || ''; } catch { return ''; }
+  });
+
+  // CardápioWeb navigation and modal states
+  const [externalTab, setExternalTab] = useState<'inicio' | 'promocoes' | 'pedidos' | 'perfil'>('inicio');
+  const [showOrderModeModal, setShowOrderModeModal] = useState(false);
+  const [showDeliveryCalcModal, setShowDeliveryCalcModal] = useState(false);
+  const [deliveryCalcAddress, setDeliveryCalcAddress] = useState('');
+  const [deliveryCalcResult, setDeliveryCalcResult] = useState<{ fee: number; time: string } | null>(null);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [profileStep, setProfileStep] = useState<'phone' | 'info'>('phone');
+  const [tempProfilePhone, setTempProfilePhone] = useState('');
+  const [tempProfileName, setTempProfileName] = useState('');
+  const [tempProfileBirthDate, setTempProfileBirthDate] = useState('');
+  const [showCategorySheet, setShowCategorySheet] = useState(false);
+
+  // Phone & Date masks
+  const formatPhoneMask = (val: string) => {
+    const digits = val.replace(/\D/g, '').slice(0, 11);
+    if (digits.length === 0) return '';
+    if (digits.length <= 2) return `(${digits}`;
+    if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+    if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`;
+  };
+
+  const formatDateMask = (val: string) => {
+    const digits = val.replace(/\D/g, '').slice(0, 8);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4, 8)}`;
+  };
+
+  // Sync customer from DB when customerPhone is available
+  useEffect(() => {
+    if (customerPhone && storeId) {
+      const cleanPhone = customerPhone.replace(/\D/g, '');
+      supabase
+        .from('customers')
+        .select('*')
+        .eq('store_id', storeId)
+        .eq('phone', customerPhone)
+        .maybeSingle()
+        .then((res: any) => {
+          const data = res?.data;
+          if (data) {
+            setCustomerId(data.id);
+            setCustomerPoints(data.points || 0);
+            if (!customerName && data.name) setCustomerName(data.name);
+            if (data.address && !deliveryAddress) handleSetAddressParts(data.address);
+          }
+        })
+        .catch(err => console.error('Error fetching customer profile:', err));
+    }
+  }, [customerPhone, storeId]);
+
+  const handleStartIdentification = () => {
+    setTempProfilePhone(formatPhoneMask(customerPhone || ''));
+    setTempProfileName(customerName || '');
+    setTempProfileBirthDate(customerBirthDate || '');
+    setProfileStep('phone');
+    setShowProfileModal(true);
+  };
+
+  const handleConfirmPhoneStep = () => {
+    const digits = tempProfilePhone.replace(/\D/g, '');
+    if (digits.length < 10) {
+      showAlert('Informe um número de WhatsApp/Telefone válido com DDD.');
+      return;
+    }
+    setProfileStep('info');
+  };
+
+  const handleSaveProfile = async () => {
+    const digits = tempProfilePhone.replace(/\D/g, '');
+    if (digits.length < 10) {
+      showAlert('Telefone inválido');
+      return;
+    }
+    if (!tempProfileName.trim()) {
+      showAlert('Por favor, informe seu nome.');
+      return;
+    }
+
+    const formattedPhone = formatPhoneMask(digits);
+    setCustomerPhone(formattedPhone);
+    setCustomerName(tempProfileName.trim());
+    setCustomerBirthDate(tempProfileBirthDate);
+
+    try {
+      localStorage.setItem('customer_phone', formattedPhone);
+      localStorage.setItem('customer_name', tempProfileName.trim());
+      if (tempProfileBirthDate) {
+        localStorage.setItem('customer_birthdate', tempProfileBirthDate);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+
+    try {
+      if (storeId) {
+        const { data: existingList }: any = await supabase
+          .from('customers')
+          .select('id, points')
+          .eq('store_id', storeId)
+          .eq('phone', formattedPhone);
+
+        const existing = existingList && existingList.length > 0 ? existingList[0] : null;
+
+        if (existing) {
+          setCustomerId(existing.id);
+          setCustomerPoints(existing.points || 0);
+          await supabase.from('customers').eq('id', existing.id).update({
+            name: tempProfileName.trim(),
+            birth_date: tempProfileBirthDate || null,
+            last_order_at: new Date().toISOString()
+          });
+        } else {
+          const res: any = await supabase.from('customers').insert([{
+            store_id: storeId,
+            name: tempProfileName.trim(),
+            phone: formattedPhone,
+            birth_date: tempProfileBirthDate || null,
+            points: 0
+          }]);
+          if (res?.data && res.data.length > 0) {
+            setCustomerId(res.data[0].id);
+            setCustomerPoints(0);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error saving customer to Supabase:', err);
+    }
+
+    setShowProfileModal(false);
+    showSuccessAlert('Cadastro salvo com sucesso!');
+  };
+
+  const handleLogoutCustomer = () => {
+    try {
+      localStorage.removeItem('customer_phone');
+      localStorage.removeItem('customer_name');
+      localStorage.removeItem('customer_birthdate');
+    } catch (e) {
+      console.error(e);
+    }
+    setCustomerPhone('');
+    setCustomerName('');
+    setCustomerBirthDate('');
+    setCustomerId(null);
+    setCustomerPoints(0);
+    showSuccessAlert('Você saiu da sua conta.');
+  };
+
+  const handleRunDeliveryCalc = async () => {
+    if (!deliveryCalcAddress.trim()) {
+      showAlert('Informe seu CEP ou bairro para calcular.');
+      return;
+    }
+    setIsCalculatingFee(true);
+    let fee = settings.deliveryFee || 0;
+    let time = settings.estimatedDeliveryTime || '35 - 50 min';
+
+    if (settings.deliveryFeeType === 'FREE') {
+      fee = 0;
+    } else if (settings.deliveryFeeType === 'NEIGHBORHOOD' && settings.neighborhoodFees) {
+      const match = settings.neighborhoodFees.find(n =>
+        deliveryCalcAddress.toLowerCase().includes(n.name.toLowerCase())
+      );
+      if (match) fee = match.fee;
+    }
+
+    setDeliveryCalcResult({ fee, time });
+    setIsCalculatingFee(false);
+  };
+
+  const promotionalProducts = useMemo(() => {
+    return products.filter(p => {
+      if (!p.isActive) return false;
+      const promoPrice = getPromotionalPrice(p);
+      const discount = getPromotionalDiscountPercentage(p);
+      return promoPrice !== null || (discount !== null && discount > 0) || p.isHighlight || p.isFeatured;
+    });
+  }, [products, settings]);
+
+  const customerPastOrders = useMemo(() => {
+    if (!customerPhone) return [];
+    const cleanPhone = customerPhone.replace(/\D/g, '');
+    return orders.filter(o => {
+      const oPhone = (o.customerPhone || '').replace(/\D/g, '');
+      return oPhone && (oPhone === cleanPhone || oPhone.endsWith(cleanPhone) || cleanPhone.endsWith(oPhone));
+    });
+  }, [orders, customerPhone]);
+
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [customerPoints, setCustomerPoints] = useState<number>(0);
   const [useCashback, setUseCashback] = useState(false);
@@ -1599,7 +1803,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
     }
   };
 
-  if (!hasSelectedMode && !isWaitstaff) {
+  if (!hasSelectedMode && !isWaitstaff && urlModo === 'local') {
     return (
       <div className="min-h-screen bg-primary flex flex-col items-center justify-center p-6 text-zinc-900 relative">
         {rawIsWaitstaff && viewAsCustomer && (
@@ -1720,7 +1924,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                       <ArrowRight className="text-purple-200 group-hover:text-purple-400 group-hover:translate-x-1 transition-all" size={20} />
                   </button>
                 )}
-                {(!urlModo || urlModo === 'externo') && settings.isCounterPickupActive && (
+                {(!urlModo || (urlModo as any) === 'externo') && settings.isCounterPickupActive && (
                   <button onClick={() => { setOrderType('BALCAO'); setHasSelectedMode(true); }} className="group flex items-center justify-between p-5 bg-blue-50/50 hover:bg-blue-100/50 rounded-[1.8rem] transition-all border border-blue-100 active:scale-95 text-left">
                       <div className="flex items-center gap-5">
                           <div className="p-4 bg-white rounded-2xl text-blue-600 shadow-sm transition-transform group-hover:scale-110"><ShoppingBag size={28} /></div>
@@ -1732,7 +1936,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                       <ArrowRight className="text-blue-200 group-hover:text-blue-400 group-hover:translate-x-1 transition-all" size={20} />
                   </button>
                 )}
-                {(!urlModo || urlModo === 'externo') && settings.isDeliveryActive && (
+                {(!urlModo || (urlModo as any) === 'externo') && settings.isDeliveryActive && (
                   <button onClick={() => { setOrderType('ENTREGA'); setHasSelectedMode(true); }} className="group flex items-center justify-between p-5 bg-green-50/50 hover:bg-green-100/50 rounded-[1.8rem] transition-all border border-green-100 active:scale-95 text-left">
                       <div className="flex items-center gap-5">
                           <div className="p-4 bg-white rounded-2xl text-green-600 shadow-sm transition-transform group-hover:scale-110"><Truck size={28} /></div>
@@ -1783,7 +1987,9 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
         </div>
       )}
 
-      <header className={`sticky top-0 z-30 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.1)] ${isWaitstaff ? 'bg-secondary' : 'bg-white'} ${isWaitstaff ? 'text-white' : 'text-slate-800'} p-3 md:p-4 transition-all w-full border-b ${isWaitstaff ? 'border-secondary' : 'border-slate-100'}`}>
+      {isWaitstaff ? (
+        <>
+          <header className={`sticky top-0 z-30 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.1)] ${isWaitstaff ? 'bg-secondary' : 'bg-white'} ${isWaitstaff ? 'text-white' : 'text-slate-800'} p-3 md:p-4 transition-all w-full border-b ${isWaitstaff ? 'border-secondary' : 'border-slate-100'}`}>
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
             <button onClick={handleBack} className={`p-2 rounded-full shrink-0 ${isWaitstaff ? 'hover:bg-white/10' : 'hover:bg-slate-100'} transition-colors`}>
@@ -2026,22 +2232,741 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
           </div>
         )}
       </main>
+      </>
+      ) : (
+        /* CARDÁPIO WEB - EXTERNAL DESIGN */
+        <div className="flex-1 flex flex-col w-full bg-slate-50 min-h-screen">
+          {/* Top Cover Banner */}
+          <div className="relative w-full h-40 sm:h-52 bg-slate-900 overflow-hidden">
+            <img 
+              src={settings.bannerUrl || "https://images.unsplash.com/photo-1550547660-d9450f859349?w=1200&auto=format&fit=crop&q=80"} 
+              alt="Capa da Loja" 
+              className="w-full h-full object-cover opacity-90"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+            
+            {/* Top Buttons inside Cover */}
+            <div className="absolute top-3 left-3 right-3 flex items-center justify-between z-10">
+              <button 
+                onClick={handleBack} 
+                className="w-9 h-9 rounded-full bg-black/40 text-white backdrop-blur-md flex items-center justify-center hover:bg-black/60 active:scale-95 transition-all shadow-sm"
+              >
+                <ChevronLeft size={22} />
+              </button>
+
+              <div className="flex items-center gap-2">
+                <InstallPrompt appType="cardapio" />
+                <button 
+                  onClick={handleShare} 
+                  className="w-9 h-9 rounded-full bg-black/40 text-white backdrop-blur-md flex items-center justify-center hover:bg-black/60 active:scale-95 transition-all shadow-sm"
+                  title="Compartilhar Cardápio"
+                >
+                  <Share2 size={18} />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Overlapping Centered Logo */}
+          <div className="relative -mt-12 sm:-mt-14 flex justify-center z-20">
+            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-white shadow-xl bg-white overflow-hidden flex items-center justify-center">
+              {settings.logoUrl ? (
+                <img src={settings.logoUrl} alt={settings.storeName} className="w-full h-full object-cover" />
+              ) : (
+                <Store size={38} className="text-slate-400" />
+              )}
+            </div>
+          </div>
+
+          {/* Store Info */}
+          <div className="text-center px-4 pt-2 pb-3 max-w-xl mx-auto">
+            <h1 className="text-xl sm:text-2xl font-black text-slate-800 leading-tight">
+              {settings.storeName}
+            </h1>
+            <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500 mt-1 font-medium flex-wrap">
+              <MapPin size={13} className="text-slate-400 shrink-0" />
+              <span>{settings.address ? (settings.address.split(',')[1] || settings.address.split(',')[0] || settings.address) : 'Fortaleza - CE'}</span>
+              <span>•</span>
+              <button onClick={() => setIsInfoOpen(true)} className="underline hover:text-slate-800 font-semibold cursor-pointer">
+                Mais informações
+              </button>
+            </div>
+            <div className="mt-2 text-xs font-bold flex items-center justify-center gap-1.5">
+              {isStoreClosed ? (
+                <span className="text-red-600 flex items-center gap-1.5 font-bold">
+                  <span className="w-2 h-2 rounded-full bg-red-600 inline-block animate-pulse"></span>
+                  Fechado {nextOpeningTime ? `• Abrimos ${nextOpeningTime}` : ''}
+                </span>
+              ) : (
+                <span className="text-emerald-600 flex items-center gap-1.5 font-bold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-600 inline-block"></span>
+                  Aberto agora
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Body Container */}
+          <div className="max-w-2xl mx-auto px-4 pb-32 w-full">
+            {/* ACTION CARD: CALCULAR TAXA E TEMPO DE ENTREGA */}
+            <div 
+              onClick={() => setShowDeliveryCalcModal(true)} 
+              className="mb-3 p-3.5 bg-white rounded-2xl border border-slate-200/90 shadow-xs flex items-center justify-between cursor-pointer hover:bg-slate-50 active:scale-[0.99] transition-all"
+            >
+              <div className="flex items-center gap-2.5">
+                <MapPin size={18} className="text-slate-400 shrink-0" />
+                <span className="text-xs font-bold text-slate-700">Calcular taxa e tempo de entrega</span>
+              </div>
+              <ChevronRight size={18} className="text-slate-400 shrink-0" />
+            </div>
+
+            {/* FREE DELIVERY BANNER */}
+            <div className="mb-3 p-3 bg-emerald-50 border border-emerald-200/70 rounded-2xl text-xs font-bold text-emerald-800 flex items-center gap-2.5">
+              <Truck size={17} className="text-emerald-600 shrink-0" />
+              <span>
+                {settings.freeDeliveryMinimumAmount 
+                  ? `Entrega grátis em pedidos a partir de R$ ${settings.freeDeliveryMinimumAmount.toFixed(2)}` 
+                  : 'Entrega rápida e segura direto na sua casa!'}
+              </span>
+            </div>
+
+            {/* LOYALTY REWARDS CARD */}
+            <div 
+              onClick={() => { if (!customerPhone) handleStartIdentification(); else setExternalTab('perfil'); }}
+              className="mb-3 p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/80 rounded-2xl cursor-pointer hover:shadow-xs transition-all text-left"
+            >
+              <div className="flex items-center justify-between mb-1">
+                <h4 className="text-xs font-black uppercase text-amber-900 tracking-wide flex items-center gap-1.5">
+                  <Sparkles size={14} className="text-amber-600 shrink-0" /> Troque pontos por recompensas
+                </h4>
+                {customerPhone && (
+                  <span className="bg-amber-200 text-amber-900 text-[10px] font-black px-2 py-0.5 rounded-full">
+                    {customerPoints} pts
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-amber-800/90 leading-relaxed">
+                A cada R$ 1,00 em compras você ganha 1 ponto que pode ser trocado por recompensas. {customerPhone ? 'Clique para acompanhar seus pontos no perfil!' : 'Para participar do programa de fidelidade clique aqui e complete seu cadastro!'}
+              </p>
+            </div>
+
+            {/* ORDER MODE SELECTOR CARD */}
+            <div className="mb-4 flex items-center justify-between p-3 bg-white border border-slate-200/90 rounded-2xl shadow-xs">
+              <div className="flex items-center gap-2.5">
+                {orderType === 'ENTREGA' ? <Bike size={20} className="text-primary shrink-0" /> : <Footprints size={20} className="text-primary shrink-0" />}
+                <div>
+                  <p className="text-xs font-bold text-slate-800">{orderType === 'ENTREGA' ? 'Entrega' : 'Retirada no Local'}</p>
+                  <p className="text-[10px] text-slate-400">{orderType === 'ENTREGA' ? 'A gente leva até você' : 'Você retira no balcão'}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowOrderModeModal(true)} 
+                className="text-[11px] font-bold text-primary bg-primary/10 hover:bg-primary/20 px-3 py-1.5 rounded-xl transition-all cursor-pointer"
+              >
+                Alterar
+              </button>
+            </div>
+
+            {/* TAB CONTENTS */}
+            {externalTab === 'inicio' && (
+              <div className="space-y-6">
+                {/* CATEGORY BAR & SEARCH */}
+                <div className="sticky top-0 z-30 bg-slate-50/95 backdrop-blur-md pt-2 pb-3 space-y-2 border-b border-slate-200/60 -mx-4 px-4">
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => setShowCategorySheet(true)}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 shadow-xs hover:bg-slate-50 shrink-0"
+                    >
+                      <span>Lista de categorias</span>
+                      <ChevronDown size={14} />
+                    </button>
+                    <div className="flex-1 flex overflow-x-auto gap-1.5 custom-scrollbar-hide py-1">
+                      <button 
+                        onClick={() => { setActiveCategory('Todos'); setSearchTerm(''); }}
+                        className={`px-3.5 py-1.5 rounded-xl whitespace-nowrap text-xs font-bold transition-all ${
+                          activeCategory === 'Todos' ? 'bg-primary text-white shadow-xs' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        Todos
+                      </button>
+                      {categories.filter(c => c !== 'Todos').map(cat => (
+                        <button 
+                          key={cat} 
+                          onClick={() => { setActiveCategory(cat); setSearchTerm(''); }}
+                          className={`px-3.5 py-1.5 rounded-xl whitespace-nowrap text-xs font-bold transition-all ${
+                            activeCategory === cat ? 'bg-primary text-white shadow-xs' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="relative">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                    <input 
+                      type="text" 
+                      placeholder="Buscar no cardápio..." 
+                      value={searchTerm} 
+                      onChange={e => setSearchTerm(e.target.value)} 
+                      className="w-full pl-10 pr-4 py-2 bg-white rounded-xl text-xs font-medium border border-slate-200 outline-none focus:border-primary shadow-xs"
+                    />
+                  </div>
+                </div>
+
+                {/* PRODUCT LISTINGS */}
+                {searchTerm || activeCategory !== 'Todos' ? (
+                  <div className="space-y-3">
+                    <h2 className="text-xs font-black text-slate-500 uppercase tracking-widest px-1">
+                      {searchTerm ? `Resultados para "${searchTerm}"` : activeCategory.toUpperCase()}
+                    </h2>
+                    {filteredProducts.length === 0 ? (
+                      <div className="py-12 text-center bg-white rounded-2xl border border-slate-200 p-6">
+                        <Package size={36} className="text-slate-300 mx-auto mb-2" />
+                        <p className="text-xs font-bold text-slate-600">Nenhum produto encontrado</p>
+                      </div>
+                    ) : (
+                      filteredProducts.map(product => {
+                        const promoPrice = getPromotionalPrice(product);
+                        const discountPct = getPromotionalDiscountPercentage(product) || (product.discountPercentage || 0);
+                        const isOutOfStock = product.stock != null && product.stock <= 0;
+                        return (
+                          <div 
+                            key={product.id}
+                            onClick={() => { if (!isOutOfStock) handleAddToCart(product); }}
+                            className={`p-3.5 sm:p-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-md transition-all flex gap-3 text-left group ${
+                              isOutOfStock ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer active:scale-[0.99]'
+                            }`}
+                          >
+                            <div className="flex-1 min-w-0 flex flex-col justify-between">
+                              <div>
+                                <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                                  {product.isFeatured && (
+                                    <span className="bg-amber-100 text-amber-900 text-[9px] font-black uppercase px-2 py-0.5 rounded-md">
+                                      MAIS PEDIDO
+                                    </span>
+                                  )}
+                                  {product.isHighlight && (
+                                    <span className="bg-pink-100 text-pink-700 text-[9px] font-black uppercase px-2 py-0.5 rounded-md">
+                                      EDIÇÃO LIMITADA
+                                    </span>
+                                  )}
+                                  {settings?.isCashbackActive && (!settings.cashbackScope || settings.cashbackScope === 'all' || (settings.cashbackScope === 'selected' && settings.cashbackProductIds?.includes(product.id))) && (
+                                    <span className="bg-green-100 text-green-700 text-[9px] font-black px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
+                                      <DollarSign size={9} /> Cashback
+                                    </span>
+                                  )}
+                                  {((product.minOrderQuantity || product.units || 0) > 1) && (
+                                    <span className="bg-indigo-50 text-indigo-700 text-[9px] font-black px-1.5 py-0.5 rounded-md">
+                                      Mín. {product.minOrderQuantity || product.units} un.
+                                    </span>
+                                  )}
+                                </div>
+                                <h3 className="font-bold text-sm sm:text-base text-slate-800 leading-snug group-hover:text-primary transition-colors line-clamp-2">
+                                  {product.name}
+                                </h3>
+                                {product.description && (
+                                  <p className="text-[11px] sm:text-xs text-slate-500 line-clamp-2 mt-1 leading-relaxed">
+                                    {product.description}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="mt-3 flex items-baseline justify-between gap-2 flex-wrap">
+                                <div className="flex items-baseline gap-2 flex-wrap">
+                                  {promoPrice !== null ? (
+                                    <>
+                                      <span className="font-extrabold text-base text-emerald-600">
+                                        R$ {promoPrice.toFixed(2)}{product.isByWeight ? '/kg' : ''}
+                                      </span>
+                                      <span className="text-[11px] text-slate-400 line-through">
+                                        R$ {product.price.toFixed(2)}
+                                      </span>
+                                      {discountPct > 0 && (
+                                        <span className="bg-emerald-100 text-emerald-700 text-[10px] font-black px-1.5 py-0.5 rounded-md">
+                                          -{discountPct}%
+                                        </span>
+                                      )}
+                                    </>
+                                  ) : product.price > 0 ? (
+                                    <span className="font-extrabold text-base text-emerald-600">
+                                      R$ {product.price.toFixed(2)}{product.isByWeight ? '/kg' : ''}
+                                    </span>
+                                  ) : (
+                                    <span className="font-bold text-xs text-slate-500">Sob consulta</span>
+                                  )}
+                                </div>
+                                {isOutOfStock && (
+                                  <span className="text-[10px] font-black uppercase text-red-600 bg-red-50 px-2 py-0.5 rounded-md">
+                                    Esgotado
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shrink-0 bg-slate-100 border border-slate-100 relative self-center">
+                              {product.imageUrl ? (
+                                <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-slate-300"><Package size={28} /></div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-8">
+                    {/* MAIS VENDIDOS */}
+                    {featuredProducts.length > 0 && (
+                      <div className="space-y-3">
+                        <h2 className="text-xs font-black text-slate-800 uppercase tracking-widest px-1 flex items-center gap-1.5">
+                          <Flame size={14} className="text-orange-500" /> MAIS VENDIDOS
+                        </h2>
+                        <div className="space-y-3">
+                          {featuredProducts.map(product => {
+                            const promoPrice = getPromotionalPrice(product);
+                            const discountPct = getPromotionalDiscountPercentage(product) || (product.discountPercentage || 0);
+                            const isOutOfStock = product.stock != null && product.stock <= 0;
+                            return (
+                              <div 
+                                key={product.id}
+                                onClick={() => { if (!isOutOfStock) handleAddToCart(product); }}
+                                className={`p-3.5 sm:p-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-md transition-all flex gap-3 text-left group ${
+                                  isOutOfStock ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer active:scale-[0.99]'
+                                }`}
+                              >
+                                <div className="flex-1 min-w-0 flex flex-col justify-between">
+                                  <div>
+                                    <span className="bg-amber-100 text-amber-900 text-[9px] font-black uppercase px-2 py-0.5 rounded-md inline-block mb-1.5">
+                                      MAIS PEDIDO
+                                    </span>
+                                    <h3 className="font-bold text-sm sm:text-base text-slate-800 leading-snug group-hover:text-primary transition-colors line-clamp-2">
+                                      {product.name}
+                                    </h3>
+                                    {product.description && (
+                                      <p className="text-[11px] sm:text-xs text-slate-500 line-clamp-2 mt-1 leading-relaxed">
+                                        {product.description}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div className="mt-3 flex items-baseline justify-between gap-2 flex-wrap">
+                                    <div className="flex items-baseline gap-2 flex-wrap">
+                                      {promoPrice !== null ? (
+                                        <>
+                                          <span className="font-extrabold text-base text-emerald-600">
+                                            R$ {promoPrice.toFixed(2)}
+                                          </span>
+                                          <span className="text-[11px] text-slate-400 line-through">
+                                            R$ {product.price.toFixed(2)}
+                                          </span>
+                                          {discountPct > 0 && (
+                                            <span className="bg-emerald-100 text-emerald-700 text-[10px] font-black px-1.5 py-0.5 rounded-md">
+                                              -{discountPct}%
+                                            </span>
+                                          )}
+                                        </>
+                                      ) : (
+                                        <span className="font-extrabold text-base text-emerald-600">
+                                          R$ {product.price.toFixed(2)}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {isOutOfStock && (
+                                      <span className="text-[10px] font-black uppercase text-red-600 bg-red-50 px-2 py-0.5 rounded-md">
+                                        Esgotado
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shrink-0 bg-slate-100 border border-slate-100 relative self-center">
+                                  {product.imageUrl ? (
+                                    <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-slate-300"><Package size={28} /></div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* CATEGORIZED SECTIONS */}
+                    {categories.filter(c => c !== 'Todos').map(cat => {
+                      const catProds = products.filter(p => p.showInMenu !== false && p.category === cat);
+                      if (catProds.length === 0) return null;
+                      return (
+                        <div key={cat} className="space-y-3">
+                          <h2 className="text-xs font-black text-slate-800 uppercase tracking-widest px-1">
+                            {cat}
+                          </h2>
+                          <div className="space-y-3">
+                            {catProds.map(product => {
+                              const promoPrice = getPromotionalPrice(product);
+                              const discountPct = getPromotionalDiscountPercentage(product) || (product.discountPercentage || 0);
+                              const isOutOfStock = product.stock != null && product.stock <= 0;
+                              return (
+                                <div 
+                                  key={product.id}
+                                  onClick={() => { if (!isOutOfStock) handleAddToCart(product); }}
+                                  className={`p-3.5 sm:p-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-md transition-all flex gap-3 text-left group ${
+                                    isOutOfStock ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer active:scale-[0.99]'
+                                  }`}
+                                >
+                                  <div className="flex-1 min-w-0 flex flex-col justify-between">
+                                    <div>
+                                      <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                                        {product.isHighlight && (
+                                          <span className="bg-pink-100 text-pink-700 text-[9px] font-black uppercase px-2 py-0.5 rounded-md">
+                                            EDIÇÃO LIMITADA
+                                          </span>
+                                        )}
+                                        {((product.minOrderQuantity || product.units || 0) > 1) && (
+                                          <span className="bg-indigo-50 text-indigo-700 text-[9px] font-black px-1.5 py-0.5 rounded-md">
+                                            Mín. {product.minOrderQuantity || product.units} un.
+                                          </span>
+                                        )}
+                                      </div>
+                                      <h3 className="font-bold text-sm sm:text-base text-slate-800 leading-snug group-hover:text-primary transition-colors line-clamp-2">
+                                        {product.name}
+                                      </h3>
+                                      {product.description && (
+                                        <p className="text-[11px] sm:text-xs text-slate-500 line-clamp-2 mt-1 leading-relaxed">
+                                          {product.description}
+                                        </p>
+                                      )}
+                                    </div>
+                                    <div className="mt-3 flex items-baseline justify-between gap-2 flex-wrap">
+                                      <div className="flex items-baseline gap-2 flex-wrap">
+                                        {promoPrice !== null ? (
+                                          <>
+                                            <span className="font-extrabold text-base text-emerald-600">
+                                              R$ {promoPrice.toFixed(2)}{product.isByWeight ? '/kg' : ''}
+                                            </span>
+                                            <span className="text-[11px] text-slate-400 line-through">
+                                              R$ {product.price.toFixed(2)}
+                                            </span>
+                                            {discountPct > 0 && (
+                                              <span className="bg-emerald-100 text-emerald-700 text-[10px] font-black px-1.5 py-0.5 rounded-md">
+                                                -{discountPct}%
+                                              </span>
+                                            )}
+                                          </>
+                                        ) : product.price > 0 ? (
+                                          <span className="font-extrabold text-base text-emerald-600">
+                                            R$ {product.price.toFixed(2)}{product.isByWeight ? '/kg' : ''}
+                                          </span>
+                                        ) : (
+                                          <span className="font-bold text-xs text-slate-500">Sob consulta</span>
+                                        )}
+                                      </div>
+                                      {isOutOfStock && (
+                                        <span className="text-[10px] font-black uppercase text-red-600 bg-red-50 px-2 py-0.5 rounded-md">
+                                          Esgotado
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shrink-0 bg-slate-100 border border-slate-100 relative self-center">
+                                    {product.imageUrl ? (
+                                      <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center text-slate-300"><Package size={28} /></div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* PROMOÇÕES TAB */}
+            {externalTab === 'promocoes' && (
+              <div className="space-y-4 animate-fade-in">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                  <h2 className="text-lg font-bold text-slate-800">Promoções</h2>
+                  <button 
+                    onClick={() => setExternalTab('inicio')}
+                    className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 bg-white border border-slate-200"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {promotionalProducts.length === 0 ? (
+                  <div className="py-16 text-center space-y-3 bg-white rounded-2xl border border-slate-200 p-6">
+                    <Percent size={44} className="text-slate-300 mx-auto" />
+                    <h3 className="font-bold text-slate-700 text-sm">Nenhuma promoção ativa no momento</h3>
+                    <p className="text-xs text-slate-400">Fique de olho, em breve teremos descontos especiais para você!</p>
+                    <button 
+                      onClick={() => setExternalTab('inicio')}
+                      className="mt-2 px-4 py-2 bg-primary text-white font-bold rounded-xl text-xs uppercase"
+                    >
+                      Ver Cardápio
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {promotionalProducts.map(product => {
+                      const promoPrice = getPromotionalPrice(product) || product.price;
+                      const discountPct = getPromotionalDiscountPercentage(product) || (product.discountPercentage || 10);
+                      return (
+                        <div 
+                          key={product.id}
+                          onClick={() => handleAddToCart(product)}
+                          className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs flex gap-3 cursor-pointer group active:scale-[0.99] hover:shadow-sm transition-all text-left"
+                        >
+                          <div className="flex-1 min-w-0 flex flex-col justify-between">
+                            <div>
+                              <span className="bg-pink-100 text-pink-700 text-[9px] font-black uppercase px-2 py-0.5 rounded-md inline-block mb-1">
+                                EDIÇÃO LIMITADA
+                              </span>
+                              <h3 className="font-bold text-sm text-slate-800 leading-snug group-hover:text-primary transition-colors">
+                                {product.name}
+                              </h3>
+                              {product.description && (
+                                <p className="text-[11px] text-slate-500 line-clamp-2 mt-1 leading-relaxed">
+                                  {product.description}
+                                </p>
+                              )}
+                            </div>
+                            <div className="mt-3 flex items-baseline gap-2 flex-wrap">
+                              <span className="font-extrabold text-base text-emerald-600">
+                                R$ {promoPrice.toFixed(2)}
+                              </span>
+                              <span className="text-xs text-slate-400 line-through">
+                                R$ {product.price.toFixed(2)}
+                              </span>
+                              <span className="bg-emerald-100 text-emerald-700 text-[10px] font-black px-1.5 py-0.5 rounded-md">
+                                -{discountPct}%
+                              </span>
+                            </div>
+                          </div>
+                          <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shrink-0 bg-slate-100 border border-slate-100 self-center">
+                            {product.imageUrl ? (
+                              <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-slate-300"><Package size={28} /></div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* PEDIDOS TAB */}
+            {externalTab === 'pedidos' && (
+              <div className="space-y-4 animate-fade-in">
+                <h2 className="text-xl font-bold text-slate-800 pb-1">Seus pedidos</h2>
+
+                {!customerPhone ? (
+                  <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center space-y-4 max-w-md mx-auto my-6 shadow-xs">
+                    <h3 className="text-lg font-bold text-slate-800">Identifique-se</h3>
+                    <p className="text-xs text-slate-500 leading-relaxed max-w-xs mx-auto">
+                      Entre na sua conta para ter acesso aos seus pedidos
+                    </p>
+                    <button 
+                      onClick={handleStartIdentification}
+                      className="w-full py-3.5 bg-[#14233c] text-white font-extrabold text-xs uppercase tracking-wider rounded-xl shadow-md hover:bg-[#0f1b2f] active:scale-98 transition-all"
+                    >
+                      ENTRAR
+                    </button>
+                  </div>
+                ) : customerPastOrders.length === 0 ? (
+                  <div className="bg-white rounded-2xl p-10 border border-slate-200 text-center space-y-4 max-w-md mx-auto my-6 shadow-xs">
+                    <div className="w-20 h-20 rounded-full border-2 border-dashed border-slate-300 flex items-center justify-center mx-auto text-slate-400">
+                      <Search size={36} />
+                    </div>
+                    <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wide">
+                      NENHUM PEDIDO ENCONTRADO
+                    </h3>
+                    <p className="text-xs text-slate-500 max-w-xs mx-auto">
+                      Você ainda não fez nenhum pedido no número {customerPhone}.
+                    </p>
+                    <button 
+                      onClick={() => setExternalTab('inicio')}
+                      className="px-6 py-3 bg-primary text-white font-bold rounded-xl text-xs uppercase tracking-wider shadow-sm hover:opacity-95 active:scale-95 transition-all"
+                    >
+                      Fazer meu primeiro pedido
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {customerPastOrders.map(order => (
+                      <div key={order.id} className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-3 text-left">
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono font-bold text-xs text-slate-800">
+                            #{order.displayId || order.id.slice(0, 6)}
+                          </span>
+                          <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full ${getStatusColor(order.status)}`}>
+                            {order.status.replace(/_/g, ' ')}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-500 space-y-1">
+                          {order.items.map((it, idx) => (
+                            <div key={idx} className="flex justify-between">
+                              <span>{it.quantity}x {it.name}</span>
+                              <span className="font-medium text-slate-700">R$ {(it.price * it.quantity).toFixed(2)}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                          <span className="text-xs text-slate-400">
+                            {new Date(order.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          <span className="text-sm font-black text-slate-900">
+                            R$ {order.total.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* PERFIL TAB */}
+            {externalTab === 'perfil' && (
+              <div className="space-y-4 animate-fade-in">
+                <h2 className="text-xl font-bold text-slate-800 pb-1">Meu perfil</h2>
+
+                {!customerPhone ? (
+                  <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center space-y-4 max-w-md mx-auto my-6 shadow-xs">
+                    <h3 className="text-lg font-bold text-slate-800">Identifique-se</h3>
+                    <p className="text-xs text-slate-500 leading-relaxed max-w-xs mx-auto">
+                      Entre na sua conta para ter acesso ao programa de fidelidade e dados cadastrais
+                    </p>
+                    <button 
+                      onClick={handleStartIdentification}
+                      className="w-full py-3.5 bg-[#14233c] text-white font-extrabold text-xs uppercase tracking-wider rounded-xl shadow-md hover:bg-[#0f1b2f] active:scale-98 transition-all"
+                    >
+                      ENTRAR
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4 max-w-md mx-auto text-left">
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
+                      <div className="w-14 h-14 rounded-full bg-primary/10 text-primary font-black text-lg flex items-center justify-center shrink-0">
+                        {customerName ? customerName.slice(0, 2).toUpperCase() : <User size={24} />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-bold text-base text-slate-800 truncate">{customerName || 'Cliente'}</h3>
+                        <p className="text-xs text-slate-500 font-medium">{customerPhone}</p>
+                        {customerBirthDate && (
+                          <p className="text-[11px] text-slate-400">Nascimento: {customerBirthDate}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="p-5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/80 rounded-2xl shadow-xs space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black uppercase text-amber-900 tracking-wide flex items-center gap-1.5">
+                          <Sparkles size={16} className="text-amber-600" /> Programa de Fidelidade
+                        </span>
+                        <span className="bg-amber-200 text-amber-900 text-xs font-black px-2.5 py-1 rounded-full">
+                          {customerPoints} pontos
+                        </span>
+                      </div>
+                      <p className="text-xs text-amber-800/90 leading-relaxed">
+                        Cada R$ 1,00 gasto vale 1 ponto. Acumule pontos e troque por vantagens nos seus próximos pedidos!
+                      </p>
+                    </div>
+
+                    {deliveryAddress && (
+                      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block mb-1">
+                          Endereço Principal
+                        </span>
+                        <p className="text-xs text-slate-700 font-medium">{deliveryAddress}</p>
+                      </div>
+                    )}
+
+                    <div className="space-y-2 pt-2">
+                      <button 
+                        onClick={handleStartIdentification}
+                        className="w-full py-3 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl text-xs uppercase tracking-wider hover:bg-slate-50 transition-all cursor-pointer"
+                      >
+                        Editar Meus Dados
+                      </button>
+                      <button 
+                        onClick={handleLogoutCustomer}
+                        className="w-full py-3 text-red-600 font-bold rounded-xl text-xs uppercase tracking-wider hover:bg-red-50 transition-all cursor-pointer"
+                      >
+                        Sair da Conta
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* FIXED 4-TAB BOTTOM NAVIGATION BAR */}
+          <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200/90 z-50 flex items-center justify-around py-2 px-4 shadow-[0_-4px_25px_rgba(0,0,0,0.06)]">
+            <button 
+              onClick={() => setExternalTab('inicio')} 
+              className={`flex flex-col items-center gap-1 transition-colors ${externalTab === 'inicio' ? 'text-primary' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              <Home size={22} strokeWidth={externalTab === 'inicio' ? 2.5 : 2} />
+              <span className={`text-[10px] ${externalTab === 'inicio' ? 'font-black' : 'font-semibold'}`}>Início</span>
+            </button>
+
+            <button 
+              onClick={() => setExternalTab('promocoes')} 
+              className={`flex flex-col items-center gap-1 transition-colors ${externalTab === 'promocoes' ? 'text-primary' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              <Percent size={22} strokeWidth={externalTab === 'promocoes' ? 2.5 : 2} />
+              <span className={`text-[10px] ${externalTab === 'promocoes' ? 'font-black' : 'font-semibold'}`}>Promoções</span>
+            </button>
+
+            <button 
+              onClick={() => setExternalTab('pedidos')} 
+              className={`flex flex-col items-center gap-1 transition-colors ${externalTab === 'pedidos' ? 'text-primary' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              <ShoppingBag size={22} strokeWidth={externalTab === 'pedidos' ? 2.5 : 2} />
+              <span className={`text-[10px] ${externalTab === 'pedidos' ? 'font-black' : 'font-semibold'}`}>Pedidos</span>
+            </button>
+
+            <button 
+              onClick={() => {
+                if (!customerPhone) handleStartIdentification();
+                else setExternalTab('perfil');
+              }} 
+              className={`flex flex-col items-center gap-1 transition-colors ${externalTab === 'perfil' ? 'text-primary' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              <User size={22} strokeWidth={externalTab === 'perfil' ? 2.5 : 2} />
+              <span className={`text-[10px] ${externalTab === 'perfil' ? 'font-black' : 'font-semibold'}`}>Perfil</span>
+            </button>
+          </nav>
+        </div>
+      )}
 
       {/* FLOATING CART BUTTON */}
       {cart.length > 0 && !isCartOpen && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[90%] max-w-sm animate-fade-in">
+        <div className={`fixed ${!isWaitstaff ? 'bottom-20' : 'bottom-6'} left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-md animate-fade-in`}>
           <button 
             onClick={() => { setIsCartOpen(true); setCheckoutStep('cart'); }} 
-            className={`w-full text-white p-4 rounded-2xl shadow-2xl flex items-center justify-between active:scale-95 transition-transform border border-white/20 ${isWaitstaff ? 'bg-secondary' : 'bg-primary'}`}
+            className={`w-full text-white py-3.5 px-5 rounded-2xl shadow-2xl flex items-center justify-between active:scale-95 transition-transform border border-white/20 ${isWaitstaff ? 'bg-secondary' : 'bg-primary'}`}
           >
             <div className="flex items-center gap-3">
               <div className="relative">
-                <ShoppingCart size={24} />
-                <span className="absolute -top-2 -right-2 bg-white text-primary text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-bold shadow-sm">{cart.length}</span>
+                <ShoppingCart size={22} />
+                <span className="absolute -top-2 -right-2 bg-secondary text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-bold shadow-sm">{cart.length}</span>
               </div>
-              <span className="font-bold text-sm uppercase tracking-widest">Ver Sacola</span>
+              <span className="font-bold text-sm uppercase tracking-wider">Ver Sacola</span>
             </div>
-            <span className="font-black text-lg">R$ {finalTotal.toFixed(2)}</span>
+            <span className="font-black text-base">R$ {finalTotal.toFixed(2)}</span>
           </button>
         </div>
       )}
@@ -3267,6 +4192,288 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+      
+      {/* MODAL: COMO VOCÊ QUER RECEBER O PEDIDO? (CARDÁPIO WEB) */}
+      {showOrderModeModal && (
+        <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in" onClick={() => setShowOrderModeModal(false)}>
+          <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-slide-up" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold text-slate-800">Como você quer receber o pedido?</h3>
+              <button onClick={() => setShowOrderModeModal(false)} className="p-1 rounded-full text-slate-400 hover:text-slate-600 cursor-pointer">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="space-y-3">
+              {settings.isDeliveryActive && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOrderType('ENTREGA');
+                    setHasSelectedMode(true);
+                    setShowOrderModeModal(false);
+                  }}
+                  className={`w-full p-4 rounded-2xl border text-left flex items-center gap-4 transition-all cursor-pointer ${
+                    orderType === 'ENTREGA' ? 'border-primary bg-primary/5 ring-2 ring-primary/20' : 'border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="p-3 bg-slate-100 rounded-xl text-slate-700">
+                    <Bike size={24} />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-bold text-sm text-slate-800">Entrega</h4>
+                    <p className="text-xs text-slate-500">A gente leva até você</p>
+                  </div>
+                  {orderType === 'ENTREGA' && <Check size={20} className="text-primary font-bold" />}
+                </button>
+              )}
+
+              {settings.isCounterPickupActive && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOrderType('BALCAO');
+                    setHasSelectedMode(true);
+                    setShowOrderModeModal(false);
+                  }}
+                  className={`w-full p-4 rounded-2xl border text-left flex items-center gap-4 transition-all cursor-pointer ${
+                    orderType === 'BALCAO' ? 'border-primary bg-primary/5 ring-2 ring-primary/20' : 'border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="p-3 bg-slate-100 rounded-xl text-slate-700">
+                    <Footprints size={24} />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-bold text-sm text-slate-800">Retirada</h4>
+                    <p className="text-xs text-slate-500">Você retira no local</p>
+                  </div>
+                  {orderType === 'BALCAO' && <Check size={20} className="text-primary font-bold" />}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: CALCULAR TAXA E TEMPO DE ENTREGA */}
+      {showDeliveryCalcModal && (
+        <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in" onClick={() => setShowDeliveryCalcModal(false)}>
+          <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-slide-up" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <MapPin size={20} className="text-primary" />
+                <h3 className="text-base font-bold text-slate-800">Calcular taxa e tempo</h3>
+              </div>
+              <button onClick={() => setShowDeliveryCalcModal(false)} className="p-1 rounded-full text-slate-400 hover:text-slate-600 cursor-pointer">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-600 mb-1 block">Informe seu CEP ou Bairro</label>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    value={deliveryCalcAddress} 
+                    onChange={e => setDeliveryCalcAddress(e.target.value)} 
+                    placeholder="Ex: 60160-000 ou Aldeota"
+                    className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-primary font-medium"
+                    onKeyDown={e => { if (e.key === 'Enter') handleRunDeliveryCalc(); }}
+                  />
+                  <button 
+                    type="button"
+                    onClick={handleRunDeliveryCalc}
+                    disabled={isCalculatingFee}
+                    className="px-4 py-3 bg-primary text-white font-bold rounded-xl text-xs hover:opacity-95 active:scale-95 transition-all flex items-center justify-center min-w-[80px] cursor-pointer"
+                  >
+                    {isCalculatingFee ? <Loader2 size={16} className="animate-spin" /> : 'Calcular'}
+                  </button>
+                </div>
+              </div>
+
+              {deliveryCalcResult && (
+                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-2 animate-fade-in text-left">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-600 font-medium">Tempo estimado:</span>
+                    <span className="font-bold text-slate-800">{deliveryCalcResult.time}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm pt-2 border-t border-emerald-100">
+                    <span className="text-slate-700 font-bold">Taxa de entrega:</span>
+                    <span className="font-black text-emerald-700">
+                      {deliveryCalcResult.fee === 0 ? 'GRÁTIS' : `R$ ${deliveryCalcResult.fee.toFixed(2)}`}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowDeliveryCalcModal(false)}
+                  className="w-full py-3 bg-slate-900 text-white font-bold rounded-xl text-xs uppercase tracking-wider hover:bg-slate-800 transition-all cursor-pointer"
+                >
+                  OK, Entendi
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: IDENTIFICAÇÃO / PERFIL DO CLIENTE (PHOTOS 4 & 5) */}
+      {showProfileModal && (
+        <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in" onClick={() => setShowProfileModal(false)}>
+          <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-slide-up relative" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setShowProfileModal(false)} className="absolute top-5 right-5 p-1 rounded-full text-slate-400 hover:text-slate-600 bg-slate-100 cursor-pointer">
+              <X size={20} />
+            </button>
+
+            {profileStep === 'phone' ? (
+              /* PHOTO 4: Informe seu número de telefone */
+              <div className="space-y-6 pt-2 text-left">
+                <div className="space-y-2">
+                  <h3 className="text-lg font-bold text-slate-900 leading-snug">Informe seu número de telefone</h3>
+                  <p className="text-xs text-slate-500 leading-relaxed">Ele é importante para falarmos com você caso necessário</p>
+                </div>
+
+                <div className="relative pt-2">
+                  <div className="relative border-2 border-slate-700 rounded-xl px-4 py-3 bg-blue-50/20 focus-within:border-primary">
+                    <span className="absolute -top-2.5 left-3 bg-white px-1 text-[11px] font-bold text-slate-700">Telefone</span>
+                    <input 
+                      type="tel"
+                      value={tempProfilePhone}
+                      onChange={e => setTempProfilePhone(formatPhoneMask(e.target.value))}
+                      placeholder="(85) 98758-2159"
+                      className="w-full bg-transparent outline-none text-base font-bold text-slate-900 tracking-wider"
+                      autoFocus
+                      onKeyDown={e => { if (e.key === 'Enter') handleConfirmPhoneStep(); }}
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleConfirmPhoneStep}
+                  className="w-full py-4 bg-[#14233c] text-white font-extrabold text-xs uppercase tracking-wider rounded-xl shadow-md hover:bg-[#0f1b2f] active:scale-98 transition-all cursor-pointer"
+                >
+                  CONFIRMAR
+                </button>
+              </div>
+            ) : (
+              /* PHOTO 5: Informações pessoais */
+              <div className="space-y-6 pt-2 text-left">
+                <div className="space-y-2">
+                  <h3 className="text-lg font-bold text-slate-900 leading-snug">Informações pessoais</h3>
+                  <p className="text-xs text-slate-500 leading-relaxed">Preencha seus dados para continuar</p>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 mb-1 block">Telefone *</label>
+                    <input 
+                      type="tel"
+                      value={tempProfilePhone}
+                      disabled
+                      className="w-full p-3.5 bg-slate-100 border border-slate-200 rounded-xl text-sm font-bold text-slate-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 mb-1 block">Seu nome *</label>
+                    <input 
+                      type="text"
+                      value={tempProfileName}
+                      onChange={e => setTempProfileName(e.target.value)}
+                      placeholder="Digite seu nome completo"
+                      className="w-full p-3.5 bg-white border border-slate-300 rounded-xl text-sm font-medium text-slate-800 outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                      autoFocus
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 mb-1 block">Data de nascimento</label>
+                    <input 
+                      type="text"
+                      value={tempProfileBirthDate}
+                      onChange={e => setTempProfileBirthDate(formatDateMask(e.target.value))}
+                      placeholder="DD/MM/AAAA"
+                      className="w-full p-3.5 bg-white border border-slate-300 rounded-xl text-sm font-medium text-slate-800 outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                      maxLength={10}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setProfileStep('phone')}
+                    className="py-4 px-5 border border-slate-200 text-slate-600 font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-slate-50 transition-all cursor-pointer"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveProfile}
+                    className="flex-1 py-4 bg-[#14233c] text-white font-extrabold text-xs uppercase tracking-wider rounded-xl shadow-md hover:bg-[#0f1b2f] active:scale-98 transition-all cursor-pointer"
+                  >
+                    CONFIRMAR
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: LISTA DE CATEGORIAS (DRAWER/SHEET) */}
+      {showCategorySheet && (
+        <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in" onClick={() => setShowCategorySheet(false)}>
+          <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-slide-up max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-800">Categorias</h3>
+              <button onClick={() => setShowCategorySheet(false)} className="p-1 rounded-full text-slate-400 hover:text-slate-600 cursor-pointer">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="overflow-y-auto py-3 space-y-1 custom-scrollbar">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveCategory('Todos');
+                  setSearchTerm('');
+                  setShowCategorySheet(false);
+                }}
+                className={`w-full p-3 rounded-xl text-left font-bold text-sm flex items-center justify-between transition-colors cursor-pointer ${
+                  activeCategory === 'Todos' ? 'bg-primary/10 text-primary font-black' : 'hover:bg-slate-50 text-slate-700'
+                }`}
+              >
+                <span>Todos os itens</span>
+                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{products.length}</span>
+              </button>
+              {categories.filter(c => c !== 'Todos').map(cat => {
+                const count = products.filter(p => p.showInMenu !== false && p.category === cat).length;
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => {
+                      setActiveCategory(cat);
+                      setSearchTerm('');
+                      setShowCategorySheet(false);
+                    }}
+                    className={`w-full p-3 rounded-xl text-left font-bold text-sm flex items-center justify-between transition-colors cursor-pointer ${
+                      activeCategory === cat ? 'bg-primary/10 text-primary font-black' : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <span>{cat}</span>
+                    <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{count}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

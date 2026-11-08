@@ -694,56 +694,6 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
         </div>
         <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
             <button 
-                onClick={() => {
-                  const printWindow = window.open('', '', 'width=800,height=600');
-                  if (printWindow) {
-                    printWindow.document.write(`
-                      <html>
-                        <head>
-                          <title>Cardápio</title>
-                          <style>
-                            body { font-family: sans-serif; padding: 20px; }
-                            h1 { text-align: center; font-size: 24px; margin-bottom: 20px; text-transform: uppercase; }
-                            .category { font-size: 18px; font-weight: bold; margin-top: 20px; border-bottom: 2px solid #ccc; padding-bottom: 5px; margin-bottom: 15px; text-transform: uppercase; }
-                            .product { display: flex; justify-content: space-between; margin-bottom: 10px; page-break-inside: avoid; border-bottom: 1px dashed #eee; padding-bottom: 8px; }
-                            .product-info { flex: 1; padding-right: 20px; }
-                            .product-name { font-weight: bold; font-size: 14px; }
-                            .product-desc { font-size: 11px; color: #666; margin-top: 4px; }
-                            .product-price { font-weight: bold; font-size: 14px; white-space: nowrap; }
-                            @media print { body { padding: 0; } }
-                          </style>
-                        </head>
-                        <body>
-                          <h1>Nosso Cardápio</h1>
-                          ${categories.map(cat => `
-                            <div class="category">${cat}</div>
-                            ${products.filter(p => p.category === cat && p.isActive).map(p => `
-                              <div class="product">
-                                <div class="product-info">
-                                  <div class="product-name">${p.name}</div>
-                                  ${p.description ? `<div class="product-desc">${p.description}</div>` : ''}
-                                </div>
-                                <div class="product-price">
-                                  ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p.price)}
-                                </div>
-                              </div>
-                            `).join('')}
-                          `).join('')}
-                        </body>
-                      </html>
-                    `);
-                    printWindow.document.close();
-                    setTimeout(() => {
-                      printWindow.print();
-                      printWindow.close();
-                    }, 500);
-                  }
-                }}
-                className="px-4 py-3 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors shadow-sm whitespace-nowrap"
-            >
-                <Printer size={18} /> Imprimir Cardápio
-            </button>
-            <button 
                 onClick={() => setShowCategoryModal(true)}
                 className="px-4 py-3 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors shadow-sm whitespace-nowrap"
             >
