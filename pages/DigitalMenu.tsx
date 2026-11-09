@@ -531,18 +531,43 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
     return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4, 8)}`;
   };
 
+  const getPhoneDetails = (rawPhone: string) => {
+    const digits = (rawPhone || '').replace(/\D/g, '');
+    const cleanLocalDigits = (digits.startsWith('55') && digits.length >= 12) ? digits.slice(2) : digits;
+    const formattedLocal = formatPhoneMask(cleanLocalDigits);
+    const with55Formatted = cleanLocalDigits ? `+55 ${formattedLocal}` : '';
+    const with55Raw = cleanLocalDigits ? `+55${cleanLocalDigits}` : '';
+    const raw55 = cleanLocalDigits ? `55${cleanLocalDigits}` : '';
+    const candidates = Array.from(new Set([
+      with55Formatted,
+      with55Raw,
+      raw55,
+      formattedLocal,
+      cleanLocalDigits,
+      rawPhone
+    ])).filter(Boolean);
+    return {
+      digits,
+      cleanLocalDigits,
+      formattedLocal,
+      with55Formatted,
+      with55Raw,
+      raw55,
+      candidates
+    };
+  };
+
   // Sync customer from DB when customerPhone is available
   useEffect(() => {
     if (customerPhone && storeId) {
-      const cleanPhone = customerPhone.replace(/\D/g, '');
+      const phoneInfo = getPhoneDetails(customerPhone);
       supabase
         .from('customers')
         .select('*')
         .eq('store_id', storeId)
-        .eq('phone', customerPhone)
-        .maybeSingle()
+        .in('phone', phoneInfo.candidates)
         .then((res: any) => {
-          const data = res?.data;
+          const data = res?.data?.[0];
           if (data) {
             setCustomerId(data.id);
             setCustomerPoints(data.points || 0);
@@ -555,7 +580,8 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   }, [customerPhone, storeId]);
 
   const handleStartIdentification = () => {
-    setTempProfilePhone(formatPhoneMask(customerPhone || ''));
+    const phoneInfo = getPhoneDetails(customerPhone || '');
+    setTempProfilePhone(phoneInfo.cleanLocalDigits ? phoneInfo.formattedLocal : '');
     setTempProfileName(customerName || '');
     setTempProfileBirthDate(customerBirthDate || '');
     setProfileStep('phone');
@@ -563,24 +589,25 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   };
 
   const handleConfirmPhoneStep = async () => {
-    const digits = tempProfilePhone.replace(/\D/g, '');
-    if (digits.length < 10) {
+    const phoneInfo = getPhoneDetails(tempProfilePhone);
+    if (phoneInfo.cleanLocalDigits.length < 10) {
       showAlert('Informe um número de WhatsApp/Telefone válido com DDD.');
       return;
     }
-    const formattedPhone = formatPhoneMask(digits);
+    const finalPhone = phoneInfo.with55Formatted;
 
     if (storeId) {
       try {
-        const { data, error } = await supabase
+        const { data: customerList } = await supabase
           .from('customers')
           .select('*')
           .eq('store_id', storeId)
-          .eq('phone', formattedPhone)
-          .maybeSingle();
+          .in('phone', phoneInfo.candidates);
+
+        const data = customerList && customerList.length > 0 ? customerList[0] : null;
 
         if (data && data.name) {
-          setCustomerPhone(formattedPhone);
+          setCustomerPhone(finalPhone);
           setCustomerName(data.name || '');
           setCustomerBirthDate(data.birth_date || '');
           setCustomerId(data.id);
@@ -589,7 +616,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
           if (data.referencePoint) setReferencePoint(data.referencePoint);
 
           try {
-            localStorage.setItem('customer_phone', formattedPhone);
+            localStorage.setItem('customer_phone', finalPhone);
             localStorage.setItem('customer_name', data.name);
             if (data.birth_date) localStorage.setItem('customer_birthdate', data.birth_date);
           } catch (e) {}
@@ -601,15 +628,15 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
 
         const matchingOrder = orders.find(o => {
           const oPhone = (o.customerPhone || '').replace(/\D/g, '');
-          return oPhone && (oPhone === digits || oPhone.endsWith(digits) || digits.endsWith(oPhone));
+          return oPhone && (oPhone === phoneInfo.cleanLocalDigits || oPhone.endsWith(phoneInfo.cleanLocalDigits) || phoneInfo.cleanLocalDigits.endsWith(oPhone));
         });
         if (matchingOrder && matchingOrder.customerName) {
-          setCustomerPhone(formattedPhone);
+          setCustomerPhone(finalPhone);
           setCustomerName(matchingOrder.customerName);
           if (matchingOrder.deliveryAddress) handleSetAddressParts(matchingOrder.deliveryAddress);
 
           try {
-            localStorage.setItem('customer_phone', formattedPhone);
+            localStorage.setItem('customer_phone', finalPhone);
             localStorage.setItem('customer_name', matchingOrder.customerName);
           } catch (e) {}
 
@@ -622,13 +649,13 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
       }
     }
 
-    setCustomerPhone(formattedPhone);
+    setCustomerPhone(finalPhone);
     setProfileStep('info');
   };
 
   const handleSaveProfile = async () => {
-    const digits = tempProfilePhone.replace(/\D/g, '');
-    if (digits.length < 10) {
+    const phoneInfo = getPhoneDetails(tempProfilePhone);
+    if (phoneInfo.cleanLocalDigits.length < 10) {
       showAlert('Telefone inválido');
       return;
     }
@@ -637,13 +664,13 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
       return;
     }
 
-    const formattedPhone = formatPhoneMask(digits);
-    setCustomerPhone(formattedPhone);
+    const finalPhone = phoneInfo.with55Formatted;
+    setCustomerPhone(finalPhone);
     setCustomerName(tempProfileName.trim());
     setCustomerBirthDate(tempProfileBirthDate);
 
     try {
-      localStorage.setItem('customer_phone', formattedPhone);
+      localStorage.setItem('customer_phone', finalPhone);
       localStorage.setItem('customer_name', tempProfileName.trim());
       if (tempProfileBirthDate) {
         localStorage.setItem('customer_birthdate', tempProfileBirthDate);
@@ -658,7 +685,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
           .from('customers')
           .select('id, points')
           .eq('store_id', storeId)
-          .eq('phone', formattedPhone);
+          .in('phone', phoneInfo.candidates);
 
         const existing = existingList && existingList.length > 0 ? existingList[0] : null;
 
@@ -667,6 +694,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
           setCustomerPoints(existing.points || 0);
           await supabase.from('customers').eq('id', existing.id).update({
             name: tempProfileName.trim(),
+            phone: finalPhone,
             birth_date: tempProfileBirthDate || null,
             last_order_at: new Date().toISOString()
           });
@@ -674,7 +702,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
           const res: any = await supabase.from('customers').insert([{
             store_id: storeId,
             name: tempProfileName.trim(),
-            phone: formattedPhone,
+            phone: finalPhone,
             birth_date: tempProfileBirthDate || null,
             points: 0
           }]);
@@ -739,14 +767,52 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
     });
   }, [products, settings]);
 
+  const [customerDbOrders, setCustomerDbOrders] = useState<Order[]>([]);
+
+  useEffect(() => {
+    if (!customerPhone || !storeId) {
+      setCustomerDbOrders([]);
+      return;
+    }
+    const phoneInfo = getPhoneDetails(customerPhone);
+    supabase
+      .from('orders')
+      .select('*')
+      .eq('store_id', storeId)
+      .in('customerPhone', phoneInfo.candidates)
+      .order('createdAt', { ascending: false })
+      .limit(30)
+      .then(({ data }) => {
+        if (data) {
+          const parsed = data.map((o: any) => ({
+            ...o,
+            items: typeof o.items === 'string' ? JSON.parse(o.items || '[]') : (o.items || [])
+          }));
+          setCustomerDbOrders(parsed);
+        }
+      })
+      .catch(err => console.error("Error fetching customer past orders:", err));
+  }, [customerPhone, storeId]);
+
   const customerPastOrders = useMemo(() => {
     if (!customerPhone) return [];
-    const cleanPhone = customerPhone.replace(/\D/g, '');
-    return orders.filter(o => {
+    const phoneInfo = getPhoneDetails(customerPhone);
+    const cleanPhone = phoneInfo.cleanLocalDigits;
+    const propOrders = orders.filter(o => {
       const oPhone = (o.customerPhone || '').replace(/\D/g, '');
       return oPhone && (oPhone === cleanPhone || oPhone.endsWith(cleanPhone) || cleanPhone.endsWith(oPhone));
     });
-  }, [orders, customerPhone]);
+
+    const combined = [...propOrders];
+    customerDbOrders.forEach(dbo => {
+      if (!combined.some(c => c.id === dbo.id)) {
+        combined.push(dbo);
+      }
+    });
+
+    combined.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    return combined;
+  }, [orders, customerPhone, customerDbOrders]);
 
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [customerPoints, setCustomerPoints] = useState<number>(0);
@@ -918,11 +984,12 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
       if (!customerPhone.trim() || !storeId) return;
       setIsConsulting(true);
       try {
+          const phoneInfo = getPhoneDetails(customerPhone);
           const { data, error } = await supabase
               .from('customers')
               .select('*')
               .eq('store_id', storeId)
-              .eq('phone', customerPhone.trim());
+              .in('phone', phoneInfo.candidates);
               
           if (data && data.length > 0) {
               const customer = data[0];
@@ -1074,22 +1141,24 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
 
     const timer = setTimeout(async () => {
         try {
+            const phoneInfo = getPhoneDetails(customerPhone);
             const { data, error } = await supabase
                 .from('customers')
+                .select('*')
                 .eq('store_id', storeId)
-                .eq('phone', customerPhone)
-                .maybeSingle();
+                .in('phone', phoneInfo.candidates);
             
-            if (data && !error) {
-                setCustomerId(data.id);
-                setCustomerPoints(Number(data.points || 0));
-                if (data.name && !customerName) {
-                    setCustomerName(data.name);
+            const customer = data && data.length > 0 ? data[0] : null;
+            if (customer && !error) {
+                setCustomerId(customer.id);
+                setCustomerPoints(Number(customer.points || 0));
+                if (customer.name && !customerName) {
+                    setCustomerName(customer.name);
                 }
-                if (data.address && !deliveryAddress) {
-                    handleSetAddressParts(data.address);
+                if (customer.address && !deliveryAddress) {
+                    handleSetAddressParts(customer.address);
                     if (orderType === 'ENTREGA') {
-                        calculateDeliveryFee(data.address);
+                        calculateDeliveryFee(customer.address);
                     }
                 }
             } else {
@@ -1105,7 +1174,17 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
     return () => clearTimeout(timer);
   }, [customerPhone, storeId, settings.isCashbackActive]);
 
-  const categories = useMemo(() => ['Todos', ...externalCategories], [externalCategories]);
+  const categories = useMemo(() => {
+    const productCategories = Array.from(
+      new Set(
+        products
+          .map(p => (p.category || '').trim())
+          .filter(Boolean)
+      )
+    );
+    const combined = Array.from(new Set([...externalCategories, ...productCategories]));
+    return ['Todos', ...combined];
+  }, [externalCategories, products]);
   
   const featuredProducts = useMemo(() => {
     const today = new Date().getDay();
@@ -1150,7 +1229,9 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const filteredProducts = useMemo(() => {
     const list = products.filter(p => {
       if (p.showInMenu === false) return false;
-      const matchesCategory = activeCategory === 'Todos' || p.category === activeCategory;
+      const matchesCategory = activeCategory === 'Todos' || 
+                              (p.category || '').trim() === activeCategory ||
+                              (activeCategory === 'Outros' && (!p.category || !p.category.trim()));
       const matchesSearch = (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
                            (p.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                            (p.barcode && String(p.barcode).includes(searchTerm));
@@ -1216,19 +1297,13 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
     if (!trackingPhone) return;
     setIsTrackingLoading(true);
     try {
-      const cleanPhone = trackingPhone.replace(/\D/g, '');
-      const phoneWithPrefix = cleanPhone.startsWith('55') ? `+${cleanPhone}` : `+55${cleanPhone}`;
-      
-      const startOfWeek = new Date();
-      startOfWeek.setHours(0, 0, 0, 0);
-      startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()); // Sunday as start of week
+      const phoneInfo = getPhoneDetails(trackingPhone);
       
       const { data, error } = await supabase
         .from('orders')
         .select('*')
         .eq('store_id', storeId)
-        .in('customerPhone', [cleanPhone, phoneWithPrefix])
-        .gte('createdAt', startOfWeek.getTime())
+        .in('customerPhone', phoneInfo.candidates)
         .order('createdAt', { ascending: false })
         .limit(20);
 
@@ -2507,24 +2582,26 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
             </div>
 
             {/* LOYALTY REWARDS CARD */}
-            <div 
-              onClick={() => { if (!customerPhone) handleStartIdentification(); else setExternalTab('perfil'); }}
-              className="mb-3 p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/80 rounded-2xl cursor-pointer hover:shadow-xs transition-all text-left"
-            >
-              <div className="flex items-center justify-between mb-1">
-                <h4 className="text-xs font-black uppercase text-amber-900 tracking-wide flex items-center gap-1.5">
-                  <Sparkles size={14} className="text-amber-600 shrink-0" /> Troque pontos por recompensas
-                </h4>
-                {customerPhone && (
-                  <span className="bg-amber-200 text-amber-900 text-[10px] font-black px-2 py-0.5 rounded-full">
-                    {customerPoints} pts
-                  </span>
-                )}
+            {Boolean(settings?.isCashbackActive) && (
+              <div 
+                onClick={() => { if (!customerPhone) handleStartIdentification(); else setExternalTab('perfil'); }}
+                className="mb-3 p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/80 rounded-2xl cursor-pointer hover:shadow-xs transition-all text-left"
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <h4 className="text-xs font-black uppercase text-amber-900 tracking-wide flex items-center gap-1.5">
+                    <Sparkles size={14} className="text-amber-600 shrink-0" /> Troque pontos por recompensas
+                  </h4>
+                  {customerPhone && (
+                    <span className="bg-amber-200 text-amber-900 text-[10px] font-black px-2 py-0.5 rounded-full">
+                      {customerPoints} pts
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-amber-800/90 leading-relaxed">
+                  A cada R$ 1,00 em compras você ganha 1 ponto que pode ser trocado por recompensas. {customerPhone ? 'Clique para acompanhar seus pontos no perfil!' : 'Para participar do programa de fidelidade clique aqui e complete seu cadastro!'}
+                </p>
               </div>
-              <p className="text-[11px] text-amber-800/90 leading-relaxed">
-                A cada R$ 1,00 em compras você ganha 1 ponto que pode ser trocado por recompensas. {customerPhone ? 'Clique para acompanhar seus pontos no perfil!' : 'Para participar do programa de fidelidade clique aqui e complete seu cadastro!'}
-              </p>
-            </div>
+            )}
 
             {/* ORDER MODE SELECTOR CARD */}
             <div className="mb-4 flex items-center justify-between p-3 bg-white border border-slate-200/90 rounded-2xl shadow-xs">
@@ -2551,32 +2628,23 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                   <div className="flex items-center gap-2">
                     <button 
                       onClick={() => setShowCategorySheet(true)}
-                      className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 shadow-xs hover:bg-slate-50 shrink-0"
+                      className="flex items-center gap-1.5 px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 shadow-xs hover:bg-slate-50 transition-colors shrink-0"
                     >
                       <span>Lista de categorias</span>
-                      <ChevronDown size={14} />
+                      <ChevronDown size={14} className="text-slate-400" />
                     </button>
-                    <div className="flex-1 flex overflow-x-auto gap-1.5 custom-scrollbar-hide py-1">
-                      <button 
-                        onClick={() => { setActiveCategory('Todos'); setSearchTerm(''); }}
-                        className={`px-3.5 py-1.5 rounded-xl whitespace-nowrap text-xs font-bold transition-all ${
-                          activeCategory === 'Todos' ? 'bg-primary text-white shadow-xs' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                        }`}
-                      >
-                        Todos
-                      </button>
-                      {categories.filter(c => c !== 'Todos').map(cat => (
+                    {activeCategory !== 'Todos' && (
+                      <div className="flex items-center gap-1.5 bg-primary/10 text-primary px-3 py-1.5 rounded-xl text-xs font-bold">
+                        <span>{activeCategory}</span>
                         <button 
-                          key={cat} 
-                          onClick={() => { setActiveCategory(cat); setSearchTerm(''); }}
-                          className={`px-3.5 py-1.5 rounded-xl whitespace-nowrap text-xs font-bold transition-all ${
-                            activeCategory === cat ? 'bg-primary text-white shadow-xs' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                          }`}
+                          onClick={() => { setActiveCategory('Todos'); setSearchTerm(''); }}
+                          className="hover:opacity-70 p-0.5"
+                          title="Remover filtro"
                         >
-                          {cat}
+                          <X size={12} />
                         </button>
-                      ))}
-                    </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="relative">
@@ -2807,116 +2875,346 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                     )}
 
                     {/* CATEGORIZED SECTIONS */}
-                    {categories.filter(c => c !== 'Todos').map(cat => {
-                      const catProds = products.filter(p => p.showInMenu !== false && p.category === cat);
-                      if (catProds.length === 0) return null;
-                      return (
-                        <div key={cat} className="space-y-3">
-                          <h2 className="text-xs font-black text-slate-800 uppercase tracking-widest px-1">
-                            {cat}
-                          </h2>
+                    {(() => {
+                      const definedCategories = categories.filter(c => c !== 'Todos');
+
+                      if (definedCategories.length === 0) {
+                        const allProds = products.filter(p => p.showInMenu !== false);
+                        if (allProds.length === 0) return null;
+                        return (
                           <div className="space-y-3">
-                            {catProds.map(product => {
-                              const promoPrice = getPromotionalPrice(product);
-                              const discountPct = getPromotionalDiscountPercentage(product) || (product.discountPercentage || 0);
-                              const isOutOfStock = product.stock != null && product.stock <= 0;
-                              return (
-                                <div 
-                                  key={product.id}
-                                  onClick={() => { if (!isOutOfStock) handleAddToCart(product); }}
-                                  className={`p-3.5 sm:p-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-md transition-all flex gap-3 text-left group ${
-                                    isOutOfStock ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer active:scale-[0.99]'
-                                  }`}
-                                >
-                                  <div className="flex-1 min-w-0 flex flex-col justify-between">
-                                    <div>
-                                      <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                                        {(product.isFeatured || (product.featuredDays && product.featuredDays.length > 0) || (product.featuredDay !== undefined && product.featuredDay !== null && product.featuredDay !== -1)) && (
-                                          <span className="bg-amber-100 text-amber-900 text-[9px] font-black uppercase px-2 py-0.5 rounded-md inline-flex items-center gap-1">
-                                            <Sparkles size={9} className="text-amber-600 fill-amber-500" /> DESTAQUE
-                                          </span>
+                            <h2 className="text-xs font-black text-slate-800 uppercase tracking-widest px-1">
+                              Todos os Produtos
+                            </h2>
+                            <div className="space-y-3">
+                              {allProds.map(product => {
+                                const promoPrice = getPromotionalPrice(product);
+                                const discountPct = getPromotionalDiscountPercentage(product) || (product.discountPercentage || 0);
+                                const isOutOfStock = product.stock != null && product.stock <= 0;
+                                return (
+                                  <div 
+                                    key={product.id}
+                                    onClick={() => { if (!isOutOfStock) handleAddToCart(product); }}
+                                    className={`p-3.5 sm:p-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-md transition-all flex gap-3 text-left group ${
+                                      isOutOfStock ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer active:scale-[0.99]'
+                                    }`}
+                                  >
+                                    <div className="flex-1 min-w-0 flex flex-col justify-between">
+                                      <div>
+                                        <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                                          {(product.isFeatured || (product.featuredDays && product.featuredDays.length > 0) || (product.featuredDay !== undefined && product.featuredDay !== null && product.featuredDay !== -1)) && (
+                                            <span className="bg-amber-100 text-amber-900 text-[9px] font-black uppercase px-2 py-0.5 rounded-md inline-flex items-center gap-1">
+                                              <Sparkles size={9} className="text-amber-600 fill-amber-500" /> DESTAQUE
+                                            </span>
+                                          )}
+                                          {product.isHighlight && (
+                                            <span className="bg-pink-100 text-pink-700 text-[9px] font-black uppercase px-2 py-0.5 rounded-md">
+                                              EDIÇÃO LIMITADA
+                                            </span>
+                                          )}
+                                          {((product.minOrderQuantity || product.units || 0) > 1) && (
+                                            <span className="bg-indigo-50 text-indigo-700 text-[9px] font-black px-1.5 py-0.5 rounded-md">
+                                              Mín. {product.minOrderQuantity || product.units} un.
+                                            </span>
+                                          )}
+                                        </div>
+                                        <h3 className="font-bold text-sm sm:text-base text-slate-800 leading-snug group-hover:text-primary transition-colors line-clamp-2">
+                                          {product.name}
+                                        </h3>
+                                        {product.description && (
+                                          <p className="text-[11px] sm:text-xs text-slate-500 line-clamp-2 mt-1 leading-relaxed">
+                                            {product.description}
+                                          </p>
                                         )}
-                                        {product.isHighlight && (
-                                          <span className="bg-pink-100 text-pink-700 text-[9px] font-black uppercase px-2 py-0.5 rounded-md">
-                                            EDIÇÃO LIMITADA
-                                          </span>
-                                        )}
-                                        {((product.minOrderQuantity || product.units || 0) > 1) && (
-                                          <span className="bg-indigo-50 text-indigo-700 text-[9px] font-black px-1.5 py-0.5 rounded-md">
-                                            Mín. {product.minOrderQuantity || product.units} un.
+                                      </div>
+                                      <div className="mt-3 flex items-baseline justify-between gap-2 flex-wrap">
+                                        <div className="flex items-baseline gap-2 flex-wrap">
+                                          {promoPrice !== null ? (
+                                            <>
+                                              <span className="font-extrabold text-base text-emerald-600">
+                                                R$ {promoPrice.toFixed(2)}{product.isByWeight ? '/kg' : ''}
+                                              </span>
+                                              <span className="text-[11px] text-slate-400 line-through">
+                                                R$ {product.price.toFixed(2)}
+                                              </span>
+                                              {discountPct > 0 && (
+                                                <span className="bg-emerald-100 text-emerald-700 text-[10px] font-black px-1.5 py-0.5 rounded-md">
+                                                  -{discountPct}%
+                                                </span>
+                                              )}
+                                            </>
+                                          ) : product.price > 0 ? (
+                                            <span className="font-extrabold text-base text-emerald-600">
+                                              R$ {product.price.toFixed(2)}{product.isByWeight ? '/kg' : ''}
+                                            </span>
+                                          ) : (
+                                            <span className="font-bold text-xs text-slate-500">Sob consulta</span>
+                                          )}
+                                        </div>
+                                        {isOutOfStock && (
+                                          <span className="text-[10px] font-black uppercase text-red-600 bg-red-50 px-2 py-0.5 rounded-md">
+                                            Esgotado
                                           </span>
                                         )}
                                       </div>
-                                      <h3 className="font-bold text-sm sm:text-base text-slate-800 leading-snug group-hover:text-primary transition-colors line-clamp-2">
-                                        {product.name}
-                                      </h3>
-                                      {product.description && (
-                                        <p className="text-[11px] sm:text-xs text-slate-500 line-clamp-2 mt-1 leading-relaxed">
-                                          {product.description}
-                                        </p>
+                                    </div>
+                                    <div 
+                                      onClick={(e) => {
+                                        if (product.imageUrl) {
+                                          e.stopPropagation();
+                                          handleExpandProductImages(product, 0);
+                                        }
+                                      }}
+                                      className={`w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shrink-0 bg-slate-100 border border-slate-100 relative self-center group/img ${
+                                        product.imageUrl ? 'cursor-zoom-in' : ''
+                                      }`}
+                                      title={product.imageUrl ? "Clique para ampliar a foto" : undefined}
+                                    >
+                                      {product.imageUrl ? (
+                                        <>
+                                          <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                                          <div className="absolute inset-0 bg-black/25 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                            <Maximize2 size={20} className="text-white drop-shadow-md" />
+                                          </div>
+                                        </>
+                                      ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-slate-300"><Package size={28} /></div>
                                       )}
                                     </div>
-                                    <div className="mt-3 flex items-baseline justify-between gap-2 flex-wrap">
-                                      <div className="flex items-baseline gap-2 flex-wrap">
-                                        {promoPrice !== null ? (
-                                          <>
-                                            <span className="font-extrabold text-base text-emerald-600">
-                                              R$ {promoPrice.toFixed(2)}{product.isByWeight ? '/kg' : ''}
-                                            </span>
-                                            <span className="text-[11px] text-slate-400 line-through">
-                                              R$ {product.price.toFixed(2)}
-                                            </span>
-                                            {discountPct > 0 && (
-                                              <span className="bg-emerald-100 text-emerald-700 text-[10px] font-black px-1.5 py-0.5 rounded-md">
-                                                -{discountPct}%
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      const uncategorized = products.filter(
+                        p => p.showInMenu !== false && (!p.category || !p.category.trim() || !definedCategories.includes(p.category.trim()))
+                      );
+
+                      return (
+                        <>
+                          {definedCategories.map(cat => {
+                            const catProds = products.filter(p => p.showInMenu !== false && (p.category || '').trim() === cat);
+                            if (catProds.length === 0) return null;
+                            return (
+                              <div key={cat} className="space-y-3">
+                                <h2 className="text-xs font-black text-slate-800 uppercase tracking-widest px-1">
+                                  {cat}
+                                </h2>
+                                <div className="space-y-3">
+                                  {catProds.map(product => {
+                                    const promoPrice = getPromotionalPrice(product);
+                                    const discountPct = getPromotionalDiscountPercentage(product) || (product.discountPercentage || 0);
+                                    const isOutOfStock = product.stock != null && product.stock <= 0;
+                                    return (
+                                      <div 
+                                        key={product.id}
+                                        onClick={() => { if (!isOutOfStock) handleAddToCart(product); }}
+                                        className={`p-3.5 sm:p-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-md transition-all flex gap-3 text-left group ${
+                                          isOutOfStock ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer active:scale-[0.99]'
+                                        }`}
+                                      >
+                                        <div className="flex-1 min-w-0 flex flex-col justify-between">
+                                          <div>
+                                            <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                                              {(product.isFeatured || (product.featuredDays && product.featuredDays.length > 0) || (product.featuredDay !== undefined && product.featuredDay !== null && product.featuredDay !== -1)) && (
+                                                <span className="bg-amber-100 text-amber-900 text-[9px] font-black uppercase px-2 py-0.5 rounded-md inline-flex items-center gap-1">
+                                                  <Sparkles size={9} className="text-amber-600 fill-amber-500" /> DESTAQUE
+                                                </span>
+                                              )}
+                                              {product.isHighlight && (
+                                                <span className="bg-pink-100 text-pink-700 text-[9px] font-black uppercase px-2 py-0.5 rounded-md">
+                                                  EDIÇÃO LIMITADA
+                                                </span>
+                                              )}
+                                              {((product.minOrderQuantity || product.units || 0) > 1) && (
+                                                <span className="bg-indigo-50 text-indigo-700 text-[9px] font-black px-1.5 py-0.5 rounded-md">
+                                                  Mín. {product.minOrderQuantity || product.units} un.
+                                                </span>
+                                              )}
+                                            </div>
+                                            <h3 className="font-bold text-sm sm:text-base text-slate-800 leading-snug group-hover:text-primary transition-colors line-clamp-2">
+                                              {product.name}
+                                            </h3>
+                                            {product.description && (
+                                              <p className="text-[11px] sm:text-xs text-slate-500 line-clamp-2 mt-1 leading-relaxed">
+                                                {product.description}
+                                              </p>
+                                            )}
+                                          </div>
+                                          <div className="mt-3 flex items-baseline justify-between gap-2 flex-wrap">
+                                            <div className="flex items-baseline gap-2 flex-wrap">
+                                              {promoPrice !== null ? (
+                                                <>
+                                                  <span className="font-extrabold text-base text-emerald-600">
+                                                    R$ {promoPrice.toFixed(2)}{product.isByWeight ? '/kg' : ''}
+                                                  </span>
+                                                  <span className="text-[11px] text-slate-400 line-through">
+                                                    R$ {product.price.toFixed(2)}
+                                                  </span>
+                                                  {discountPct > 0 && (
+                                                    <span className="bg-emerald-100 text-emerald-700 text-[10px] font-black px-1.5 py-0.5 rounded-md">
+                                                      -{discountPct}%
+                                                    </span>
+                                                  )}
+                                                </>
+                                              ) : product.price > 0 ? (
+                                                <span className="font-extrabold text-base text-emerald-600">
+                                                  R$ {product.price.toFixed(2)}{product.isByWeight ? '/kg' : ''}
+                                                </span>
+                                              ) : (
+                                                <span className="font-bold text-xs text-slate-500">Sob consulta</span>
+                                              )}
+                                            </div>
+                                            {isOutOfStock && (
+                                              <span className="text-[10px] font-black uppercase text-red-600 bg-red-50 px-2 py-0.5 rounded-md">
+                                                Esgotado
                                               </span>
                                             )}
+                                          </div>
+                                        </div>
+                                        <div 
+                                          onClick={(e) => {
+                                            if (product.imageUrl) {
+                                              e.stopPropagation();
+                                              handleExpandProductImages(product, 0);
+                                            }
+                                          }}
+                                          className={`w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shrink-0 bg-slate-100 border border-slate-100 relative self-center group/img ${
+                                            product.imageUrl ? 'cursor-zoom-in' : ''
+                                          }`}
+                                          title={product.imageUrl ? "Clique para ampliar a foto" : undefined}
+                                        >
+                                          {product.imageUrl ? (
+                                            <>
+                                              <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                                              <div className="absolute inset-0 bg-black/25 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                                <Maximize2 size={20} className="text-white drop-shadow-md" />
+                                              </div>
+                                            </>
+                                          ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-slate-300"><Package size={28} /></div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                          {uncategorized.length > 0 && (
+                            <div key="outros-geral" className="space-y-3">
+                              <h2 className="text-xs font-black text-slate-800 uppercase tracking-widest px-1">
+                                Outros
+                              </h2>
+                              <div className="space-y-3">
+                                {uncategorized.map(product => {
+                                  const promoPrice = getPromotionalPrice(product);
+                                  const discountPct = getPromotionalDiscountPercentage(product) || (product.discountPercentage || 0);
+                                  const isOutOfStock = product.stock != null && product.stock <= 0;
+                                  return (
+                                    <div 
+                                      key={product.id}
+                                      onClick={() => { if (!isOutOfStock) handleAddToCart(product); }}
+                                      className={`p-3.5 sm:p-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-md transition-all flex gap-3 text-left group ${
+                                        isOutOfStock ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer active:scale-[0.99]'
+                                      }`}
+                                    >
+                                      <div className="flex-1 min-w-0 flex flex-col justify-between">
+                                        <div>
+                                          <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                                            {(product.isFeatured || (product.featuredDays && product.featuredDays.length > 0) || (product.featuredDay !== undefined && product.featuredDay !== null && product.featuredDay !== -1)) && (
+                                              <span className="bg-amber-100 text-amber-900 text-[9px] font-black uppercase px-2 py-0.5 rounded-md inline-flex items-center gap-1">
+                                                <Sparkles size={9} className="text-amber-600 fill-amber-500" /> DESTAQUE
+                                              </span>
+                                            )}
+                                            {product.isHighlight && (
+                                              <span className="bg-pink-100 text-pink-700 text-[9px] font-black uppercase px-2 py-0.5 rounded-md">
+                                                EDIÇÃO LIMITADA
+                                              </span>
+                                            )}
+                                            {((product.minOrderQuantity || product.units || 0) > 1) && (
+                                              <span className="bg-indigo-50 text-indigo-700 text-[9px] font-black px-1.5 py-0.5 rounded-md">
+                                                Mín. {product.minOrderQuantity || product.units} un.
+                                              </span>
+                                            )}
+                                          </div>
+                                          <h3 className="font-bold text-sm sm:text-base text-slate-800 leading-snug group-hover:text-primary transition-colors line-clamp-2">
+                                            {product.name}
+                                          </h3>
+                                          {product.description && (
+                                            <p className="text-[11px] sm:text-xs text-slate-500 line-clamp-2 mt-1 leading-relaxed">
+                                              {product.description}
+                                            </p>
+                                          )}
+                                        </div>
+                                        <div className="mt-3 flex items-baseline justify-between gap-2 flex-wrap">
+                                          <div className="flex items-baseline gap-2 flex-wrap">
+                                            {promoPrice !== null ? (
+                                              <>
+                                                <span className="font-extrabold text-base text-emerald-600">
+                                                  R$ {promoPrice.toFixed(2)}{product.isByWeight ? '/kg' : ''}
+                                                </span>
+                                                <span className="text-[11px] text-slate-400 line-through">
+                                                  R$ {product.price.toFixed(2)}
+                                                </span>
+                                                {discountPct > 0 && (
+                                                  <span className="bg-emerald-100 text-emerald-700 text-[10px] font-black px-1.5 py-0.5 rounded-md">
+                                                    -{discountPct}%
+                                                  </span>
+                                                )}
+                                              </>
+                                            ) : product.price > 0 ? (
+                                              <span className="font-extrabold text-base text-emerald-600">
+                                                R$ {product.price.toFixed(2)}{product.isByWeight ? '/kg' : ''}
+                                              </span>
+                                            ) : (
+                                              <span className="font-bold text-xs text-slate-500">Sob consulta</span>
+                                            )}
+                                          </div>
+                                          {isOutOfStock && (
+                                            <span className="text-[10px] font-black uppercase text-red-600 bg-red-50 px-2 py-0.5 rounded-md">
+                                              Esgotado
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div 
+                                        onClick={(e) => {
+                                          if (product.imageUrl) {
+                                            e.stopPropagation();
+                                            handleExpandProductImages(product, 0);
+                                          }
+                                        }}
+                                        className={`w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shrink-0 bg-slate-100 border border-slate-100 relative self-center group/img ${
+                                          product.imageUrl ? 'cursor-zoom-in' : ''
+                                        }`}
+                                        title={product.imageUrl ? "Clique para ampliar a foto" : undefined}
+                                      >
+                                        {product.imageUrl ? (
+                                          <>
+                                            <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                                            <div className="absolute inset-0 bg-black/25 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                              <Maximize2 size={20} className="text-white drop-shadow-md" />
+                                            </div>
                                           </>
-                                        ) : product.price > 0 ? (
-                                          <span className="font-extrabold text-base text-emerald-600">
-                                            R$ {product.price.toFixed(2)}{product.isByWeight ? '/kg' : ''}
-                                          </span>
                                         ) : (
-                                          <span className="font-bold text-xs text-slate-500">Sob consulta</span>
+                                          <div className="w-full h-full flex items-center justify-center text-slate-300"><Package size={28} /></div>
                                         )}
                                       </div>
-                                      {isOutOfStock && (
-                                        <span className="text-[10px] font-black uppercase text-red-600 bg-red-50 px-2 py-0.5 rounded-md">
-                                          Esgotado
-                                        </span>
-                                      )}
                                     </div>
-                                  </div>
-                                  <div 
-                                    onClick={(e) => {
-                                      if (product.imageUrl) {
-                                        e.stopPropagation();
-                                        handleExpandProductImages(product, 0);
-                                      }
-                                    }}
-                                    className={`w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shrink-0 bg-slate-100 border border-slate-100 relative self-center group/img ${
-                                      product.imageUrl ? 'cursor-zoom-in' : ''
-                                    }`}
-                                    title={product.imageUrl ? "Clique para ampliar a foto" : undefined}
-                                  >
-                                    {product.imageUrl ? (
-                                      <>
-                                        <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
-                                        <div className="absolute inset-0 bg-black/25 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                                          <Maximize2 size={20} className="text-white drop-shadow-md" />
-                                        </div>
-                                      </>
-                                    ) : (
-                                      <div className="w-full h-full flex items-center justify-center text-slate-300"><Package size={28} /></div>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </>
                       );
-                    })}
+                    })()}
                   </div>
                 )}
               </div>
@@ -4624,9 +4922,9 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                     <label className="text-xs font-bold text-slate-700 mb-1 block">Telefone *</label>
                     <input 
                       type="tel"
-                      value={tempProfilePhone}
+                      value={tempProfilePhone.startsWith('+55') ? tempProfilePhone : `+55 ${formatPhoneMask(tempProfilePhone.replace(/\D/g, '').startsWith('55') && tempProfilePhone.replace(/\D/g, '').length >= 12 ? tempProfilePhone.replace(/\D/g, '').slice(2) : tempProfilePhone.replace(/\D/g, ''))}`}
                       disabled
-                      className="w-full p-3.5 bg-slate-100 border border-slate-200 rounded-xl text-sm font-bold text-slate-500"
+                      className="w-full p-3.5 bg-slate-100 border border-slate-200 rounded-xl text-sm font-bold text-slate-700"
                     />
                   </div>
 

@@ -121,6 +121,9 @@ export default function POS({ storeId, user, settings, orders, products: propPro
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   
+  // Session State
+  const [currentSession, setCurrentSession] = useState<any | null>(null);
+
   // Estados da Roleta no PDV
   const [hasSpunRoulettePos, setHasSpunRoulettePos] = useState(false);
   const [showRouletteModalPos, setShowRouletteModalPos] = useState(false);
@@ -1048,64 +1051,85 @@ export default function POS({ storeId, user, settings, orders, products: propPro
     COMANDA: 0
   });
 
+  const isPendingOrderForPos = (order: Order, currentSessionId?: string | null) => {
+    if (!order) return false;
+
+    // 1. Never show cancelled orders
+    if (order.status === 'CANCELADO') return false;
+
+    // 2. If it's finalized in a closed session, hide it
+    if (order.session_id === 'FECHADO') return false;
+
+    // 3. Session ownership logic:
+    // If it has a session_id, it must be OUR open session.
+    // If it has NO session_id, it's a new pending order from an attendant or digital menu.
+    if (order.session_id && currentSessionId && order.session_id !== currentSessionId) return false;
+
+    // 4. Allowed active / pending statuses
+    const allowedStatuses = [
+      'AGUARDANDO', 
+      'AGUARDANDO_PAGAMENTO', 
+      'PENDENTE', 
+      'PAGO', 
+      'PREPARANDO', 
+      'PRONTO', 
+      'ENVIADO_PARA_ENTREGA', 
+      'SAIU_PARA_ENTREGA', 
+      'CHEGUEI_NA_ORIGEM',
+      'ENTREGUE'
+    ];
+    if (!allowedStatuses.includes(order.status)) return false;
+
+    // 5. If it's already finalized/delivered (ENTREGUE), check if it still needs payment
+    if (order.status === 'ENTREGUE') {
+      let hasRealPayment = false;
+      if (order.paymentMethod && order.paymentMethod !== 'A_PAGAR') hasRealPayment = true;
+      if (order.paymentDetails) {
+        try {
+          const pd = typeof order.paymentDetails === 'string' ? JSON.parse(order.paymentDetails) : order.paymentDetails;
+          if (Array.isArray(pd) && pd.some((p: any) => p.method !== 'A_PAGAR')) hasRealPayment = true;
+        } catch {}
+      }
+      // If delivered AND paid, it is not pending
+      if (hasRealPayment) return false;
+    }
+
+    // 6. For PAGO status: if order already has our session_id and is completed
+    if (order.status === 'PAGO' && order.session_id === currentSessionId && (order as any).is_completed) {
+      return false;
+    }
+
+    return true;
+  };
+
   useEffect(() => {
-    if (!storeId || isContingencyMode || !orders) return;
+    if (!storeId || isContingencyMode || !orders) {
+      setNewOrdersCount({ ENTREGA: 0, BALCAO: 0, MESA: 0, COMANDA: 0 });
+      return;
+    }
 
     const counts = { ENTREGA: 0, BALCAO: 0, MESA: 0, COMANDA: 0 };
     orders.forEach(order => {
-      if (
-        (order.status === 'AGUARDANDO' || order.status === 'AGUARDANDO_PAGAMENTO' || order.status === 'PENDENTE' || order.status === 'PAGO') &&
-        order.type in counts
-      ) {
+      if (order.type in counts && isPendingOrderForPos(order, currentSession?.id)) {
         counts[order.type as keyof typeof counts]++;
       }
     });
     setNewOrdersCount(counts);
-  }, [orders, storeId, isContingencyMode]);
+  }, [orders, storeId, isContingencyMode, currentSession?.id]);
 
   const lookupOrdersList = async (type: 'ENTREGA' | 'BALCAO' | 'MESA' | 'COMANDA') => {
     setIsLookingUpCommand(true);
     setLookupType(type);
     try {
-        const data = orders.filter(o => o.type === type && ['AGUARDANDO', 'AGUARDANDO_PAGAMENTO', 'PENDENTE', 'PAGO', 'PREPARANDO', 'PRONTO', 'ENVIADO_PARA_ENTREGA', 'SAIU_PARA_ENTREGA', 'CHEGUEI_NA_ORIGEM'].includes(o.status));
+        const data = orders.filter(o => o.type === type && isPendingOrderForPos(o, currentSession?.id));
         data.sort((a, b) => b.createdAt - a.createdAt);
 
-        if (data && data.length > 0) {
-            const unpaidData = data.filter(o => {
-                // 1. Never show cancelled orders
-                if (o.status === 'CANCELADO') return false;
-                
-                // 2. If it's finalized in a closed session, hide it
-                if (o.session_id === 'FECHADO') return false;
+        if (data.length === 0) {
+            alert(`Nenhum pedido de ${type.toLowerCase()} pendente encontrado.`);
+            return;
+        }
 
-                // 3. Session ownership logic:
-                // If it has a session_id, it must be OUR session.
-                // If it has NO session_id, it's a new order from an attendant/menu.
-                if (o.session_id && o.session_id !== currentSession?.id) return false;
-
-                // 4. If it's already finalized (ENTREGUE), check if it needs payment
-                if (o.status === 'ENTREGUE') {
-                    let hasRealPayment = false;
-                    if (o.paymentMethod && o.paymentMethod !== 'A_PAGAR') hasRealPayment = true;
-                    if (o.paymentDetails) {
-                        try {
-                            const pd = JSON.parse(o.paymentDetails);
-                            if (pd.some((p: any) => p.method !== 'A_PAGAR')) hasRealPayment = true;
-                        } catch {}
-                    }
-                    // If it's delivered AND paid, it's definitely not "pendente"
-                    if (hasRealPayment) return false;
-                }
-                
-                return true;
-            });
-            
-            if (unpaidData.length === 0) {
-                alert(`Nenhum pedido de ${type.toLowerCase()} pendente encontrado.`);
-                return;
-            }
-
-            const parsedData = unpaidData.map(order => {
+        const parsedData = data.map(order => {
                 let items = order.items;
                 if (typeof items === 'string') {
                     try {
@@ -1120,14 +1144,10 @@ export default function POS({ storeId, user, settings, orders, products: propPro
                     items: Array.isArray(items) ? items : []
                 };
             });
-            setDeliveryOrdersList(parsedData);
-            setShowDeliveryModal(true);
-        } else {
-            alert(`Nenhum pedido de ${type.toLowerCase()} encontrado.`);
-        }
+        setDeliveryOrdersList(parsedData);
+        setShowDeliveryModal(true);
     } catch (err) {
-      console.error(err);
-        alert("Erro ao buscar pedidos.");
+      alert("Erro ao buscar pedidos.");
     } finally {
         setIsLookingUpCommand(false);
     }
@@ -1322,8 +1342,6 @@ export default function POS({ storeId, user, settings, orders, products: propPro
   const [isClosingRegister, setIsClosingRegister] = useState(false);
   const [dailySales, setDailySales] = useState<{ total: number, byMethod: Record<string, number>, count: number, bleeds: number, estornos?: number, bleedsList?: any[], estornosList?: any[], products: any[] } | null>(null);
   
-  // Session State
-  const [currentSession, setCurrentSession] = useState<any | null>(null);
   const [isOpeningRegister, setIsOpeningRegister] = useState(false);
   const [initialAmount, setInitialAmount] = useState('');
   
