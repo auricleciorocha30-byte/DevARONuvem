@@ -133,6 +133,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const [generatedDisplayId, setGeneratedDisplayId] = useState<string | null>(null);
   const [generatedPix, setGeneratedPix] = useState<{qr_code: string, qr_code_base64: string} | null>(null);
   const [isPixCopied, setIsPixCopied] = useState(false);
+  const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<Order | null>(null);
   const [isSchedulingMode, setIsSchedulingMode] = useState(false);
   const [selectedScheduledDate, setSelectedScheduledDate] = useState('');
   const [selectedScheduledTime, setSelectedScheduledTime] = useState('');
@@ -3351,34 +3352,49 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {customerPastOrders.map(order => (
-                      <div key={order.id} className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-3 text-left">
-                        <div className="flex items-center justify-between">
-                          <span className="font-mono font-bold text-xs text-slate-800">
-                            #{order.displayId || order.id.slice(0, 6)}
-                          </span>
-                          <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full ${getStatusColor(order.status)}`}>
-                            {order.status.replace(/_/g, ' ')}
-                          </span>
-                        </div>
-                        <div className="text-xs text-slate-500 space-y-1">
-                          {order.items.map((it, idx) => (
-                            <div key={idx} className="flex justify-between">
-                              <span>{it.quantity}x {it.name}</span>
-                              <span className="font-medium text-slate-700">R$ {(it.price * it.quantity).toFixed(2)}</span>
+                    {customerPastOrders.map(order => {
+                      const orderDate = new Date(order.createdAt);
+                      const formattedDate = `Feito em ${orderDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).replace('.', '')}`;
+                      const formattedTime = orderDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                      const orderTypeLabel = order.type === 'ENTREGA' ? 'Entrega' : order.type === 'BALCAO' ? 'Retirada' : order.type;
+                      const statusText = order.status === 'PAGO' || order.status === 'AGUARDANDO' || order.status === 'PENDENTE' ? 'Pedido em preparação' : order.status.replace(/_/g, ' ');
+
+                      return (
+                        <div 
+                          key={order.id} 
+                          onClick={() => setSelectedOrderForDetails(order)}
+                          className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition-all cursor-pointer text-left space-y-3"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                                <Package size={22} />
+                              </div>
+                              <div className="min-w-0">
+                                <h3 className="font-bold text-sm sm:text-base text-slate-800 truncate">
+                                  Pedido Nº {order.displayId || order.id.slice(0, 6)}
+                                </h3>
+                                <p className="text-[11px] text-slate-400 font-medium">{formattedDate}</p>
+                                <p className="text-xs text-slate-600 font-medium">
+                                  Tipo: <span className="font-bold">{orderTypeLabel}</span> • Total: <span className="font-black text-slate-900">R$ {order.total.toFixed(2)}</span>
+                                </p>
+                              </div>
                             </div>
-                          ))}
+                            <ChevronRight size={20} className="text-slate-400 shrink-0" />
+                          </div>
+                          
+                          <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                              <span className="text-xs font-bold text-slate-700">{statusText}</span>
+                            </div>
+                            <span className="text-[11px] text-slate-400 font-medium">
+                              hoje, {formattedTime}
+                            </span>
+                          </div>
                         </div>
-                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                          <span className="text-xs text-slate-400">
-                            {new Date(order.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                          <span className="text-sm font-black text-slate-900">
-                            R$ {order.total.toFixed(2)}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -4073,96 +4089,38 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
                      </button>
                   </div>
                 ) : (
-                  <div className="py-12 text-center animate-scale-up space-y-6">
-                     <div className={`w-24 h-24 ${verifiedPaymentStatus === 'failure' ? 'bg-red-500' : verifiedPaymentStatus === 'pending' ? 'bg-yellow-500' : 'bg-green-500'} text-white rounded-full flex items-center justify-center mx-auto shadow-2xl animate-bounce`}>
-                       {verifiedPaymentStatus === 'failure' ? <X size={48} strokeWidth={4} /> : verifiedPaymentStatus === 'pending' ? <Clock size={48} strokeWidth={4} /> : <Check size={48} strokeWidth={4} />}
+                  <div className="py-10 text-center animate-scale-up space-y-6">
+                     <div className="w-24 h-24 bg-[#14233c] text-white rounded-full flex items-center justify-center mx-auto shadow-2xl">
+                       <Check size={48} strokeWidth={3} />
                      </div>
-                     <div>
-                        <h3 className="text-3xl font-brand font-bold text-primary">
-                          {verifiedPaymentStatus === 'success' ? 'Pagamento Aprovado!' : 
-                           verifiedPaymentStatus === 'failure' ? 'Pagamento Recusado' : 
-                           verifiedPaymentStatus === 'pending' ? 'Aguardando Pagamento' : 
-                           'Pedido Enviado!'}
+                     <div className="space-y-2">
+                        <h3 className="text-xl font-bold text-slate-900">
+                          Pedido enviado com sucesso
                         </h3>
-                        <p className="text-gray-500 mt-2 font-medium">
-                          {verifiedPaymentStatus === 'success' ? 'Recebemos seu pagamento e já estamos preparando seu pedido.' : 
-                           verifiedPaymentStatus === 'failure' ? 'Houve um problema com seu pagamento. Por favor, pague no balcão ou na entrega.' :
-                           verifiedPaymentStatus === 'pending' ? 'Estamos aguardando a confirmação do pagamento.' :
-                           'Já recebemos seu pedido e estamos preparando tudo para você.'}
+                        <p className="text-xs text-slate-500 max-w-xs mx-auto leading-relaxed">
+                          Obrigado por pedir com a gente! Você pode acompanhar o seu pedido através da página Pedidos.
                         </p>
                      </div>
-                     <div className="bg-gray-50 p-6 rounded-3xl border border-gray-100 text-left space-y-2">
-                        <div className="flex justify-between items-center"><span className="text-[10px] font-black text-gray-400 uppercase">Senha do Pedido</span><span className="text-xl font-black text-primary">#{generatedDisplayId || paymentOrderId?.slice(-4)}</span></div>
-                        <p className="text-[10px] text-gray-400 leading-snug">Fique atento ao painel da loja ou aguarde nosso atendente chamar.</p>
-                     </div>
 
-                     {generatedPix && verifiedPaymentStatus !== 'success' && (
-                        <div className="bg-white p-6 rounded-3xl border border-gray-200 text-center space-y-4 shadow-xl">
-                           <h4 className="font-bold text-gray-800 text-sm">Pague agora com Pix (Mercado Pago)</h4>
-                           
-                           <div className="flex items-center justify-center gap-2 text-xs font-black bg-orange-50 text-orange-700 px-4 py-2.5 rounded-2xl border border-orange-100 max-w-[200px] mx-auto animate-pulse">
-                              <Clock size={16} />
-                              <span>Tempo restante: {Math.floor(countdownSeconds / 60).toString().padStart(2, '0')}:{(countdownSeconds % 60).toString().padStart(2, '0')}</span>
-                           </div>
-                           <img src={`data:image/jpeg;base64,${generatedPix.qr_code_base64}`} alt="QR Code Pix" className="mx-auto w-48 h-48" />
-                           <div className="bg-gray-50 p-3 rounded-xl">
-                              <p className="text-[9px] text-gray-500 break-all select-all font-mono">{generatedPix.qr_code}</p>
-                           </div>
-                           <button onClick={() => {
-                              navigator.clipboard.writeText(generatedPix.qr_code);
-                              setIsPixCopied(true);
-                              setTimeout(() => setIsPixCopied(false), 3000);
-                           }} className="w-full py-4 bg-purple-100 text-purple-700 font-bold rounded-xl text-sm mt-2 flex items-center justify-center gap-2 transition-all">
-                              {isPixCopied ? <><Check size={16}/> Copiado!</> : <><QrCode size={16}/> Copiar Código Pix</>}
-                           </button>
-                        </div>
-                     )}
-                     
-                     {(orderType === 'ENTREGA' || orderType === 'BALCAO') && (
-                       <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100 text-left space-y-4">
-                         <div className="flex items-center gap-2 text-blue-600">
-                           <Search size={20} />
-                           <span className="text-base font-bold">Acompanhe seu pedido</span>
-                         </div>
-                         <p className="text-sm text-blue-800 leading-snug">
-                           Você pode consultar o status {orderType === 'ENTREGA' ? 'da sua entrega' : 'da sua retirada'} a qualquer momento clicando no ícone de lupa <Search size={14} className="inline mx-1" /> no topo da tela{customerPhone ? ` e informando seu telefone ` : '.'}{customerPhone && <strong>{customerPhone}</strong>}
-                         </p>
-                         
-                         <div className="bg-white/60 p-4 rounded-xl border border-blue-100/50 mt-2">
-                           <div className="flex items-center gap-2 text-blue-900 mb-1">
-                             <Wallet size={16} />
-                             <span className="font-bold text-sm">Status do Pagamento</span>
-                           </div>
-                           <p className="text-sm text-blue-800">
-                             {orderType === 'BALCAO' ? (
-                               verifiedPaymentStatus === 'success' || (payment === 'CASHBACK' && customerPoints >= finalTotal) ? 
-                               'Pagamento já realizado. Quando estiver pronto, é somente retirar no local!' : 
-                               verifiedPaymentStatus === 'pending' ?
-                               'Aguardando o pagamento online. Realize o pagamento selecionado no estabelecimento.' :
-                               'Pagamento pendente. Por favor, realize o pagamento no local da retirada.'
-                             ) : (
-                               verifiedPaymentStatus === 'success' || (payment === 'CASHBACK' && customerPoints >= finalTotal) ? 
-                               'Pagamento já realizado online. Agora é só aguardar e receber seu pedido!' : 
-                               verifiedPaymentStatus === 'pending' ?
-                               'Aguardando o pagamento online. Realize o pagamento selecionado quando sua entrega chegar.' :
-                               'Pagamento pendente. Por favor, faça o pagamento no momento da entrega.'
-                             )}
-                           </p>
-                         </div>
-                       </div>
-                     )}
-                     
-                     <div className="flex flex-col gap-3">
-                        <button onClick={handleCloseCart} className="w-full py-5 bg-gray-100 text-gray-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-gray-200 transition-all">Lançar outro item na sacola</button>
-                        
-                        {isWaitstaff && (
-                           <button 
-                             onClick={handleBack} 
-                             className="w-full py-5 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl flex items-center justify-center gap-2"
-                           >
-                             <ArrowLeft size={16} /> Concluir e Voltar ao Mapa
-                           </button>
-                        )}
+                     <div className="space-y-3 pt-2">
+                       <button 
+                         onClick={() => {
+                           handleCloseCart();
+                           setExternalTab('pedidos');
+                         }}
+                         className="w-full py-4 bg-[#14233c] text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-md hover:bg-[#0f1b2f] transition-all cursor-pointer"
+                       >
+                         ACOMPANHAR MEU PEDIDO
+                       </button>
+                       <button 
+                         onClick={() => {
+                           handleCloseCart();
+                           setExternalTab('inicio');
+                         }}
+                         className="w-full py-4 bg-transparent text-slate-700 font-bold text-xs uppercase tracking-wider hover:bg-slate-50 transition-all rounded-2xl cursor-pointer"
+                       >
+                         CONTINUAR COMPRANDO
+                       </button>
                      </div>
                   </div>
                 )}
@@ -5024,7 +4982,119 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
           </div>
         </div>
       )}
-      
+
+      {selectedOrderForDetails && (
+        <div className="fixed inset-0 z-[250] bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in" onClick={() => setSelectedOrderForDetails(null)}>
+          <div className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-slide-up max-h-[90vh] flex flex-col text-left" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <h3 className="text-lg font-bold text-slate-900">Detalhes do pedido</h3>
+              <button onClick={() => setSelectedOrderForDetails(null)} className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 bg-slate-100 cursor-pointer">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto py-4 space-y-5 custom-scrollbar flex-1">
+              {/* Estimated time */}
+              <div className="text-center py-2">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Previsão para {selectedOrderForDetails.type === 'ENTREGA' ? 'entrega' : 'retirada'}</p>
+                <p className="text-lg font-black text-slate-800">
+                  {new Date(selectedOrderForDetails.createdAt + 30 * 60000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} - {new Date(selectedOrderForDetails.createdAt + 45 * 60000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+
+              {/* Status badge */}
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-xs font-bold text-slate-800">{selectedOrderForDetails.status === 'PAGO' || selectedOrderForDetails.status === 'AGUARDANDO' ? 'Pedido em preparação' : selectedOrderForDetails.status.replace(/_/g, ' ')}</span>
+                </div>
+                <ChevronDown size={16} className="text-slate-400" />
+              </div>
+
+              {/* Order Number & Items */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider">
+                    Pedido Nº {selectedOrderForDetails.displayId || selectedOrderForDetails.id.slice(0, 6)}
+                  </h4>
+                </div>
+
+                <div className="space-y-3 bg-slate-50/70 p-4 rounded-2xl border border-slate-100">
+                  {selectedOrderForDetails.items.map((it, idx) => (
+                    <div key={idx} className="flex justify-between items-start gap-4">
+                      <div className="flex gap-2.5">
+                        <span className="px-2 py-0.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 h-fit">
+                          {it.quantity}x
+                        </span>
+                        <div>
+                          <p className="text-xs font-bold text-slate-800">{it.name}</p>
+                          {it.observation && <p className="text-[11px] text-slate-500 mt-0.5">{it.observation}</p>}
+                        </div>
+                      </div>
+                      <span className="text-xs font-black text-slate-900 shrink-0">
+                        R$ {(it.price * it.quantity).toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Financial Breakdown */}
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 space-y-2 text-xs">
+                <div className="flex justify-between text-slate-500">
+                  <span>Subtotal</span>
+                  <span className="font-medium text-slate-700">R$ {selectedOrderForDetails.total.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-slate-500">
+                  <span>Desconto</span>
+                  <span className="font-medium text-slate-700">R$ 0,00</span>
+                </div>
+                <div className="pt-2 border-t border-slate-100 flex justify-between text-sm font-black text-slate-900">
+                  <span>Total</span>
+                  <span>R$ {selectedOrderForDetails.total.toFixed(2)}</span>
+                </div>
+                {settings?.isCashbackActive && (
+                  <div className="pt-2 border-t border-slate-100 flex justify-between text-xs font-bold text-emerald-600">
+                    <span>Pontuação deste pedido</span>
+                    <span>{Math.floor(selectedOrderForDetails.total)} pontos</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Customer / Establishment Info */}
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 space-y-3 text-xs">
+                <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">
+                  {selectedOrderForDetails.type === 'ENTREGA' ? 'Endereço de Entrega' : 'Retirar no estabelecimento'}
+                </span>
+                <div className="flex items-start gap-2.5">
+                  <User size={16} className="text-slate-400 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-bold text-slate-800">{selectedOrderForDetails.customerName || customerName || 'Cliente'}</p>
+                    <p className="text-slate-500">{selectedOrderForDetails.customerPhone || customerPhone || ''}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <MapPin size={16} className="text-slate-400 mt-0.5 shrink-0" />
+                  <p className="text-slate-600 font-medium">{selectedOrderForDetails.deliveryAddress || settings.address || 'Endereço da Loja'}</p>
+                </div>
+              </div>
+
+              {/* WhatsApp Button */}
+              <button
+                onClick={() => {
+                  const storePhoneNum = (settings.whatsapp || settings.phone || '').replace(/\D/g, '');
+                  const message = encodeURIComponent(`Olá, gostaria de falar sobre o meu pedido #${selectedOrderForDetails.displayId || selectedOrderForDetails.id.slice(0, 6)}.`);
+                  window.open(`https://wa.me/55${storePhoneNum}?text=${message}`, '_blank');
+                }}
+                className="w-full py-4 bg-[#14233c] text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-md hover:bg-[#0f1b2f] flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <MessageCircle size={18} /> FALAR COM O ESTABELECIMENTO
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         .animate-slide-up { animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }

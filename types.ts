@@ -94,6 +94,7 @@ export interface OrderItem {
   productId: string;
   name: string;
   description?: string;
+  observation?: string;
   quantity: number;
   price: number;
   isByWeight?: boolean;
@@ -228,6 +229,7 @@ export interface StoreSettings {
   address?: string;
   cep?: string;
   whatsapp?: string;
+  phone?: string;
   deliveryFee?: number;
   deliveryFeeType?: 'FREE' | 'FIXED' | 'DISTANCE' | 'NEIGHBORHOOD';
   neighborhoodFees?: { name: string; fee: number }[];
