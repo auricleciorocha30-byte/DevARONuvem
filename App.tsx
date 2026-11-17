@@ -568,7 +568,10 @@ function StoreContext() {
             // Delta update
             finalOrders = [...ordersRef.current];
             fetchedOrders.forEach(newOrder => {
-                const idx = finalOrders.findIndex(o => o.id === newOrder.id);
+                const idx = finalOrders.findIndex(o => 
+                  String(o.id) === String(newOrder.id) ||
+                  (o.displayId && newOrder.displayId && String(o.displayId) === String(newOrder.displayId) && Math.abs((Number(o.createdAt) || 0) - (Number(newOrder.createdAt) || 0)) < 60000)
+                );
                 if (idx > -1) {
                     const oldStatus = finalOrders[idx].status;
                     finalOrders[idx] = newOrder;
@@ -584,9 +587,19 @@ function StoreContext() {
              // Initial load: don't play sounds for old orders
         }
 
-        ordersRef.current = finalOrders;
-        setOrders(finalOrders);
-        localStorage.setItem(`${ORDERS_CACHE_KEY}_${currentStore.id}`, JSON.stringify(finalOrders));
+        // Global deduplication to strictly guarantee no duplicate orders in memory or storage
+        const seenOrderMap = new Map<string, Order>();
+        finalOrders.forEach(order => {
+          const idKey = String(order.id);
+          if (!seenOrderMap.has(idKey)) {
+            seenOrderMap.set(idKey, order);
+          }
+        });
+        const dedupedOrders = Array.from(seenOrderMap.values());
+
+        ordersRef.current = dedupedOrders;
+        setOrders(dedupedOrders);
+        localStorage.setItem(`${ORDERS_CACHE_KEY}_${currentStore.id}`, JSON.stringify(dedupedOrders));
       }
 
       initialLoadRef.current = false;
@@ -759,6 +772,21 @@ function StoreContext() {
       stockDeducted: order.stockDeducted !== false ? 1 : 0
     };
     await supabase.from('orders').insert([dbOrder]);
+
+    const mappedOrder = mapOrderFromDb(dbOrder);
+    setOrders(prev => {
+      const exists = prev.some(o => 
+        String(o.id) === String(mappedOrder.id) ||
+        (o.displayId && mappedOrder.displayId && String(o.displayId) === String(mappedOrder.displayId) && Math.abs((Number(o.createdAt) || 0) - (Number(mappedOrder.createdAt) || 0)) < 30000)
+      );
+      if (exists) return prev;
+      const updated = [mappedOrder, ...prev];
+      ordersRef.current = updated;
+      try {
+        localStorage.setItem(`${ORDERS_CACHE_KEY}_${currentStore?.id}`, JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
   };
 
   const pendingStatusUpdates = useRef(new Set<string>());

@@ -491,6 +491,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const [changeFor, setChangeFor] = useState<string>('');
   const [notes, setNotes] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const isSubmittingOrderRef = useRef(false);
 
   const [customerName, setCustomerName] = useState(() => {
     try { return localStorage.getItem('customer_name') || ''; } catch { return ''; }
@@ -787,6 +788,8 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
         if (data) {
           const parsed = data.map((o: any) => ({
             ...o,
+            id: String(o.id),
+            displayId: o.displayId ? String(o.displayId) : undefined,
             items: typeof o.items === 'string' ? JSON.parse(o.items || '[]') : (o.items || [])
           }));
           setCustomerDbOrders(parsed);
@@ -804,14 +807,58 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
       return oPhone && (oPhone === cleanPhone || oPhone.endsWith(cleanPhone) || cleanPhone.endsWith(oPhone));
     });
 
-    const combined = [...propOrders];
-    customerDbOrders.forEach(dbo => {
-      if (!combined.some(c => c.id === dbo.id)) {
-        combined.push(dbo);
+    const isDuplicate = (existing: Order[], candidate: Order) => {
+      const candId = String(candidate.id);
+      const candDisp = candidate.displayId ? String(candidate.displayId) : null;
+      const candTime = Number(candidate.createdAt) || 0;
+      const candTotal = Number(candidate.total) || 0;
+
+      return existing.some(ex => {
+        const exId = String(ex.id);
+        const exDisp = ex.displayId ? String(ex.displayId) : null;
+        const exTime = Number(ex.createdAt) || 0;
+        const exTotal = Number(ex.total) || 0;
+
+        // 1. Same ID (coerced to string)
+        if (exId === candId) return true;
+
+        // 2. Same displayId within 10 minutes
+        if (candDisp && exDisp && exDisp === candDisp && Math.abs(exTime - candTime) < 600000) {
+          return true;
+        }
+
+        // 3. Same total and timestamp within 20 seconds (catches double submissions)
+        if (candTotal > 0 && Math.abs(exTotal - candTotal) < 0.01 && Math.abs(exTime - candTime) < 20000) {
+          return true;
+        }
+
+        return false;
+      });
+    };
+
+    const combined: Order[] = [];
+
+    // First add propOrders
+    propOrders.forEach(po => {
+      if (!isDuplicate(combined, po)) {
+        combined.push({
+          ...po,
+          id: String(po.id)
+        });
       }
     });
 
-    combined.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    // Then add customerDbOrders if not already present
+    customerDbOrders.forEach(dbo => {
+      if (!isDuplicate(combined, dbo)) {
+        combined.push({
+          ...dbo,
+          id: String(dbo.id)
+        });
+      }
+    });
+
+    combined.sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
     return combined;
   }, [orders, customerPhone, customerDbOrders]);
 
@@ -1309,7 +1356,25 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
         .limit(20);
 
       if (error) throw error;
-      setTrackedOrders(data || []);
+      if (data) {
+        const parsed = data.map((o: any) => ({
+          ...o,
+          id: String(o.id),
+          items: typeof o.items === 'string' ? JSON.parse(o.items || '[]') : (o.items || [])
+        }));
+        const uniqueTracked: Order[] = [];
+        const seenIds = new Set<string>();
+        for (const ord of parsed) {
+          const ordId = String(ord.id);
+          if (!seenIds.has(ordId)) {
+            seenIds.add(ordId);
+            uniqueTracked.push(ord);
+          }
+        }
+        setTrackedOrders(uniqueTracked);
+      } else {
+        setTrackedOrders([]);
+      }
     } catch (err) {
       console.error("Error tracking order:", err);
       alert("Erro ao buscar pedidos.");
@@ -1605,7 +1670,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
   const finalTotal = baseOrderTotal + cardFeeAmount;
 
   const handleCheckout = async () => {
-    if (cart.length === 0) return;
+    if (cart.length === 0 || isSending || isSubmittingOrderRef.current) return;
 
     if (isSchedulingMode) {
       if (!selectedScheduledDate) {
@@ -1677,6 +1742,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
         }
     }
 
+    isSubmittingOrderRef.current = true;
     setIsSending(true);
 
     if ((orderType === 'MESA' || orderType === 'COMANDA') && !isWaitstaff) {
@@ -1958,8 +2024,12 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
 
         setGeneratedDisplayId(submittedDisplayId);
         setCart([]); 
-        setCustomerName('');
-        setCustomerPhone('');
+        if (customerPhone) {
+          try {
+            localStorage.setItem('customer_phone', customerPhone);
+            if (customerName) localStorage.setItem('customer_name', customerName);
+          } catch (e) {}
+        }
         setDeliveryAddress('');
         setReferencePoint('');
         setNotes('');
@@ -2031,6 +2101,7 @@ const DigitalMenu: React.FC<Props> = ({ storeId, products, categories: externalC
     } catch (err: any) { 
         alert(`Erro ao enviar pedido: ${err.message}`); 
     } finally { 
+        isSubmittingOrderRef.current = false;
         setIsSending(false); 
     }
   };
