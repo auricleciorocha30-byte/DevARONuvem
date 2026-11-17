@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Product } from '../types';
 import { Plus, Search, Edit2, Trash2, Camera, Star, Tag, X, Loader2, Weight, Power, ListTree, ScanLine, FileText, Printer, Layers, Check, Upload, Percent } from 'lucide-react';
 import { Switch } from '../components/Switch';
@@ -74,6 +74,11 @@ interface Props {
 }
 
 const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct, categories, setCategories, storeId, onCategoryChange, settings, ecosystemUsage, refreshEcosystemUsage }) => {
+  const allCategories = useMemo(() => {
+    const productCats = products.map(p => (p.category || '').trim()).filter(Boolean);
+    return Array.from(new Set([...categories, ...productCats]));
+  }, [categories, products]);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [showProductModal, setShowProductModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -134,8 +139,8 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
     const trimmed = inlineCategoryName.trim();
     if (!trimmed) return;
 
-    if (categories.some(c => c.toLowerCase() === trimmed.toLowerCase())) {
-      const existing = categories.find(c => c.toLowerCase() === trimmed.toLowerCase()) || trimmed;
+    if (allCategories.some(c => c.toLowerCase() === trimmed.toLowerCase())) {
+      const existing = allCategories.find(c => c.toLowerCase() === trimmed.toLowerCase()) || trimmed;
       setEditingProduct(prev => prev ? { ...prev, category: existing } : prev);
       setIsAddingCategoryInline(false);
       setInlineCategoryName('');
@@ -257,7 +262,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
           matchedProductName: matchedProduct ? matchedProduct.name : undefined,
           selected: true,
           salePrice: matchedProduct ? matchedProduct.price : salePrice,
-          category: matchedProduct ? matchedProduct.category : (categories[0] || 'Geral')
+          category: matchedProduct ? matchedProduct.category : (allCategories[0] || 'Geral')
         });
       }
 
@@ -507,7 +512,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
             description: editingProduct.description || '',
             price: Number(editingProduct.price) || 0,
             costPrice: Number(editingProduct.costPrice) || 0,
-            category: editingProduct.category || categories[0] || 'Geral',
+            category: editingProduct.category || allCategories[0] || 'Geral',
             imageUrl: editingProduct.imageUrl || 'https://picsum.photos/400/300',
             imageUrl2: editingProduct.imageUrl2 || '',
             isActive: editingProduct.isActive !== false,
@@ -546,7 +551,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
     const trimmedName = newCategoryName.trim();
     if (!trimmedName) return;
     
-    if (categories.some(c => c.toLowerCase() === trimmedName.toLowerCase())) {
+    if (allCategories.some(c => c.toLowerCase() === trimmedName.toLowerCase())) {
         alert("Esta categoria já existe.");
         return;
     }
@@ -597,7 +602,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
       return;
     }
 
-    if (categories.some(c => c.toLowerCase() === trimmedNewName.toLowerCase() && c !== oldName)) {
+    if (allCategories.some(c => c.toLowerCase() === trimmedNewName.toLowerCase() && c !== oldName)) {
       alert("Esta categoria já existe.");
       return;
     }
@@ -715,7 +720,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                       alert("Limite máximo de produtos atingido. Entre em contato com seu consultor para fazer um upgrade do seu plano.");
                       return;
                   }
-                  setEditingProduct({ category: categories[0] || '', description: '', featuredDay: -1, isActive: true, showInMenu: true, isByWeight: false, complements: [] }); setProductTab('INFO'); setShowProductModal(true); 
+                  setEditingProduct({ category: allCategories[0] || '', description: '', featuredDay: -1, isActive: true, showInMenu: true, isByWeight: false, complements: [] }); setProductTab('INFO'); setShowProductModal(true); 
                 }}
                 className="px-4 py-3 bg-[#f68c3e] text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-orange-600 transition-colors shadow-md whitespace-nowrap"
             >
@@ -828,7 +833,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                 <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-500 uppercase">Categorias Atuais</label>
                     <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-2">
-                        {categories.map((cat, idx) => {
+                        {allCategories.map((cat, idx) => {
                             const isEditing = editingCategory === cat;
                             return (
                                 <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 group min-h-[50px]">
@@ -1145,7 +1150,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                         }} 
                         className="flex-1 p-2 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-orange-500 text-sm font-medium"
                       >
-                        {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                        {allCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                         <option value="__NEW__" className="text-orange-600 font-bold bg-orange-50">+ Nova Categoria...</option>
                       </select>
                       <button
@@ -1718,7 +1723,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                                 onChange={(e) => setParsedNfeItems(prev => prev.map(p => p.id === item.id ? { ...p, category: e.target.value } : p))}
                                 className="w-full p-1.5 border border-slate-200 rounded-lg bg-white outline-none font-bold"
                               >
-                                {categories.map(cat => (
+                                {allCategories.map(cat => (
                                   <option key={cat} value={cat}>{cat}</option>
                                 ))}
                               </select>

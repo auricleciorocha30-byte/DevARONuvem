@@ -631,20 +631,27 @@ function StoreContext() {
           supabase.from('categories').select('*').eq('store_id', currentStore.id)
         ]);
         
+        let productCats: string[] = [];
         if (pRes.error) {
             console.error("Error fetching products:", pRes.error);
         } else if (pRes.data) {
           const mappedP = pRes.data.map(mapProductFromDb);
           setProducts(mappedP);
           localStorage.setItem(`products_cache_${currentStore.id}`, JSON.stringify(pRes.data));
+          productCats = mappedP.map((p: any) => (p.category || '').trim()).filter(Boolean);
         }
 
+        let dbCats: string[] = [];
         if (cRes.error) {
             console.error("Error fetching categories:", cRes.error);
         } else if (cRes.data) {
-          const cats = cRes.data.map((c: any) => c.name);
-          setCategories(cats);
-          localStorage.setItem(`categories_cache_${currentStore.id}`, JSON.stringify(cats));
+          dbCats = cRes.data.map((c: any) => c.name).filter(Boolean);
+        }
+
+        const combinedCats = Array.from(new Set([...dbCats, ...productCats]));
+        if (combinedCats.length > 0) {
+          setCategories(combinedCats);
+          localStorage.setItem(`categories_cache_${currentStore.id}`, JSON.stringify(combinedCats));
         }
       } catch (err: any) {
           console.error("Error fetching metadata:", err);
